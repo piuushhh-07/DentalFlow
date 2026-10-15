@@ -1,0 +1,3 @@
+ALTER TABLE "message_logs"
+ALTER COLUMN "openedAt" DROP NOT NULL,
+ALTER COLUMN "openedAt" DROP DEFAULT;

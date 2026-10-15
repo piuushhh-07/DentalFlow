@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum ClinicRole {
+  OWNER
+  STAFF
+}
+
+enum TreatmentType {
+  ROOT_CANAL
+  CROWN
+  IMPLANT
+  BRACES
+  SCALING
+  CUSTOM
+}
+
+enum TreatmentPlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TreatmentVisitStatus {
+  PENDING
+  REMINDER_SENT
+  CONFIRMED
+  RESCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_RESPONSE
+}
+
+enum PreventiveRecallType {
+  SIX_MONTH_CHECKUP
+  CLEANING
+  CUSTOM
+}
+
+enum PreventiveRecallStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  CANCELLED
+}
+
+enum MessageChannel {
+  WHATSAPP
+}
+
+enum MessageLogStatus {
+  OPENED_IN_WHATSAPP
+  MANUALLY_RECORDED_SENT
+}
+
+model UserProfile {
+  id              String             @id @db.Uuid
+  displayName     String?            @db.VarChar(120)
+  createdAt       DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(6)
+  memberships     ClinicMembership[]
+  onboardedClinic Clinic?            @relation("ClinicOnboarding")
+
+  @@map("user_profiles")
+}
+
+model Clinic {
+  id                String             @id @default(uuid()) @db.Uuid
+  name              String             @db.VarChar(160)
+  phoneNumber       String?            @db.VarChar(20)
+  contactEmail      String?            @db.VarChar(254)
+  address           String?            @db.VarChar(400)
+  timeZone          String             @default("Asia/Kolkata") @db.VarChar(64)
+  onboardingUserId  String?            @unique @db.Uuid
+  createdAt         DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @db.Timestamptz(6)
+  onboardingUser    UserProfile?       @relation("ClinicOnboarding", fields: [onboardingUserId], references: [id], onDelete: SetNull)
+  memberships       ClinicMembership[]
+  patients          Patient[]
+  treatmentPlans    TreatmentPlan[]
+  treatmentVisits   TreatmentVisit[]
+  preventiveRecalls PreventiveRecall[]
+  messageTemplates  MessageTemplate[]
+  messageLogs       MessageLog[]
+
+  @@index([name])
+  @@map("clinics")
+}
+
+model ClinicMembership {
+  id          String       @id @default(uuid()) @db.Uuid
+  clinicId    String       @db.Uuid
+  userId      String       @db.Uuid
+  role        ClinicRole
+  createdAt   DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(6)
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  user        UserProfile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messageLogs MessageLog[] @relation("MessageSender")
+
+  @@unique([userId, clinicId])
+  @@index([clinicId, role])
+  @@map("clinic_memberships")
+}
+
+model Patient {
+  id                String             @id @default(uuid()) @db.Uuid
+  clinicId          String             @db.Uuid
+  fullName          String             @db.VarChar(160)
+  phoneNumber       String             @db.VarChar(20)
+  normalizedPhone   String             @db.VarChar(16)
+  whatsappOptIn     Boolean            @default(false)
+  whatsappOptedInAt DateTime?          @db.Timestamptz(6)
+  notes             String?            @db.Text
+  createdAt         DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @db.Timestamptz(6)
+  clinic            Clinic             @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  treatmentPlans    TreatmentPlan[]
+  preventiveRecalls PreventiveRecall[]
+  messageLogs       MessageLog[]
+
+  @@unique([id, clinicId])
+  @@unique([clinicId, normalizedPhone])
+  @@index([clinicId, fullName])
+  @@map("patients")
+}
+
+model TreatmentPlan {
+  id          String              @id @default(uuid()) @db.Uuid
+  clinicId    String              @db.Uuid
+  patientId   String              @db.Uuid
+  name        String              @db.VarChar(160)
+  type        TreatmentType
+  status      TreatmentPlanStatus @default(ACTIVE)
+  totalVisits Int                 @default(1)
+  completedAt DateTime?           @db.Timestamptz(6)
+  notes       String?             @db.Text
+  createdAt   DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime            @updatedAt @db.Timestamptz(6)
+  clinic      Clinic              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient     Patient             @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Cascade)
+  visits      TreatmentVisit[]
+
+  @@unique([id, clinicId])
+  @@unique([id, clinicId, patientId])
+  @@index([clinicId, status, completedAt])
+  @@index([clinicId, patientId])
+  @@map("treatment_plans")
+}
+
+model TreatmentVisit {
+  id              String               @id @default(uuid()) @db.Uuid
+  clinicId        String               @db.Uuid
+  treatmentPlanId String               @db.Uuid
+  patientId       String               @db.Uuid
+  visitNumber     Int
+  dueDate         DateTime             @db.Date
+  status          TreatmentVisitStatus @default(PENDING)
+  completedAt     DateTime?            @db.Timestamptz(6)
+  notes           String?              @db.Text
+  createdAt       DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime             @updatedAt @db.Timestamptz(6)
+  clinic          Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  treatmentPlan   TreatmentPlan        @relation(fields: [treatmentPlanId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Cascade)
+  messageLogs     MessageLog[]
+
+  @@unique([id, clinicId])
+  @@unique([id, clinicId, patientId])
+  @@unique([treatmentPlanId, visitNumber])
+  @@index([clinicId, status, dueDate])
+  @@index([clinicId, dueDate])
+  @@map("treatment_visits")
+}
+
+model PreventiveRecall {
+  id             String                 @id @default(uuid()) @db.Uuid
+  clinicId       String                 @db.Uuid
+  patientId      String                 @db.Uuid
+  type           PreventiveRecallType
+  customName     String?                @db.VarChar(160)
+  intervalMonths Int?
+  dueDate        DateTime               @db.Date
+  status         PreventiveRecallStatus @default(ACTIVE)
+  completedAt    DateTime?              @db.Timestamptz(6)
+  notes          String?                @db.Text
+  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime               @updatedAt @db.Timestamptz(6)
+  clinic         Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient        Patient                @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Cascade)
+  messageLogs    MessageLog[]
+
+  @@unique([id, clinicId])
+  @@unique([id, clinicId, patientId])
+  @@index([clinicId, status, dueDate])
+  @@index([clinicId, patientId])
+  @@map("preventive_recalls")
+}
+
+model MessageTemplate {
+  id          String       @id @default(uuid()) @db.Uuid
+  clinicId    String       @db.Uuid
+  name        String       @db.VarChar(120)
+  content     String       @db.Text
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(6)
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  messageLogs MessageLog[]
+
+  @@unique([id, clinicId])
+  @@unique([clinicId, name])
+  @@index([clinicId, isActive])
+  @@map("message_templates")
+}
+
+model MessageLog {
+  id                      String            @id @default(uuid()) @db.Uuid
+  clinicId                String            @db.Uuid
+  patientId               String            @db.Uuid
+  treatmentVisitId        String?           @db.Uuid
+  preventiveRecallId      String?           @db.Uuid
+  messageTemplateId       String?           @db.Uuid
+  senderUserId            String            @db.Uuid
+  channel                 MessageChannel    @default(WHATSAPP)
+  status                  MessageLogStatus  @default(OPENED_IN_WHATSAPP)
+  recipientPhoneSnapshot  String            @db.VarChar(20)
+  templateNameSnapshot    String?           @db.VarChar(120)
+  messageSnapshot         String            @db.Text
+  openedAt                DateTime?         @db.Timestamptz(6)
+  clientRequestId         String?           @db.Uuid
+  manuallyConfirmedSentAt DateTime?         @db.Timestamptz(6)
+  createdAt               DateTime          @default(now()) @db.Timestamptz(6)
+  clinic                  Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient                 Patient           @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  treatmentVisit          TreatmentVisit?   @relation(fields: [treatmentVisitId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  preventiveRecall        PreventiveRecall? @relation(fields: [preventiveRecallId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  messageTemplate         MessageTemplate?  @relation(fields: [messageTemplateId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  sender                  ClinicMembership  @relation("MessageSender", fields: [senderUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@unique([clinicId, clientRequestId])
+  @@index([clinicId, openedAt])
+  @@index([clinicId, patientId, openedAt])
+  @@index([clinicId, senderUserId, openedAt])
+  @@index([clinicId, preventiveRecallId])
+  @@index([clinicId, status, manuallyConfirmedSentAt])
+  @@map("message_logs")
+}
