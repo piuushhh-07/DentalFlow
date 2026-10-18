@@ -23,6 +23,7 @@ import { TreatmentVisitControls } from "@/features/treatments/components/treatme
 import { WhatsAppReminder } from "@/features/messages/components/whatsapp-reminder";
 import { DEFAULT_WHATSAPP_TEMPLATE } from "@/features/messages/lib/template-validation";
 import { getClinicWhatsAppTemplate } from "@/features/messages/lib/template-repository";
+import { getClinicTreatmentFinanceSummary } from "@/features/treatments/lib/treatment-finance";
 import {
   getFollowUpSummary,
   listFollowUpQueue,
@@ -100,11 +101,13 @@ export default async function ClinicDashboardPage({
   const query = parsed.success ? parsed.data.query : "";
   const page = parsed.success ? parsed.data.page : 1;
   const clinicToday = getClinicToday();
-  const [queue, summary, reminderTemplate] = await Promise.all([
-    listFollowUpQueue(membership.clinicId, tab, query, page, clinicToday),
-    getFollowUpSummary(membership.clinicId, clinicToday),
-    getClinicWhatsAppTemplate(membership.clinicId),
-  ]);
+  const [queue, summary, reminderTemplate, financialSummary] =
+    await Promise.all([
+      listFollowUpQueue(membership.clinicId, tab, query, page, clinicToday),
+      getFollowUpSummary(membership.clinicId, clinicToday),
+      getClinicWhatsAppTemplate(membership.clinicId),
+      getClinicTreatmentFinanceSummary(membership.clinicId),
+    ]);
   const { items, pagination } = queue;
   const basePath = `/clinic/${membership.clinicId}`;
 
@@ -174,6 +177,48 @@ export default async function ClinicDashboardPage({
               </Link>
             );
           })}
+        </section>
+
+        <section
+          aria-label="Treatment finance summary"
+          className="mt-6 grid gap-3 sm:grid-cols-2"
+        >
+          <Link
+            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-teal-200"
+            href={`/clinic/${membership.clinicId}/treatments/catalogue`}
+          >
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Payments collected this month
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-emerald-700">
+              {new Intl.NumberFormat("en-IN", {
+                style: "currency",
+                currency: "INR",
+                maximumFractionDigits: 2,
+              }).format(financialSummary.collectionsThisMonth)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Treatment payments recorded · Manage treatment catalogue
+            </p>
+          </Link>
+          <Link
+            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-teal-200"
+            href={`/clinic/${membership.clinicId}/treatments/catalogue`}
+          >
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Outstanding treatment balances
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-amber-700">
+              {new Intl.NumberFormat("en-IN", {
+                style: "currency",
+                currency: "INR",
+                maximumFractionDigits: 2,
+              }).format(financialSummary.outstanding)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Based on saved plans, discounts, payments and refunds
+            </p>
+          </Link>
         </section>
 
         <section className="mt-8" id="follow-up-queue">

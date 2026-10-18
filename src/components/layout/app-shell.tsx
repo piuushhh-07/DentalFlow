@@ -10,6 +10,7 @@ type AppShellProps = Readonly<{
   activeSection?:
     | "dashboard"
     | "patients"
+    | "treatments"
     | "recalls"
     | "templates"
     | "reports"
@@ -23,7 +24,7 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <div className="min-h-svh bg-slate-50 text-slate-900">
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col border-r border-slate-200 bg-white px-4 py-5 lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col border-r border-slate-200 bg-white px-4 py-5 lg:flex print:hidden">
         <Link
           aria-label="DentalFlow dashboard"
           className="mb-10 flex items-center gap-3 px-2"
@@ -48,7 +49,7 @@ export function AppShell({
       </aside>
 
       <div className="lg:pl-[248px]">
-        <header className="sticky top-0 z-10 flex h-[68px] items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur sm:px-8">
+        <header className="sticky top-0 z-10 flex h-[68px] items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur sm:px-8 print:hidden">
           <Link
             aria-label="DentalFlow dashboard"
             className="flex items-center gap-2.5 lg:hidden"
@@ -81,7 +82,7 @@ export function AppShell({
         </main>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 overflow-x-auto border-t border-slate-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-20 overflow-x-auto border-t border-slate-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur lg:hidden print:hidden">
         <AppNavigation
           clinicId={clinicId}
           activeSection={activeSection}

@@ -1,6 +1,6 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
+import { ClinicRole, Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -23,14 +23,20 @@ import {
   treatmentVisitStatusInputSchema,
   updateTreatmentPlanSchema,
 } from "@/features/treatments/lib/treatment-validation";
+import {
+  createTreatmentPlanFinancialEntry,
+  saveClinicTreatmentCatalogueItem,
+  setClinicTreatmentCatalogueItemStatus,
+  treatmentCatalogueItemSchema,
+  treatmentCatalogueStatusSchema,
+  treatmentFinancialEntrySchema,
+  treatmentPlanFinanceSchema,
+  updateTreatmentPlanFinance,
+} from "@/features/treatments/lib/treatment-finance";
+import { requireClinicRole } from "@/features/auth/lib/server-auth";
 
 export type TreatmentActionState = Readonly<{
-  errors?: Partial<
-    Record<
-      "type" | "customName" | "notes" | "totalVisits" | "dueDates",
-      string[]
-    >
-  >;
+  errors?: Record<string, string[] | undefined>;
   error?: string;
 }>;
 
@@ -279,6 +285,174 @@ export async function cancelTreatmentPlan(
     };
   }
 
+  redirect(
+    `/clinic/${membership.clinicId}/patients/${patientId.data}/treatments/${treatmentPlanId.data}`,
+  );
+}
+
+export async function recordFinancialEntry(
+  _previousState: TreatmentActionState,
+  formData: FormData,
+): Promise<TreatmentActionState> {
+  const clinicId = uuidSchema.safeParse(formData.get("clinicId"));
+  const patientId = uuidSchema.safeParse(formData.get("patientId"));
+  const treatmentPlanId = uuidSchema.safeParse(formData.get("treatmentPlanId"));
+  const parsed = treatmentFinancialEntrySchema.safeParse({
+    entryType: formData.get("entryType"),
+    amount: formData.get("amount"),
+    discountMode: formData.get("discountMode") ?? undefined,
+    paymentMethod: formData.get("paymentMethod") ?? undefined,
+    reference: formData.get("reference") ?? "",
+    notes: formData.get("notes") ?? "",
+    paidAt: formData.get("paidAt") ?? new Date().toISOString(),
+    requestKey: formData.get("requestKey"),
+  });
+
+  if (
+    !clinicId.success ||
+    !patientId.success ||
+    !treatmentPlanId.success ||
+    !parsed.success
+  ) {
+    return {
+      errors: parsed.success ? undefined : parsed.error.flatten().fieldErrors,
+      error: "The financial record details are invalid.",
+    };
+  }
+
+  const membership =
+    parsed.data.entryType === "PAYMENT"
+      ? await requireClinicMembership(clinicId.data)
+      : await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
+  try {
+    await createTreatmentPlanFinancialEntry(
+      membership.clinicId,
+      patientId.data,
+      treatmentPlanId.data,
+      membership.userId,
+      parsed.data,
+    );
+  } catch (error) {
+    logTreatmentError("Treatment financial entry failed", error);
+    return {
+      error:
+        error instanceof Error &&
+        (error.message.includes("cannot") ||
+          error.message.includes("exceed") ||
+          error.message.includes("greater"))
+          ? error.message
+          : "We couldn't record this financial entry. Please check for a duplicate submission and try again.",
+    };
+  }
+
+  redirect(
+    `/clinic/${membership.clinicId}/patients/${patientId.data}/treatments/${treatmentPlanId.data}`,
+  );
+}
+
+export async function saveTreatmentCatalogueItem(
+  _previousState: TreatmentActionState,
+  formData: FormData,
+): Promise<TreatmentActionState> {
+  const clinicId = uuidSchema.safeParse(formData.get("clinicId"));
+  const id = formData.get("id");
+  const parsed = treatmentCatalogueItemSchema.safeParse({
+    id: id ? String(id) : undefined,
+    name: formData.get("name"),
+    description: formData.get("description") ?? "",
+    defaultPrice: formData.get("defaultPrice") ?? "",
+  });
+  if (!clinicId.success || !parsed.success) {
+    return {
+      errors: parsed.success ? undefined : parsed.error.flatten().fieldErrors,
+      error: "Enter a valid treatment name and price.",
+    };
+  }
+  const membership = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
+  try {
+    await saveClinicTreatmentCatalogueItem(membership.clinicId, parsed.data);
+  } catch (error) {
+    logTreatmentError("Treatment catalogue save failed", error);
+    return {
+      error:
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+          ? "A treatment with this name already exists."
+          : "We couldn't save this catalogue item.",
+    };
+  }
+  redirect(`/clinic/${membership.clinicId}/treatments/catalogue`);
+}
+
+export async function setTreatmentCatalogueStatus(
+  _previousState: TreatmentActionState,
+  formData: FormData,
+): Promise<TreatmentActionState> {
+  const clinicId = uuidSchema.safeParse(formData.get("clinicId"));
+  const parsed = treatmentCatalogueStatusSchema.safeParse({
+    id: formData.get("id"),
+    status: formData.get("status"),
+  });
+  if (!clinicId.success || !parsed.success) {
+    return { error: "Choose a valid catalogue status." };
+  }
+  const membership = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
+  try {
+    await setClinicTreatmentCatalogueItemStatus(
+      membership.clinicId,
+      parsed.data.id,
+      parsed.data.status,
+    );
+  } catch (error) {
+    logTreatmentError("Treatment catalogue status update failed", error);
+    return { error: "We couldn't update this catalogue item." };
+  }
+  redirect(`/clinic/${membership.clinicId}/treatments/catalogue`);
+}
+
+export async function updateTreatmentPlanFinancialDetails(
+  _previousState: TreatmentActionState,
+  formData: FormData,
+): Promise<TreatmentActionState> {
+  const clinicId = uuidSchema.safeParse(formData.get("clinicId"));
+  const patientId = uuidSchema.safeParse(formData.get("patientId"));
+  const treatmentPlanId = uuidSchema.safeParse(formData.get("treatmentPlanId"));
+  const parsed = treatmentPlanFinanceSchema.safeParse({
+    estimatedAmount: formData.get("estimatedAmount") ?? "",
+    finalAmount: formData.get("finalAmount") ?? "",
+    catalogItemId: formData.get("catalogItemId") ?? "",
+    status: formData.get("status"),
+  });
+  if (
+    !clinicId.success ||
+    !patientId.success ||
+    !treatmentPlanId.success ||
+    !parsed.success
+  ) {
+    return {
+      errors: parsed.success ? undefined : parsed.error.flatten().fieldErrors,
+      error: "Enter valid plan prices and status.",
+    };
+  }
+  const membership = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
+  try {
+    await updateTreatmentPlanFinance(
+      membership.clinicId,
+      patientId.data,
+      treatmentPlanId.data,
+      parsed.data,
+    );
+  } catch (error) {
+    logTreatmentError("Treatment financial details update failed", error);
+    return {
+      error:
+        error instanceof Error &&
+        (error.message.includes("Complete") ||
+          error.message.includes("Cancelled"))
+          ? error.message
+          : "We couldn't update the treatment plan.",
+    };
+  }
   redirect(
     `/clinic/${membership.clinicId}/patients/${patientId.data}/treatments/${treatmentPlanId.data}`,
   );

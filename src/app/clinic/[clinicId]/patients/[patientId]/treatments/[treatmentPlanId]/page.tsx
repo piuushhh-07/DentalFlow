@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { z } from "zod";
@@ -8,7 +9,13 @@ import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { CancelTreatmentPlanButton } from "@/features/treatments/components/cancel-treatment-plan-button";
 import { TreatmentVisitControls } from "@/features/treatments/components/treatment-visit-controls";
+import { TreatmentPlanFinanceForm } from "@/features/treatments/components/treatment-plan-finance-form";
+import { TreatmentFinancialEntryForm } from "@/features/treatments/components/treatment-financial-entry-form";
 import { getClinicTreatmentPlan } from "@/features/treatments/lib/treatment-repository";
+import {
+  getTreatmentPlanFinancialSummary,
+  listClinicTreatmentCatalogue,
+} from "@/features/treatments/lib/treatment-finance";
 import {
   formatClinicDate,
   treatmentPlanStatusLabels,
@@ -42,15 +49,35 @@ export default async function TreatmentPlanPage({
     throw error;
   }
 
-  const plan = await getClinicTreatmentPlan(
-    membership.clinicId,
-    patientId.data,
-    treatmentPlanId.data,
-  );
+  const [plan, summary, catalogueItems] = await Promise.all([
+    getClinicTreatmentPlan(
+      membership.clinicId,
+      patientId.data,
+      treatmentPlanId.data,
+    ),
+    getTreatmentPlanFinancialSummary(
+      membership.clinicId,
+      patientId.data,
+      treatmentPlanId.data,
+    ),
+    listClinicTreatmentCatalogue(membership.clinicId),
+  ]);
 
   if (!plan) {
     notFound();
   }
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const currency = (amount: number) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 2,
+    }).format(amount);
 
   return (
     <AppShell activeSection="patients" clinicId={membership.clinicId}>
@@ -88,6 +115,166 @@ export default async function TreatmentPlanPage({
             />
           </div>
         </header>
+
+        <section className="mt-7 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+          <h2 className="text-base font-semibold text-slate-900">
+            Financial summary
+          </h2>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Estimate
+              </p>
+              <p className="mt-2 text-xl font-semibold text-slate-900">
+                {currency(summary.estimate)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Final
+              </p>
+              <p className="mt-2 text-xl font-semibold text-slate-900">
+                {currency(summary.final)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Collected
+              </p>
+              <p className="mt-2 text-xl font-semibold text-emerald-700">
+                {currency(summary.payments)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Outstanding
+              </p>
+              <p className="mt-2 text-xl font-semibold text-amber-700">
+                {currency(summary.outstanding)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Discounts
+              </p>
+              <p className="mt-2 text-xl font-semibold text-slate-900">
+                {currency(summary.discount)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Refunds
+              </p>
+              <p className="mt-2 text-xl font-semibold text-slate-900">
+                {currency(summary.refunds)}
+              </p>
+            </div>
+            {summary.patientCredit > 0 && (
+              <div className="rounded-lg bg-blue-50 p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-blue-700">
+                  Patient credit
+                </p>
+                <p className="mt-2 text-xl font-semibold text-blue-900">
+                  {currency(summary.patientCredit)}
+                </p>
+              </div>
+            )}
+          </div>
+          {plan.status !== "CANCELLED" && (
+            <>
+              {membership.role === "OWNER" && (
+                <div className="mt-6 border-t border-slate-100 pt-5">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Treatment plan charges and status
+                  </h3>
+                  <TreatmentPlanFinanceForm
+                    clinicId={membership.clinicId}
+                    estimate={plan.estimatedAmount?.toFixed(2) ?? ""}
+                    finalAmount={plan.finalAmount?.toFixed(2) ?? ""}
+                    catalogItems={catalogueItems.map((item) => ({
+                      id: item.id,
+                      name:
+                        item.status === "ACTIVE"
+                          ? item.name
+                          : `${item.name} (inactive)`,
+                      active:
+                        item.status === "ACTIVE" ||
+                        item.id === plan.catalogItemId,
+                      defaultPrice: item.defaultPrice?.toFixed(2) ?? null,
+                    }))}
+                    selectedCatalogItemId={plan.catalogItemId ?? ""}
+                    patientId={patientId.data}
+                    status={plan.status}
+                    treatmentPlanId={plan.id}
+                  />
+                </div>
+              )}
+              <div className="mt-6 border-t border-slate-100 pt-5">
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Record payment, discount or refund
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Payments may be entered by clinic members. Discounts and
+                  refunds require an owner account and a reason.
+                </p>
+                <TreatmentFinancialEntryForm
+                  clinicId={membership.clinicId}
+                  owner={membership.role === "OWNER"}
+                  patientId={patientId.data}
+                  requestKey={randomUUID()}
+                  today={today}
+                  treatmentPlanId={plan.id}
+                />
+              </div>
+            </>
+          )}
+          <div className="mt-6 border-t border-slate-100 pt-5">
+            <h3 className="text-sm font-semibold text-slate-900">
+              Financial history
+            </h3>
+            {summary.entries.length === 0 ? (
+              <p className="mt-3 text-sm text-slate-600">
+                No payments, discounts or refunds recorded.
+              </p>
+            ) : (
+              <div className="mt-3 divide-y divide-slate-100">
+                {summary.entries.map((entry) => (
+                  <div
+                    className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    key={entry.id}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">
+                        {entry.entryType} · {currency(entry.amount)}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {entry.paymentMethod ?? "—"} ·{" "}
+                        {new Date(entry.paidAt).toLocaleDateString("en-IN", {
+                          dateStyle: "medium",
+                          timeZone: "Asia/Kolkata",
+                        })}
+                        {entry.reference ? ` · ${entry.reference}` : ""}
+                      </p>
+                      {entry.notes && (
+                        <p className="mt-1 text-xs text-slate-600">
+                          {entry.notes}
+                        </p>
+                      )}
+                    </div>
+                    {entry.entryType === "PAYMENT" && (
+                      <Link
+                        className="text-sm font-medium text-teal-800 hover:underline"
+                        href={`/clinic/${membership.clinicId}/patients/${patientId.data}/treatments/${plan.id}/receipts/${entry.id}`}
+                      >
+                        Receipt {entry.receiptNumber ?? ""}
+                      </Link>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
 
         <section className="mt-7 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <h2 className="text-base font-semibold text-slate-900">
@@ -136,7 +323,11 @@ export default async function TreatmentPlanPage({
             <h2 className="text-base font-semibold text-slate-900">Visits</h2>
             <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-800">
               <CheckCircle2 aria-hidden="true" className="size-3.5" />
-              {plan.visits.length} scheduled
+              {
+                plan.visits.filter((visit) => visit.status === "COMPLETED")
+                  .length
+              }{" "}
+              of {plan.visits.length} completed
             </span>
           </div>
 
@@ -154,6 +345,11 @@ export default async function TreatmentPlanPage({
                     <p className="mt-1 text-sm text-slate-600">
                       Due {formatClinicDate(visit.dueDate)}
                     </p>
+                    {visit.completedAt && (
+                      <p className="mt-1 text-xs text-emerald-700">
+                        Completed {formatClinicDate(visit.completedAt)}
+                      </p>
+                    )}
                   </div>
                   <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
                     {treatmentVisitStatusLabels[visit.status]}

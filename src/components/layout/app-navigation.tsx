@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   MessageCircle,
   ShieldCheck,
+  Stethoscope,
   UsersRound,
 } from "lucide-react";
 
@@ -14,6 +15,7 @@ const navigationGroups = [
     items: [
       { label: "Dashboard", icon: LayoutDashboard, href: "" },
       { label: "Patients", icon: UsersRound, href: "patients" },
+      { label: "Treatments", icon: Stethoscope, href: "treatments/catalogue" },
       { label: "Follow-ups", icon: ClipboardList, href: "#follow-up-queue" },
       { label: "Recalls", icon: CalendarClock },
       { label: "Templates", icon: MessageCircle, href: "messages/templates" },
@@ -29,6 +31,7 @@ type AppNavigationProps = Readonly<{
   activeSection?:
     | "dashboard"
     | "patients"
+    | "treatments"
     | "recalls"
     | "templates"
     | "reports"
@@ -65,6 +68,7 @@ export function AppNavigation({
               const isActive =
                 (label === "Dashboard" && activeSection === "dashboard") ||
                 (label === "Patients" && activeSection === "patients") ||
+                (label === "Treatments" && activeSection === "treatments") ||
                 (label === "Recalls" && activeSection === "recalls") ||
                 (label === "Templates" && activeSection === "templates") ||
                 (label === "Reports" && activeSection === "reports") ||
@@ -79,7 +83,9 @@ export function AppNavigation({
                       ? "/insurance"
                       : label === "Reports"
                         ? "/reports"
-                        : "";
+                        : label === "Treatments"
+                          ? "/treatments/catalogue"
+                          : "";
 
               return (
                 <li key={label}>
