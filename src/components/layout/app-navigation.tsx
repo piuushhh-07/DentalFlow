@@ -4,6 +4,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   MessageCircle,
+  ShieldCheck,
   UsersRound,
 } from "lucide-react";
 
@@ -11,12 +12,13 @@ const navigationGroups = [
   {
     label: "Workspace",
     items: [
-      { label: "Dashboard", icon: LayoutDashboard, active: true },
+      { label: "Dashboard", icon: LayoutDashboard, href: "" },
       { label: "Patients", icon: UsersRound, href: "patients" },
-      { label: "Follow-ups", icon: ClipboardList },
+      { label: "Follow-ups", icon: ClipboardList, href: "#follow-up-queue" },
       { label: "Recalls", icon: CalendarClock },
       { label: "Templates", icon: MessageCircle, href: "messages/templates" },
       { label: "Reports", icon: ClipboardList, href: "reports" },
+      { label: "Insurance", icon: ShieldCheck, href: "insurance" },
     ],
   },
 ];
@@ -25,7 +27,12 @@ type AppNavigationProps = Readonly<{
   compact?: boolean;
   clinicId: string;
   activeSection?:
-    "dashboard" | "patients" | "recalls" | "templates" | "reports";
+    | "dashboard"
+    | "patients"
+    | "recalls"
+    | "templates"
+    | "reports"
+    | "insurance";
 }>;
 
 export function AppNavigation({
@@ -60,7 +67,19 @@ export function AppNavigation({
                 (label === "Patients" && activeSection === "patients") ||
                 (label === "Recalls" && activeSection === "recalls") ||
                 (label === "Templates" && activeSection === "templates") ||
-                (label === "Reports" && activeSection === "reports");
+                (label === "Reports" && activeSection === "reports") ||
+                (label === "Insurance" && activeSection === "insurance");
+
+              const destination =
+                label === "Recalls"
+                  ? "/recalls"
+                  : label === "Templates"
+                    ? "/messages/templates"
+                    : label === "Insurance"
+                      ? "/insurance"
+                      : label === "Reports"
+                        ? "/reports"
+                        : "";
 
               return (
                 <li key={label}>
@@ -72,15 +91,7 @@ export function AppNavigation({
                           ? "flex min-w-[72px] flex-col items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-teal-800"
                           : "flex min-h-10 items-center gap-3 rounded-lg bg-teal-50 px-3 text-sm font-semibold text-teal-800"
                       }
-                      href={`/clinic/${clinicId}${
-                        label === "Recalls"
-                          ? "/recalls"
-                          : label === "Templates"
-                            ? "/messages/templates"
-                            : label === "Reports"
-                              ? "/reports"
-                              : ""
-                      }`}
+                      href={`/clinic/${clinicId}${destination}`}
                     >
                       <Icon
                         aria-hidden="true"
@@ -88,14 +99,20 @@ export function AppNavigation({
                       />
                       {label}
                     </Link>
-                  ) : href ? (
+                  ) : href !== undefined ? (
                     <Link
                       className={
                         compact
                           ? "flex min-w-[72px] flex-col items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-slate-500 hover:bg-slate-50 hover:text-teal-800"
                           : "flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-teal-800"
                       }
-                      href={`/clinic/${clinicId}/${href}`}
+                      href={
+                        href.startsWith("#")
+                          ? `/clinic/${clinicId}${href}`
+                          : href
+                            ? `/clinic/${clinicId}/${href}`
+                            : `/clinic/${clinicId}`
+                      }
                     >
                       <Icon
                         aria-hidden="true"
@@ -118,27 +135,6 @@ export function AppNavigation({
                       />
                       {label}
                     </Link>
-                  ) : label === "Follow-ups" ? (
-                    <span
-                      aria-disabled="true"
-                      className={
-                        compact
-                          ? "flex min-w-[72px] cursor-not-allowed flex-col items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-slate-400"
-                          : "flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-500"
-                      }
-                      title="Available in a future milestone"
-                    >
-                      <Icon
-                        aria-hidden="true"
-                        className={compact ? "size-5" : "size-[18px]"}
-                      />
-                      <span>{label}</span>
-                      {!compact && (
-                        <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400">
-                          Soon
-                        </span>
-                      )}
-                    </span>
                   ) : null}
                 </li>
               );

@@ -3,6 +3,10 @@
 import { z } from "zod";
 import { redirect } from "next/navigation";
 
+import {
+  classifySignInResult,
+  getSafeAuthErrorMetadata,
+} from "@/features/auth/lib/auth-login";
 import { prisma } from "@/lib/db/prisma";
 import { createSupabaseServerActionClient } from "@/lib/supabase/server";
 
@@ -22,15 +26,42 @@ export async function signIn(formData: FormData) {
   }
 
   const supabase = await createSupabaseServerActionClient();
-  const { data, error } = await supabase.auth.signInWithPassword(result.data);
+  let authResult;
 
-  if (error || !data.user) {
-    redirect("/login?error=credentials");
+  try {
+    authResult = await supabase.auth.signInWithPassword(result.data);
+  } catch (error) {
+    const failure = classifySignInResult(null, error);
+    console.error(
+      "Supabase sign-in request failed",
+      getSafeAuthErrorMetadata(error),
+    );
+    redirect(`/login?error=${failure}`);
   }
 
+  const signInOutcome = classifySignInResult(
+    authResult.data.user,
+    authResult.error,
+  );
+  if (signInOutcome !== "success" || !authResult.data.user) {
+    console.warn(
+      "Supabase sign-in rejected",
+      getSafeAuthErrorMetadata(authResult.error),
+    );
+
+    if (signInOutcome === "unavailable") {
+      redirect("/login?error=unavailable");
+    }
+
+    redirect(
+      `/login?error=${signInOutcome === "unconfirmed" ? "unconfirmed" : "credentials"}`,
+    );
+  }
+
+  const user = authResult.data.user;
   await prisma.userProfile.upsert({
-    where: { id: data.user.id },
-    create: { id: data.user.id },
+    where: { id: user.id },
+    create: { id: user.id },
     update: {},
   });
 

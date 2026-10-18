@@ -110,12 +110,6 @@ export default async function RecallListPage({
           </Link>
         </div>
 
-        {(searchParams.created || searchParams.updated) && (
-          <p className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            Recall {searchParams.created ? "created" : "updated"} successfully.
-          </p>
-        )}
-
         <form
           action={basePath}
           className="my-6 flex flex-col gap-2 sm:flex-row"

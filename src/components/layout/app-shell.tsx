@@ -8,7 +8,12 @@ type AppShellProps = Readonly<{
   children: React.ReactNode;
   clinicId: string;
   activeSection?:
-    "dashboard" | "patients" | "recalls" | "templates" | "reports";
+    | "dashboard"
+    | "patients"
+    | "recalls"
+    | "templates"
+    | "reports"
+    | "insurance";
 }>;
 
 export function AppShell({
@@ -56,7 +61,7 @@ export function AppShell({
           </Link>
           <div className="hidden items-center gap-2 text-sm text-slate-500 lg:flex">
             <span className="size-2 rounded-full bg-amber-400" />
-            Clinic setup
+            Clinic workspace
           </div>
           <span className="ml-auto text-xs font-medium text-slate-500 sm:text-sm">
             Care, continued.

@@ -53,6 +53,7 @@ src/
     patients/          Clinic-scoped patient records
     treatments/        Treatment plans and multi-visit schedules
     recalls/            Preventive recall cycles
+    insurance/         Clinic-scoped insurers, policies, claims and private documents
   lib/                 Shared utilities
 prisma/
   migrations/          Versioned PostgreSQL migrations
@@ -75,8 +76,9 @@ source control.
 
 `DATABASE_URL` must use the Supabase transaction pooler on port `6543` with
 `pgbouncer=true` and a small connection limit for serverless runtime access.
-`DIRECT_URL` must use the direct database connection on port `5432`; Prisma
-Migrate uses it for schema changes. Copy the exact host, username and TLS
+`DIRECT_URL` must use the direct database connection or Supabase session
+pooler on port `5432`; Prisma Migrate uses it for schema changes. Do not use
+the transaction pooler for migrations. Copy the exact host, username and TLS
 parameters from the Supabase dashboard for your project and network. Do not
 expose either database URL to browser code.
 
@@ -207,8 +209,64 @@ The automated tests cover onboarding retries and authorization, Indian phone
 normalization and clinic-scoped patient access, treatment visit status and date
 rules, and recall validation, duplicate-cycle detection, completion,
 rescheduling and clinic isolation. Database integration checks require a
-configured Supabase project and should be run only against a disposable test
-project.
+separate disposable Supabase project and synthetic Auth users. Integration
+tests must never use the staging or production project.
+
+### Disposable database integration tests
+
+Create a separate Supabase project exclusively for integration tests. It must
+not contain clinic data or serve as staging/production. Create two confirmed
+synthetic Auth users in that project and keep their passwords private. Create
+`.env.test.local` (this filename is Git-ignored) with the following
+test-project settings:
+
+```dotenv
+DENTALFLOW_TEST_PROJECT_REF=your-dedicated-project-ref
+DENTALFLOW_TEST_DATABASE_CONFIRMATION=I-UNDERSTAND-THIS-IS-A-DISPOSABLE-TEST-PROJECT
+DENTALFLOW_TEST_DATABASE_URL=postgresql://postgres.your-dedicated-project-ref:YOUR_PASSWORD@YOUR_POOLER_HOST:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
+DENTALFLOW_TEST_DIRECT_URL=postgresql://postgres.your-dedicated-project-ref:YOUR_PASSWORD@YOUR_DIRECT_OR_SESSION_HOST:5432/postgres?sslmode=require
+DENTALFLOW_TEST_SUPABASE_URL=https://your-dedicated-project-ref.supabase.co
+DENTALFLOW_TEST_SUPABASE_ANON_KEY=YOUR_TEST_PROJECT_ANON_KEY
+DENTALFLOW_TEST_USER_A_EMAIL=synthetic-owner-a@example.invalid
+DENTALFLOW_TEST_USER_A_PASSWORD=YOUR_SYNTHETIC_USER_A_PASSWORD
+DENTALFLOW_TEST_USER_B_EMAIL=synthetic-owner-b@example.invalid
+DENTALFLOW_TEST_USER_B_PASSWORD=YOUR_SYNTHETIC_USER_B_PASSWORD
+```
+
+Use the exact connection username, hosts, and TLS parameters from that
+project's Supabase dashboard. Do not paste these values into chat or commit
+`.env.test.local`. The runner checks the explicit disposable-project
+confirmation, project reference in both PostgreSQL URLs and Auth URL, expected
+database and pooler ports/options, and that the target differs from the
+application URLs in `.env` and `.env.local`. It then makes a read-only
+connection check before any migration command. Do not weaken these checks to
+make an environment pass.
+
+Run:
+
+```powershell
+npm run test:integration:prepare
+npm run test:integration
+```
+
+The prepare command runs `prisma migrate deploy` only after those checks, using
+the test-only migration URL. It applies pending local migration directories
+only to the verified disposable project. The integration suite refuses to run
+unless all local migration directories are recorded as successfully applied.
+It creates
+synthetic clinics, patients, treatment, recall, message, and insurance rows
+and does not delete database rows; keep the project disposable and discard it
+when finished. Synthetic private test files are removed by the test cleanup
+hook. The suite authenticates the two synthetic users against Supabase and
+checks database-backed repository reads/writes, isolation, RLS, Storage
+access, state transitions, duplicate submissions, and selected concurrent
+updates. A failed cleanup is reported as a test failure.
+
+The test database guard is not a substitute for verifying the project in the
+Supabase dashboard. Confirm the displayed project reference yourself before
+running `test:integration:prepare`; never point these variables at staging or
+production. No integration test command is run automatically by build or
+application startup.
 
 ## WhatsApp click-to-chat
 
@@ -277,3 +335,70 @@ clinic-filtered database count (no joins), preventing joined visit/message
 rows from multiplying counts. Treatment-plan completion timestamps are
 backfilled from `updatedAt` for plans already completed when the migration is
 applied.
+
+## Insurance management
+
+The Insurance section tracks clinic-specific insurers/TPAs, patient policies,
+cashless pre-authorizations, reimbursement claims, payments, follow-ups,
+required documents and append-only activity. Estimates and submitted requests
+are never treated as confirmed approvals. Claim statuses and approval amounts
+are validated server-side; reimbursement submission requires patient payments
+to cover the claimed amount. Patient and insurer receipts are recorded as
+separate immutable payment entries, and insurer payments cannot exceed the
+approved amount. Financial values use PostgreSQL `DECIMAL(12,2)` and
+paise-safe integer arithmetic in application validation.
+
+Policy and member identifiers are masked in list/detail summaries. Provider,
+policy, patient, treatment-plan, claim and payment queries are scoped to the
+verified clinic membership. Composite foreign keys prevent cross-clinic patient
+and treatment-plan links. Insurance files use the private
+`dentalflow-insurance-private` Supabase Storage bucket created by the insurance
+migration, with PDF/JPEG/PNG content types and a 10 MB limit. The migration
+defines authenticated membership- and claim-scoped Storage policies; files
+have no public URLs. The browser uses the signed-in user's Supabase session,
+not a service-role key. Do not apply the migration until it has been reviewed
+and the target has been confirmed as staging.
+
+The additive Insurance migration is
+`prisma/migrations/20261016220000_insurance_management_mvp`. Review its SQL
+and check the migration ledger for the intended project before applying it.
+Only apply it when it is pending and after confirming the configured
+`DIRECT_URL` points to the intended non-production project. The operator can
+then run:
+
+```powershell
+npm run db:migrate:deploy
+```
+
+That command applies all pending checked-in migrations against the configured
+`DIRECT_URL`; verify the target immediately before running it. No migration is
+applied by application startup or feature pages. After applying it, verify the
+private bucket and storage policies in the Supabase dashboard and run
+authenticated upload/download checks using synthetic accounts from two
+clinics. Database and Storage authorization must be tested in the target
+environment before production use.
+
+## Production readiness, backups and privacy
+
+Before deployment, configure and verify Vercel environment variables
+separately for each environment. Confirm the Supabase Auth site URL and
+redirect allowlist, public client configuration, and server-only database
+URLs. Run `npm run db:validate` and inspect `npx prisma migrate status` against
+the intended database; apply reviewed migrations as a separate, explicitly
+approved operation. Do not run migration commands against production until
+the target and rollback plan are confirmed.
+
+Select a Supabase backup/PITR plan and retention period that meet the clinic's
+recovery needs. Before a production migration, ensure a recent recoverable
+backup exists. Test restoration only into an isolated project, then verify
+schema, constraints and application access there; never test restore
+procedures against the live clinic database. Document the clinic's recovery
+point/time objectives and who is authorized to perform recovery.
+
+Before using real patient information, obtain appropriate Indian privacy and
+legal review, establish the clinic's data-controller responsibilities and
+vendor agreements, document consent and retention/deletion procedures, and
+prepare access, incident-response and breach-notification processes. Minimize
+patient information in messages and logs. This software documentation is not
+legal advice or a substitute for verifying the applicable law and current
+regulations.

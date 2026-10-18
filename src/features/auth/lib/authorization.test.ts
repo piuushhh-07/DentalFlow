@@ -115,3 +115,36 @@ test("allows template editing only for an owner membership", () => {
     ClinicAccessDeniedError,
   );
 });
+
+test("rejects malformed memberships and invalid role checks without crashing", () => {
+  assert.throws(
+    () =>
+      authorizeClinicMembership(
+        userId,
+        clinicId,
+        // @ts-expect-error intentional malformed record shape for validation
+        { userId, clinicId, role: "NOT_A_ROLE" },
+      ),
+    ClinicAccessDeniedError,
+  );
+
+  assert.throws(
+    () =>
+      authorizeClinicRole(
+        // @ts-expect-error intentional malformed membership
+        { userId, clinicId, role: "NOT_A_ROLE" },
+        [ClinicRole.OWNER],
+      ),
+    ClinicRoleDeniedError,
+  );
+
+  assert.throws(
+    () =>
+      authorizeClinicRole(
+        { userId, clinicId, role: ClinicRole.OWNER },
+        // @ts-expect-error intentional malformed allowed-role input
+        ["NOT_A_ROLE"],
+      ),
+    ClinicRoleDeniedError,
+  );
+});

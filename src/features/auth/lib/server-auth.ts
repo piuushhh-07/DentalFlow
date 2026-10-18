@@ -1,10 +1,15 @@
 import "server-only";
 
 import { ClinicRole } from "@prisma/client";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  isExpectedUnauthenticatedAuthError,
+  resolveAuthenticatedUser,
+} from "@/features/auth/lib/auth-session";
 import {
   authorizeClinicMembership,
   authorizeClinicRole,
@@ -13,26 +18,26 @@ import {
 
 const clinicIdSchema = z.string().uuid();
 
-export class UnauthenticatedError extends Error {
-  constructor() {
-    super("Authentication is required.");
-    this.name = "UnauthenticatedError";
-  }
-}
-
 export async function getAuthenticatedUser() {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
 
-  if (error) {
-    throw new Error("Unable to verify the Supabase session.", { cause: error });
+  const result = await supabase.auth.getUser().catch((error: unknown) => {
+    if (isExpectedUnauthenticatedAuthError(error)) {
+      redirect("/login");
+    }
+
+    throw new Error("Unable to verify the Supabase session.", {
+      cause: error,
+    });
+  });
+
+  const user = resolveAuthenticatedUser(result.data.user, result.error);
+
+  if (!user) {
+    redirect("/login");
   }
 
-  if (!data.user) {
-    throw new UnauthenticatedError();
-  }
-
-  return data.user;
+  return user;
 }
 
 export async function requireClinicMembership(

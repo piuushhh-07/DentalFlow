@@ -17,6 +17,17 @@ export async function createSupabaseServerClient() {
         getAll() {
           return cookieStore.getAll();
         },
+        setAll(cookiesToSet) {
+          try {
+            for (const { name, value, options } of cookiesToSet) {
+              cookieStore.set(name, value, options);
+            }
+          } catch (error) {
+            console.warn("Unable to persist refreshed Supabase cookies", {
+              errorName: error instanceof Error ? error.name : "UnknownError",
+            });
+          }
+        },
       },
     },
   );

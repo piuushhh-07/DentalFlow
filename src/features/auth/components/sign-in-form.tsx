@@ -9,11 +9,15 @@ export function SignInForm({ error }: SignInFormProps) {
   const errorMessage =
     error === "credentials"
       ? "We could not sign you in with those details."
-      : error === "invalid"
-        ? "Enter a valid email address and password."
-        : error === "verification"
-          ? "We could not verify your session. Please sign in again."
-          : null;
+      : error === "unconfirmed"
+        ? "Confirm your email address in Supabase before signing in."
+        : error === "invalid"
+          ? "Enter a valid email address and password."
+          : error === "verification"
+            ? "We could not verify your session. Please sign in again."
+            : error === "unavailable"
+              ? "Sign-in is temporarily unavailable. Please try again."
+              : null;
 
   return (
     <form action={signIn} className="space-y-5">

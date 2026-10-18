@@ -176,7 +176,7 @@ export default async function ClinicDashboardPage({
           })}
         </section>
 
-        <section className="mt-8">
+        <section className="mt-8" id="follow-up-queue">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-xl font-semibold tracking-tight text-slate-900">

@@ -88,7 +88,7 @@ export async function createPatient(
     return { error: "We couldn't save this patient. Please try again." };
   }
 
-  redirect(`/clinic/${membership.clinicId}/patients/${patientId}?created=1`);
+  redirect(`/clinic/${membership.clinicId}/patients/${patientId}`);
 }
 
 export async function updatePatient(
@@ -142,9 +142,7 @@ export async function updatePatient(
     return { error: "We couldn't update this patient. Please try again." };
   }
 
-  redirect(
-    `/clinic/${membership.clinicId}/patients/${patientId.data}?updated=1`,
-  );
+  redirect(`/clinic/${membership.clinicId}/patients/${patientId.data}`);
 }
 
 export async function deletePatient(
@@ -177,5 +175,5 @@ export async function deletePatient(
     return { error: "We couldn't delete this patient. Please try again." };
   }
 
-  redirect(`/clinic/${membership.clinicId}/patients?deleted=1`);
+  redirect(`/clinic/${membership.clinicId}/patients`);
 }

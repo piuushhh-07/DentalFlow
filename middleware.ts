@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isExpectedUnauthenticatedAuthError } from "@/features/auth/lib/auth-session";
 import { getSupabasePublicEnvironment } from "@/lib/supabase/config";
 
 export async function middleware(request: NextRequest) {
@@ -30,10 +31,22 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  let user = null;
+  let error: unknown = null;
+
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+    error = result.error;
+  } catch (authError) {
+    error = authError;
+  }
+
+  if (isExpectedUnauthenticatedAuthError(error)) {
+    user = null;
+    error = null;
+  }
+
   const isLoginPage = request.nextUrl.pathname === "/login";
 
   if (error) {

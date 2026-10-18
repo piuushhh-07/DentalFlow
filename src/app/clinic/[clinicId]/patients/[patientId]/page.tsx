@@ -9,10 +9,11 @@ import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { DeletePatientButton } from "@/features/patients/components/delete-patient-button";
 import { getClinicPatient } from "@/features/patients/lib/patient-repository";
 import { formatIndianPhoneNumber } from "@/features/patients/lib/patient-validation";
+import { listInsurancePolicies } from "@/features/insurance/lib/insurance-repository";
+import { maskPolicyIdentifier } from "@/features/insurance/lib/insurance-validation";
 
 type PatientDetailPageProps = Readonly<{
   params: { clinicId: string; patientId: string };
-  searchParams: { created?: string; updated?: string };
 }>;
 
 const dateFormatter = new Intl.DateTimeFormat("en-IN", {
@@ -23,7 +24,6 @@ const dateFormatter = new Intl.DateTimeFormat("en-IN", {
 
 export default async function PatientDetailPage({
   params,
-  searchParams,
 }: PatientDetailPageProps) {
   const clinicId = z.string().uuid().safeParse(params.clinicId);
   const patientId = z.string().uuid().safeParse(params.patientId);
@@ -50,6 +50,14 @@ export default async function PatientDetailPage({
     notFound();
   }
 
+  const insurancePolicies = await listInsurancePolicies(
+    membership.clinicId,
+    "",
+    patient.id,
+  );
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+  }).format(new Date());
   const patientPath = `/clinic/${membership.clinicId}/patients/${patient.id}`;
 
   return (
@@ -62,17 +70,6 @@ export default async function PatientDetailPage({
           <ArrowLeft aria-hidden="true" className="size-4" />
           Back to patients
         </Link>
-
-        {searchParams.created && (
-          <p className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            Patient created successfully.
-          </p>
-        )}
-        {searchParams.updated && (
-          <p className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            Patient details updated.
-          </p>
-        )}
 
         <header className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
@@ -117,6 +114,94 @@ export default async function PatientDetailPage({
             Create preventive recall
           </Link>
         </nav>
+
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">
+                Insurance policies
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Policy references are masked in this summary.
+              </p>
+            </div>
+            <Link
+              className="inline-flex min-h-9 items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-slate-50"
+              href={`/clinic/${membership.clinicId}/insurance/policies/new?patientId=${patient.id}`}
+            >
+              Add policy
+            </Link>
+          </div>
+          {insurancePolicies.length ? (
+            <ul className="mt-4 divide-y divide-slate-100">
+              {insurancePolicies.map((policy) => {
+                const expired =
+                  policy.validUntil.toISOString().slice(0, 10) < today;
+                return (
+                  <li
+                    className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    key={policy.id}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">
+                        {policy.provider.name} ·{" "}
+                        {maskPolicyIdentifier(policy.policyNumber)}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Valid through {dateFormatter.format(policy.validUntil)}
+                        {policy.coverageLimit
+                          ? ` · Limit ₹${Number(policy.coverageLimit).toLocaleString("en-IN")}`
+                          : ""}
+                        {policy.deductible !== null
+                          ? ` · Deductible ₹${Number(policy.deductible).toLocaleString("en-IN")}`
+                          : ""}
+                        {policy.coPaymentPercent !== null
+                          ? ` · Co-pay ${policy.coPaymentPercent.toString()}%`
+                          : ""}
+                      </p>
+                      {(policy.coverageNotes || policy.exclusions) && (
+                        <details className="mt-2 text-xs text-slate-600">
+                          <summary className="cursor-pointer font-medium text-teal-800">
+                            Coverage notes and exclusions
+                          </summary>
+                          {policy.coverageNotes && (
+                            <p className="mt-1 whitespace-pre-wrap">
+                              {policy.coverageNotes}
+                            </p>
+                          )}
+                          {policy.exclusions && (
+                            <p className="mt-1 whitespace-pre-wrap">
+                              Exclusions: {policy.exclusions}
+                            </p>
+                          )}
+                        </details>
+                      )}
+                    </div>
+                    <span
+                      className={
+                        expired
+                          ? "text-xs font-semibold text-red-700"
+                          : "text-xs font-semibold text-emerald-700"
+                      }
+                    >
+                      {expired ? "Expired" : "Current"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              No insurance policies are recorded for this patient.
+            </p>
+          )}
+          <Link
+            className="mt-4 inline-flex min-h-9 items-center text-sm font-medium text-teal-800 hover:underline"
+            href={`/clinic/${membership.clinicId}/insurance/claims?patientId=${patient.id}`}
+          >
+            View this patient&apos;s insurance claims
+          </Link>
+        </section>
 
         <section
           aria-labelledby="patient-details-title"

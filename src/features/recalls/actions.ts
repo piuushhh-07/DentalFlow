@@ -101,7 +101,7 @@ export async function createRecall(
     return { error: "We couldn't create this recall. Please try again." };
   }
 
-  redirect(`/clinic/${membership.clinicId}/recalls/${recallId}?created=1`);
+  redirect(`/clinic/${membership.clinicId}/recalls/${recallId}`);
 }
 
 export async function updateRecall(
@@ -148,7 +148,7 @@ export async function updateRecall(
     return { error: "We couldn't update this recall. Please try again." };
   }
 
-  redirect(`/clinic/${membership.clinicId}/recalls/${recallId.data}?updated=1`);
+  redirect(`/clinic/${membership.clinicId}/recalls/${recallId.data}`);
 }
 
 export async function rescheduleRecall(
@@ -187,7 +187,7 @@ export async function rescheduleRecall(
     return { error: "We couldn't reschedule this recall. Please try again." };
   }
 
-  redirect(`/clinic/${membership.clinicId}/recalls/${recallId.data}?updated=1`);
+  redirect(`/clinic/${membership.clinicId}/recalls/${recallId.data}`);
 }
 
 export async function updateRecallStatus(
@@ -228,5 +228,5 @@ export async function updateRecallStatus(
     return { error: "We couldn't update this recall. Please try again." };
   }
 
-  redirect(`/clinic/${membership.clinicId}/recalls/${recallId.data}?updated=1`);
+  redirect(`/clinic/${membership.clinicId}/recalls/${recallId.data}`);
 }

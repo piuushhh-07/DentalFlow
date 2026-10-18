@@ -19,12 +19,10 @@ export const dynamic = "force-dynamic";
 
 type TreatmentPlanPageProps = Readonly<{
   params: { clinicId: string; patientId: string; treatmentPlanId: string };
-  searchParams: { created?: string; updated?: string; cancelled?: string };
 }>;
 
 export default async function TreatmentPlanPage({
   params,
-  searchParams,
 }: TreatmentPlanPageProps) {
   const clinicId = z.string().uuid().safeParse(params.clinicId);
   const patientId = z.string().uuid().safeParse(params.patientId);
@@ -64,22 +62,6 @@ export default async function TreatmentPlanPage({
           <ArrowLeft aria-hidden="true" className="size-4" />
           Back to patient
         </Link>
-
-        {searchParams.created && (
-          <p className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            Treatment plan created successfully.
-          </p>
-        )}
-        {searchParams.updated && (
-          <p className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            Treatment plan updated.
-          </p>
-        )}
-        {searchParams.cancelled && (
-          <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            This plan has been cancelled.
-          </p>
-        )}
 
         <header className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>

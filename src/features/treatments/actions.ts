@@ -99,7 +99,7 @@ export async function createTreatmentPlan(
   }
 
   redirect(
-    `/clinic/${membership.clinicId}/patients/${patientId.data}/treatments/${treatmentPlanId}?created=1`,
+    `/clinic/${membership.clinicId}/patients/${patientId.data}/treatments/${treatmentPlanId}`,
   );
 }
 
@@ -153,7 +153,7 @@ export async function updateTreatmentPlan(
   }
 
   redirect(
-    `/clinic/${membership.clinicId}/patients/${ids.patientId.data}/treatments/${ids.treatmentPlanId.data}?updated=1`,
+    `/clinic/${membership.clinicId}/patients/${ids.patientId.data}/treatments/${ids.treatmentPlanId.data}`,
   );
 }
 
@@ -197,7 +197,7 @@ export async function updateTreatmentVisitStatus(
   }
 
   redirect(
-    `/clinic/${membership.clinicId}/patients/${ids.patientId.data}/treatments/${ids.treatmentPlanId.data}?updated=1`,
+    `/clinic/${membership.clinicId}/patients/${ids.patientId.data}/treatments/${ids.treatmentPlanId.data}`,
   );
 }
 
@@ -246,7 +246,7 @@ export async function rescheduleTreatmentVisit(
   }
 
   redirect(
-    `/clinic/${membership.clinicId}/patients/${ids.patientId.data}/treatments/${ids.treatmentPlanId.data}?updated=1`,
+    `/clinic/${membership.clinicId}/patients/${ids.patientId.data}/treatments/${ids.treatmentPlanId.data}`,
   );
 }
 
@@ -280,6 +280,6 @@ export async function cancelTreatmentPlan(
   }
 
   redirect(
-    `/clinic/${membership.clinicId}/patients/${patientId.data}/treatments/${treatmentPlanId.data}?cancelled=1`,
+    `/clinic/${membership.clinicId}/patients/${patientId.data}/treatments/${treatmentPlanId.data}`,
   );
 }

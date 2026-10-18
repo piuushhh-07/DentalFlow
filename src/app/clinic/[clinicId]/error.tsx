@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 type ClinicDashboardErrorProps = Readonly<{
   error: Error & { digest?: string };
   reset: () => void;
@@ -9,13 +11,20 @@ export default function ClinicDashboardError({
   error,
   reset,
 }: ClinicDashboardErrorProps) {
+  useEffect(() => {
+    console.error("Clinic page failed", {
+      errorName: error.name,
+      digest: error.digest,
+    });
+  }, [error]);
+
   return (
     <div className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-white p-6 shadow-sm sm:p-8">
       <h1 className="text-xl font-semibold text-slate-900">
-        Follow-ups could not be loaded
+        Clinic page could not be loaded
       </h1>
       <p className="mt-2 text-sm leading-6 text-slate-600">
-        The clinic queue is temporarily unavailable. Your records have not been
+        This clinic page is temporarily unavailable. Your records have not been
         changed. Please retry, or contact support if the problem continues.
       </p>
       {error.digest && (

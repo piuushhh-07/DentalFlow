@@ -26,20 +26,30 @@ export class ClinicRoleDeniedError extends Error {
   }
 }
 
+function isValidClinicRole(value: unknown): value is ClinicRole {
+  return typeof value === "string" && Object.values(ClinicRole).includes(value as ClinicRole);
+}
+
 export function authorizeClinicMembership(
   authenticatedUserId: string,
   requestedClinicId: string,
   membership: ClinicMembershipRecord | null,
 ): VerifiedClinicMembership {
-  if (
-    !membership ||
-    membership.userId !== authenticatedUserId ||
-    membership.clinicId !== requestedClinicId
-  ) {
-    throw new ClinicAccessDeniedError();
-  }
+  const hasValidAuthIdentity =
+    typeof authenticatedUserId === "string" && authenticatedUserId.length > 0;
+  const hasValidClinicSelection =
+    typeof requestedClinicId === "string" && requestedClinicId.length > 0;
 
-  if (!Object.values(ClinicRole).includes(membership.role)) {
+  if (
+    !hasValidAuthIdentity ||
+    !hasValidClinicSelection ||
+    !membership ||
+    typeof membership.userId !== "string" ||
+    typeof membership.clinicId !== "string" ||
+    membership.userId !== authenticatedUserId ||
+    membership.clinicId !== requestedClinicId ||
+    !isValidClinicRole(membership.role)
+  ) {
     throw new ClinicAccessDeniedError();
   }
 
@@ -51,10 +61,15 @@ export function authorizeClinicMembership(
 }
 
 export function authorizeClinicRole(
-  membership: VerifiedClinicMembership,
-  allowedRoles: readonly ClinicRole[],
+  membership: VerifiedClinicMembership | null,
+  allowedRoles: readonly ClinicRole[] | null | undefined,
 ): VerifiedClinicMembership {
-  if (!allowedRoles.includes(membership.role)) {
+  if (
+    !membership ||
+    !Array.isArray(allowedRoles) ||
+    !allowedRoles.every((role) => isValidClinicRole(role)) ||
+    !allowedRoles.includes(membership.role)
+  ) {
     throw new ClinicRoleDeniedError();
   }
 

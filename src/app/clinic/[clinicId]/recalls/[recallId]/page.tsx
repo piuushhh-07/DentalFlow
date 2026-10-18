@@ -22,12 +22,10 @@ export const dynamic = "force-dynamic";
 
 type RecallDetailPageProps = Readonly<{
   params: { clinicId: string; recallId: string };
-  searchParams: { created?: string; updated?: string };
 }>;
 
 export default async function RecallDetailPage({
   params,
-  searchParams,
 }: RecallDetailPageProps) {
   const clinicId = z.string().uuid().safeParse(params.clinicId);
   const recallId = z.string().uuid().safeParse(params.recallId);
@@ -64,12 +62,6 @@ export default async function RecallDetailPage({
           <ArrowLeft aria-hidden="true" className="size-4" />
           Back to recalls
         </Link>
-
-        {(searchParams.created || searchParams.updated) && (
-          <p className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            Recall {searchParams.created ? "created" : "updated"} successfully.
-          </p>
-        )}
 
         <header className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
