@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Prisma } from "@prisma/client";
 import {
   classifyErrorCause,
   describeSupabaseHost,
@@ -111,11 +112,56 @@ test("classifies recognized message categories without returning message text", 
     ["connect ECONNREFUSED synthetic endpoint", "connection_refused"],
     ["socket timed out while connecting", "tcp_timeout"],
     ["Can't reach database server at synthetic endpoint", "server_unreachable"],
+    [
+      "Error querying the database: failed to lookup address information: Name or service not known",
+      "dns",
+    ],
+    [
+      "Error querying the database: FATAL: password authentication failed for user synthetic-role",
+      "authentication",
+    ],
+    ["Error opening a TLS connection: certificate verification failed", "tls"],
+    [
+      "Error querying the database: Connection timed out (os error 110)",
+      "tcp_timeout",
+    ],
+    [
+      "Error querying the database: error communicating with database: Connection refused",
+      "connection_refused",
+    ],
+    ["could not connect to server: No route to host", "server_unreachable"],
+    ["FATAL: too many connections for synthetic role", "server_unavailable"],
+    ["server closed the connection unexpectedly", "connection_closed"],
   ] as const;
 
   for (const [message, expected] of cases) {
     assert.equal(classifyErrorCause(new Error(message)), expected);
   }
+});
+
+test("classifies Prisma initialization messages without a Prisma error code or cause", () => {
+  const error = new Prisma.PrismaClientInitializationError(
+    "Error querying the database: Connection timed out at ****** endpoint",
+    "6.19.2",
+  );
+
+  assert.equal(Object.hasOwn(error, "message"), true);
+  assert.equal(Object.hasOwn(error, "cause"), false);
+  assert.equal(error.errorCode, undefined);
+  assert.equal(classifyErrorCause(error), "tcp_timeout");
+
+  const diagnostics = safeErrorDiagnostics(error);
+  assert.deepEqual(diagnostics, {
+    type: "PrismaClientInitializationError",
+    prismaCode: "none",
+    networkCode: "none",
+    cause: "tcp_timeout",
+  });
+  assert.equal(
+    JSON.stringify(diagnostics).includes("Connection timed out"),
+    false,
+  );
+  assert.equal(JSON.stringify(diagnostics).includes("endpoint"), false);
 });
 
 test("classifies safe codes on nested causes and defaults to unknown", () => {
@@ -156,8 +202,6 @@ test("extracts a nested connection cause without exposing error messages", () =>
     prismaCode: "none",
     networkCode: "ECONNREFUSED",
     cause: "connection_refused",
-    messages:
-      "[PrismaClientInitializationError] Can't reach database server at [redacted-url] <- [Error] connect ECONNREFUSED synthetic-host",
   });
   assert.equal(
     JSON.stringify(diagnostics).includes("synthetic-password"),
@@ -216,8 +260,6 @@ test("extracts an allowlisted Prisma code from a nested cause", () => {
     prismaCode: "P1011",
     networkCode: "none",
     cause: "tls",
-    messages:
-      "[PrismaClientInitializationError] synthetic initialization failure <- [Error] synthetic Prisma cause",
   });
 });
 

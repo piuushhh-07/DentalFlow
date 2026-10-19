@@ -1,0 +1,125 @@
+import type { DemoData } from "@/features/demo/lib/demo-types";
+
+function dateOffset(offset: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + offset);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts.map(({ type, value }) => [type, value]),
+  );
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+export function createInitialDemoData(): DemoData {
+  const patients: DemoData["patients"] = [
+    { id: "pt-001", name: "Aarav Mehta", age: 34, phone: "+91 90000 00001", email: "aarav@example.test", lastVisit: dateOffset(-18), consent: "GRANTED", consentSource: "In-clinic form", consentRecordedAt: dateOffset(-40), notes: "Fictional demo patient." },
+    { id: "pt-002", name: "Ananya Iyer", age: 28, phone: "+91 90000 00002", email: "ananya@example.test", lastVisit: dateOffset(-32), consent: "NOT_RECORDED", consentSource: null, consentRecordedAt: null, notes: "Fictional demo patient." },
+    { id: "pt-003", name: "Kabir Shah", age: 46, phone: "+91 90000 00003", email: "kabir@example.test", lastVisit: dateOffset(-90), consent: "GRANTED", consentSource: "Verbal, recorded at clinic", consentRecordedAt: dateOffset(-90), notes: "Fictional demo patient." },
+    { id: "pt-004", name: "Diya Nair", age: 22, phone: "+91 90000 00004", email: "diya@example.test", lastVisit: dateOffset(-12), consent: "OPTED_OUT", consentSource: "Patient request", consentRecordedAt: dateOffset(-10), notes: "Fictional demo patient." },
+    { id: "pt-005", name: "Rohan Kulkarni", age: 52, phone: "+91 90000 00005", email: "rohan@example.test", lastVisit: dateOffset(-7), consent: "GRANTED", consentSource: "In-clinic form", consentRecordedAt: dateOffset(-100), notes: "Fictional demo patient." },
+    { id: "pt-006", name: "Mira Desai", age: 39, phone: "+91 90000 00006", email: "mira@example.test", lastVisit: dateOffset(-180), consent: "NOT_RECORDED", consentSource: null, consentRecordedAt: null, notes: "Fictional demo patient." },
+    { id: "pt-007", name: "Ishaan Rao", age: 31, phone: "+91 90000 00007", email: "ishaan@example.test", lastVisit: dateOffset(-25), consent: "GRANTED", consentSource: "In-clinic form", consentRecordedAt: dateOffset(-25), notes: "Fictional demo patient." },
+    { id: "pt-008", name: "Sara Fernandes", age: 43, phone: "+91 90000 00008", email: "sara@example.test", lastVisit: dateOffset(-60), consent: "OPTED_OUT", consentSource: "Patient request", consentRecordedAt: dateOffset(-15), notes: "Fictional demo patient." },
+    { id: "pt-009", name: "Neel Joshi", age: 19, phone: "+91 90000 00009", email: "neel@example.test", lastVisit: dateOffset(-5), consent: "GRANTED", consentSource: "In-clinic form", consentRecordedAt: dateOffset(-5), notes: "Fictional demo patient." },
+    { id: "pt-010", name: "Tara Banerjee", age: 61, phone: "+91 90000 00010", email: "tara@example.test", lastVisit: dateOffset(-210), consent: "NOT_RECORDED", consentSource: null, consentRecordedAt: null, notes: "Fictional demo patient." },
+  ];
+
+  const treatmentPlans: DemoData["treatmentPlans"] = [
+    {
+      id: "plan-001", patientId: "pt-001", name: "Root canal and crown", createdAt: dateOffset(-35), clinicalNotes: "Clinician-entered demo notes. Not a diagnosis.", priority: "CLINICIAN_DEFINED_SOON", acceptance: "PARTIALLY_ACCEPTED", acceptanceDate: dateOffset(-30),
+      procedures: [
+        { id: "proc-001", name: "Root canal treatment", treatmentArea: "Tooth 16", amount: 9000, acceptance: "ACCEPTED" },
+        { id: "proc-002", name: "Crown placement", treatmentArea: "Tooth 16", amount: 12000, acceptance: "DEFERRED" },
+      ],
+      stages: [
+        { id: "stage-001", name: "Canal preparation", description: "First treatment visit", sequence: 1, plannedDate: dateOffset(-20), status: "COMPLETED", appointmentId: null, notes: "" },
+        { id: "stage-002", name: "Canal obturation", description: "Follow-up treatment visit", sequence: 2, plannedDate: dateOffset(2), status: "SCHEDULED", appointmentId: "apt-003", notes: "" },
+        { id: "stage-003", name: "Crown placement", description: "Deferred procedure", sequence: 3, plannedDate: dateOffset(18), status: "PLANNED", appointmentId: null, notes: "" },
+      ],
+    },
+    {
+      id: "plan-002", patientId: "pt-003", name: "Implant treatment plan", createdAt: dateOffset(-12), clinicalNotes: "Clinician-entered demo notes. Confirm plan in clinic.", priority: "ROUTINE", acceptance: "PRESENTED", acceptanceDate: null,
+      procedures: [
+        { id: "proc-003", name: "Implant placement", treatmentArea: "Tooth 36", amount: 45000, acceptance: "DEFERRED" },
+        { id: "proc-004", name: "Crown restoration", treatmentArea: "Tooth 36", amount: 18000, acceptance: "DEFERRED" },
+      ],
+      stages: [
+        { id: "stage-004", name: "Treatment discussion", description: "Plan presented for discussion", sequence: 1, plannedDate: dateOffset(5), status: "PLANNED", appointmentId: null, notes: "" },
+        { id: "stage-005", name: "Implant placement", description: "Planned treatment stage", sequence: 2, plannedDate: dateOffset(30), status: "PLANNED", appointmentId: null, notes: "" },
+      ],
+    },
+    {
+      id: "plan-003", patientId: "pt-005", name: "Orthodontic review", createdAt: dateOffset(-70), clinicalNotes: "Clinician-entered demo notes.", priority: "ROUTINE", acceptance: "IN_PROGRESS", acceptanceDate: dateOffset(-65),
+      procedures: [
+        { id: "proc-005", name: "Orthodontic review", treatmentArea: "Full arch", amount: 6000, acceptance: "ACCEPTED" },
+        { id: "proc-006", name: "Retainer fitting", treatmentArea: "Full arch", amount: 8000, acceptance: "ACCEPTED" },
+      ],
+      stages: [
+        { id: "stage-006", name: "Initial review", description: "Review visit", sequence: 1, plannedDate: dateOffset(-30), status: "COMPLETED", appointmentId: null, notes: "" },
+        { id: "stage-007", name: "Retainer fitting", description: "Next treatment stage", sequence: 2, plannedDate: dateOffset(1), status: "SCHEDULED", appointmentId: "apt-006", notes: "" },
+      ],
+    },
+    {
+      id: "plan-004", patientId: "pt-007", name: "Preventive care", createdAt: dateOffset(-25), clinicalNotes: "Routine care plan for demonstration.", priority: "ROUTINE", acceptance: "DECLINED", acceptanceDate: dateOffset(-24),
+      procedures: [
+        { id: "proc-007", name: "Scaling", treatmentArea: "Full mouth", amount: 3500, acceptance: "DECLINED" },
+      ],
+      stages: [
+        { id: "stage-008", name: "Scaling visit", description: "Suggested preventive procedure", sequence: 1, plannedDate: dateOffset(4), status: "PLANNED", appointmentId: null, notes: "" },
+      ],
+    },
+  ];
+
+  const appointments: DemoData["appointments"] = [
+    { id: "apt-001", patientId: "pt-005", date: dateOffset(0), time: "09:00", durationMinutes: 30, dentist: "Dr. Kavya Shah", chair: "Chair 1", type: "Review", status: "CHECKED_IN", notes: "", planId: "plan-003", stageId: "stage-007" },
+    { id: "apt-002", patientId: "pt-009", date: dateOffset(0), time: "09:45", durationMinutes: 45, dentist: "Dr. Kavya Shah", chair: "Chair 1", type: "Consultation", status: "CONFIRMED", notes: "", planId: null, stageId: null },
+    { id: "apt-003", patientId: "pt-001", date: dateOffset(2), time: "10:30", durationMinutes: 60, dentist: "Dr. Arjun Menon", chair: "Chair 2", type: "Root canal", status: "SCHEDULED", notes: "", planId: "plan-001", stageId: "stage-002" },
+    { id: "apt-004", patientId: "pt-002", date: dateOffset(0), time: "11:45", durationMinutes: 30, dentist: "Dr. Arjun Menon", chair: "Chair 2", type: "Cleaning", status: "NO_SHOW", notes: "No response at visit time.", planId: null, stageId: null },
+    { id: "apt-005", patientId: "pt-003", date: dateOffset(-1), time: "12:30", durationMinutes: 45, dentist: "Dr. Kavya Shah", chair: "Chair 1", type: "Implant discussion", status: "COMPLETED", notes: "", planId: "plan-002", stageId: "stage-004" },
+    { id: "apt-006", patientId: "pt-005", date: dateOffset(1), time: "14:00", durationMinutes: 45, dentist: "Dr. Kavya Shah", chair: "Chair 1", type: "Orthodontic review", status: "CONFIRMED", notes: "", planId: "plan-003", stageId: "stage-007" },
+    { id: "apt-007", patientId: "pt-006", date: dateOffset(10), time: "09:30", durationMinutes: 30, dentist: "Dr. Arjun Menon", chair: "Chair 2", type: "Recall", status: "SCHEDULED", notes: "", planId: null, stageId: null },
+    { id: "apt-008", patientId: "pt-004", date: dateOffset(-2), time: "10:00", durationMinutes: 30, dentist: "Dr. Kavya Shah", chair: "Chair 1", type: "Consultation", status: "CANCELLED", notes: "", planId: null, stageId: null },
+    { id: "apt-009", patientId: "pt-008", date: dateOffset(3), time: "11:00", durationMinutes: 30, dentist: "Dr. Arjun Menon", chair: "Chair 2", type: "Recall", status: "SCHEDULED", notes: "", planId: null, stageId: null },
+    { id: "apt-010", patientId: "pt-010", date: dateOffset(-4), time: "15:00", durationMinutes: 30, dentist: "Dr. Kavya Shah", chair: "Chair 1", type: "Review", status: "COMPLETED", notes: "", planId: null, stageId: null },
+    { id: "apt-011", patientId: "pt-001", date: dateOffset(-10), time: "16:00", durationMinutes: 60, dentist: "Dr. Arjun Menon", chair: "Chair 2", type: "Root canal", status: "COMPLETED", notes: "", planId: "plan-001", stageId: "stage-001" },
+    { id: "apt-012", patientId: "pt-007", date: dateOffset(0), time: "16:30", durationMinutes: 30, dentist: "Dr. Kavya Shah", chair: "Chair 1", type: "Follow-up", status: "SCHEDULED", notes: "", planId: "plan-004", stageId: "stage-008" },
+  ];
+
+  const followUps: DemoData["followUps"] = [
+    { id: "fu-001", patientId: "pt-001", planId: "plan-001", appointmentId: null, kind: "TREATMENT", dueDate: dateOffset(-3), status: "PENDING", lastOutcome: "Awaiting response", notes: "Check preferred date for the next visit." },
+    { id: "fu-002", patientId: "pt-002", planId: null, appointmentId: "apt-004", kind: "MISSED_APPOINTMENT", dueDate: dateOffset(0), status: "PENDING", lastOutcome: "Missed appointment", notes: "" },
+    { id: "fu-003", patientId: "pt-003", planId: "plan-002", appointmentId: null, kind: "TREATMENT", dueDate: dateOffset(1), status: "PENDING", lastOutcome: "Plan presented", notes: "Follow up on the decision." },
+    { id: "fu-004", patientId: "pt-005", planId: "plan-003", appointmentId: null, kind: "RESPONSE", dueDate: dateOffset(0), status: "CONTACTED", lastOutcome: "Message prepared", notes: "" },
+    { id: "fu-005", patientId: "pt-007", planId: "plan-004", appointmentId: null, kind: "TREATMENT", dueDate: dateOffset(2), status: "PENDING", lastOutcome: "Treatment decision pending", notes: "" },
+    { id: "fu-006", patientId: "pt-010", planId: null, appointmentId: null, kind: "RECALL", dueDate: dateOffset(-8), status: "PENDING", lastOutcome: "Recall overdue", notes: "" },
+  ];
+
+  return {
+    version: 1,
+    patients,
+    appointments,
+    treatmentPlans,
+    recalls: [
+      { id: "rec-001", patientId: "pt-006", type: "Six-month checkup", lastVisit: dateOffset(-180), intervalMonths: 6, dueDate: dateOffset(3), status: "ACTIVE", dentistConfirmed: false },
+      { id: "rec-002", patientId: "pt-010", type: "Cleaning", lastVisit: dateOffset(-210), intervalMonths: 6, dueDate: dateOffset(-30), status: "ACTIVE", dentistConfirmed: true },
+      { id: "rec-003", patientId: "pt-008", type: "Six-month checkup", lastVisit: dateOffset(-60), intervalMonths: 6, dueDate: dateOffset(120), status: "ACTIVE", dentistConfirmed: true },
+      { id: "rec-004", patientId: "pt-002", type: "Cleaning", lastVisit: dateOffset(-32), intervalMonths: 6, dueDate: dateOffset(150), status: "ACTIVE", dentistConfirmed: false },
+      { id: "rec-005", patientId: "pt-005", type: "Six-month checkup", lastVisit: dateOffset(-190), intervalMonths: 6, dueDate: dateOffset(-10), status: "COMPLETED", dentistConfirmed: true },
+    ],
+    followUps,
+    templates: [
+      { id: "tpl-appointment", name: "Appointment reminder", content: "Hello {{patient_name}}, this is a reminder of your appointment at {{clinic_name}} on {{appointment_date}} at {{appointment_time}} with {{clinician_name}}. For help, call {{clinic_phone}}." },
+      { id: "tpl-reschedule", name: "Rescheduling", content: "Hello {{patient_name}}, please contact {{clinic_name}} at {{clinic_phone}} to discuss a convenient appointment time." },
+      { id: "tpl-missed", name: "Missed appointment", content: "Hello {{patient_name}}, we hope you are well. Please contact {{clinic_name}} at {{clinic_phone}} if you would like to arrange another visit." },
+      { id: "tpl-treatment", name: "Treatment follow-up", content: "Hello {{patient_name}}, please contact {{clinic_name}} at {{clinic_phone}} if you would like to discuss your proposed care plan." },
+      { id: "tpl-recall", name: "Preventive recall", content: "Hello {{patient_name}}, it may be time to arrange a routine checkup at {{clinic_name}}. Please call {{clinic_phone}} at your convenience." },
+      { id: "tpl-postvisit", name: "Post-visit follow-up", content: "Hello {{patient_name}}, thank you for visiting {{clinic_name}}. Please contact us at {{clinic_phone}} if you have any questions." },
+    ],
+    messages: [],
+  };
+}

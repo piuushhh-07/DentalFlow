@@ -68,8 +68,8 @@ const causeCategories = new Map<string, string>([
   ["08001", "server_unreachable"],
   ["08004", "authentication"],
   ["08006", "connection_closed"],
-  ["53300", "server_unreachable"],
-  ["57P03", "server_unreachable"],
+  ["53300", "server_unavailable"],
+  ["57P03", "server_unavailable"],
   ["ECONNREFUSED", "connection_refused"],
   ["ECONNRESET", "connection_reset"],
   ["ETIMEDOUT", "tcp_timeout"],
@@ -94,7 +94,7 @@ const messageCauseCategories: ReadonlyArray<readonly [RegExp, string]> = [
   ],
   [/\b(?:tls|ssl|certificate|handshake)\b/i, "tls"],
   [
-    /\b(?:getaddrinfo|dns lookup|name or service not known|no such host|temporary failure in name resolution|could not resolve host)\b/i,
+    /\b(?:getaddrinfo|dns lookup|name or service not known|no such host|temporary failure in name resolution|could not resolve host|could not translate host name|failed to lookup address information)\b/i,
     "dns",
   ],
   [
@@ -102,15 +102,23 @@ const messageCauseCategories: ReadonlyArray<readonly [RegExp, string]> = [
     "connection_refused",
   ],
   [
-    /\b(?:etimedout|timed?\s*out|timeout|deadline exceeded|socket timeout)\b/i,
+    /\b(?:etimedout|timed?\s*out|timeout|deadline exceeded|socket timeout|connection timed out)\b/i,
     "tcp_timeout",
+  ],
+  [
+    /\b(?:too many connections|remaining connection slots are reserved|database system is starting up|database system is shutting down|server is not accepting connections)\b/i,
+    "server_unavailable",
+  ],
+  [
+    /\b(?:connection reset by peer|econnreset|connection terminated unexpectedly|server closed the connection unexpectedly|connection closed unexpectedly)\b/i,
+    "connection_closed",
   ],
   [
     /\b(?:database .* does not exist|invalid connection string|invalid datasource url|datasource url is invalid|environment variable .* not found|missing .* environment variable|prisma schema.*invalid)\b/i,
     "configuration",
   ],
   [
-    /\b(?:can't reach|cannot reach|could not connect|server unreachable|network is unreachable)\b/i,
+    /\b(?:can't reach|cannot reach|could not connect|server unreachable|network is unreachable|no route to host|host is unreachable|network unreachable)\b/i,
     "server_unreachable",
   ],
 ];
@@ -292,38 +300,24 @@ export function sanitizeDiagnosticMessage(
   return sanitized.slice(0, 1200);
 }
 
-function sanitizedErrorMessages(error: unknown): string {
-  return errorChain(error)
-    .map((item) => {
-      const message = readOwnDataProperty(item, "message");
-      if (typeof message !== "string") return undefined;
-      return `[${safeErrorType(item)}] ${sanitizeDiagnosticMessage(message)}`;
-    })
-    .filter((message): message is string => Boolean(message))
-    .join(" <- ")
-    .slice(0, 1800);
-}
-
 export function safeErrorDiagnostics(error: unknown): Readonly<{
   type: string;
   prismaCode: string;
   networkCode: string;
   cause: string;
-  messages: string;
 }> {
   return {
     type: safeErrorType(error),
     prismaCode: prismaErrorCode(error),
     networkCode: underlyingNetworkCode(error),
     cause: classifyErrorCause(error),
-    messages: sanitizedErrorMessages(error),
   };
 }
 
 function reportSetupFailure(error: unknown): void {
   const diagnostics = safeErrorDiagnostics(error);
   console.error(
-    `Integration test setup failed (type=${diagnostics.type}; prismaCode=${diagnostics.prismaCode}; networkCode=${diagnostics.networkCode}; cause=${diagnostics.cause}; messages=${JSON.stringify(diagnostics.messages)}).`,
+    `Integration test setup failed (type=${diagnostics.type}; prismaCode=${diagnostics.prismaCode}; networkCode=${diagnostics.networkCode}; cause=${diagnostics.cause}).`,
   );
 }
 

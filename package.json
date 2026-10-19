@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "tsx --test src/features/auth/lib/*.test.ts src/features/onboarding/lib/*.test.ts src/features/patients/lib/*.test.ts src/features/treatments/lib/*.test.ts src/features/recalls/lib/*.test.ts src/features/follow-ups/lib/*.test.ts src/features/messages/lib/*.test.ts src/features/reports/lib/*.test.ts src/features/insurance/lib/*.test.ts scripts/integration-test.test.ts",
+    "test": "tsx --test src/features/auth/lib/*.test.ts src/features/onboarding/lib/*.test.ts src/features/patients/lib/*.test.ts src/features/treatments/lib/*.test.ts src/features/recalls/lib/*.test.ts src/features/follow-ups/lib/*.test.ts src/features/messages/lib/*.test.ts src/features/reports/lib/*.test.ts src/features/insurance/lib/*.test.ts src/features/demo/lib/*.test.ts scripts/integration-test.test.ts",
     "test:integration:diagnose": "tsx scripts/integration-test.ts diagnose",
     "test:integration:prepare": "tsx scripts/integration-test.ts prepare",
     "test:integration": "tsx scripts/integration-test.ts test",

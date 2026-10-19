@@ -5,6 +5,19 @@ import { isExpectedUnauthenticatedAuthError } from "@/features/auth/lib/auth-ses
 import { getSupabasePublicEnvironment } from "@/lib/supabase/config";
 
 export async function middleware(request: NextRequest) {
+  const isDemoRoute =
+    request.nextUrl.pathname === "/demo" ||
+    request.nextUrl.pathname.startsWith("/demo/");
+  if (isDemoRoute) {
+    if (
+      process.env.NODE_ENV === "development" &&
+      process.env.NEXT_PUBLIC_DENTALFLOW_DEMO_MODE === "true"
+    ) {
+      return NextResponse.next();
+    }
+    return new NextResponse(null, { status: 404 });
+  }
+
   const environment = getSupabasePublicEnvironment();
   let response = NextResponse.next({ request });
 

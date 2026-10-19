@@ -22,6 +22,11 @@ marked placeholders in `.env.local` with your own development credentials
 before connecting external services. Never commit `.env.local` or real
 credentials.
 
+For the local no-database demo, set `NEXT_PUBLIC_DENTALFLOW_DEMO_MODE=true`
+in `.env.local` and visit [http://localhost:3000/demo](http://localhost:3000/demo).
+The demo uses a fictional clinic dataset stored in browser local storage only,
+so it never touches Supabase or the production database.
+
 ## Scripts
 
 | Command                     | Purpose                                                 |
