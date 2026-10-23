@@ -22,6 +22,8 @@ type TestDatabaseConfig = Readonly<{
   directUrl: string;
   supabaseUrl: string;
   anonKey: string;
+  runtimeTlsValidated: boolean;
+  runtimePoolerOptionsValidated: boolean;
 }>;
 
 type DatabaseIdentity = Readonly<{
@@ -29,10 +31,12 @@ type DatabaseIdentity = Readonly<{
   serverVersion: string;
 }>;
 
-type IntegrationCommand = "diagnose" | "prepare" | "test";
+type IntegrationCommand = "diagnose" | "diagnose-migrate" | "prepare" | "test";
 
 type RunnerOperations = Readonly<{
   diagnose?: (config: TestDatabaseConfig) => Promise<void>;
+  diagnoseMigrationEngine?: (config: TestDatabaseConfig) => void;
+  observeRuntimeEndpoint?: (config: TestDatabaseConfig) => Promise<void>;
   verifyDatabaseTarget: (
     config: TestDatabaseConfig,
     connectionUrl?: string,
@@ -41,6 +45,14 @@ type RunnerOperations = Readonly<{
   verifyMigrations: () => Promise<void>;
   runTests: (config: TestDatabaseConfig) => void;
 }>;
+
+type DiagnosticStage =
+  | "runtime_identity"
+  | "migration_identity"
+  | "schema_engine_diff"
+  | "integration_suite";
+
+const diagnosticStages = new WeakMap<object, DiagnosticStage>();
 
 const prismaErrorTypes = new Set([
   "PrismaClientInitializationError",
@@ -305,20 +317,58 @@ export function safeErrorDiagnostics(error: unknown): Readonly<{
   prismaCode: string;
   networkCode: string;
   cause: string;
+  stage?: DiagnosticStage;
 }> {
+  const stage =
+    typeof error === "object" && error !== null
+      ? diagnosticStages.get(error)
+      : undefined;
   return {
     type: safeErrorType(error),
     prismaCode: prismaErrorCode(error),
     networkCode: underlyingNetworkCode(error),
     cause: classifyErrorCause(error),
+    ...(stage ? { stage } : {}),
   };
 }
 
 function reportSetupFailure(error: unknown): void {
   const diagnostics = safeErrorDiagnostics(error);
+  const failureType =
+    diagnostics.stage === "integration_suite"
+      ? "Integration test suite failed"
+      : "Integration test setup failed";
   console.error(
-    `Integration test setup failed (type=${diagnostics.type}; prismaCode=${diagnostics.prismaCode}; networkCode=${diagnostics.networkCode}; cause=${diagnostics.cause}).`,
+    `${failureType} (type=${diagnostics.type}; prismaCode=${diagnostics.prismaCode}; networkCode=${diagnostics.networkCode}; cause=${diagnostics.cause}${diagnostics.stage ? `; stage=${diagnostics.stage}` : ""}).`,
   );
+}
+
+async function runDiagnosticStage<T>(
+  stage: DiagnosticStage,
+  operation: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (typeof error === "object" && error !== null) {
+      diagnosticStages.set(error, stage);
+    }
+    throw error;
+  }
+}
+
+function runSynchronousDiagnosticStage<T>(
+  stage: DiagnosticStage,
+  operation: () => T,
+): T {
+  try {
+    return operation();
+  } catch (error) {
+    if (typeof error === "object" && error !== null) {
+      diagnosticStages.set(error, stage);
+    }
+    throw error;
+  }
 }
 
 export function loadEnvironmentContents(
@@ -336,6 +386,16 @@ export function loadEnvironmentContents(
           ? value.slice(1, -1)
           : value;
   }
+}
+
+export function migrationEngineDiagnosticArgs(): string[] {
+  return [
+    "migrate",
+    "diff",
+    "--from-schema-datasource",
+    path.join(rootDirectory, "prisma", "schema.prisma"),
+    "--to-empty",
+  ];
 }
 
 function loadLocalTestEnvironment(): void {
@@ -445,6 +505,16 @@ function loadAndValidateTestConfig(): TestDatabaseConfig {
   const directUrl = required("DENTALFLOW_TEST_DIRECT_URL");
   const runtimeIdentity = connectionIdentity(databaseUrl);
   const directIdentity = connectionIdentity(directUrl);
+  const runtimeTlsValidated = hasSingleQueryValue(
+    runtimeIdentity.query,
+    "sslmode",
+    "require",
+  );
+  const runtimePoolerOptionsValidated =
+    runtimeIdentity.port === "6543" &&
+    runtimeIdentity.host.endsWith(".pooler.supabase.com") &&
+    hasSingleQueryValue(runtimeIdentity.query, "pgbouncer", "true") &&
+    hasSingleQueryValue(runtimeIdentity.query, "connection_limit", "1");
 
   for (const [label, identity] of [
     ["runtime", runtimeIdentity],
@@ -467,13 +537,7 @@ function loadAndValidateTestConfig(): TestDatabaseConfig {
     }
   }
 
-  if (
-    runtimeIdentity.port !== "6543" ||
-    !runtimeIdentity.host.endsWith(".pooler.supabase.com") ||
-    !hasSingleQueryValue(runtimeIdentity.query, "pgbouncer", "true") ||
-    !hasSingleQueryValue(runtimeIdentity.query, "connection_limit", "1") ||
-    !hasSingleQueryValue(runtimeIdentity.query, "sslmode", "require")
-  ) {
+  if (!runtimeTlsValidated || !runtimePoolerOptionsValidated) {
     throw new IntegrationTestError(
       "The test runtime URL must use the Supabase transaction pooler on port 6543 with pgbouncer=true, connection_limit=1, and sslmode=require.",
     );
@@ -555,6 +619,8 @@ function loadAndValidateTestConfig(): TestDatabaseConfig {
     directUrl,
     supabaseUrl,
     anonKey: required("DENTALFLOW_TEST_SUPABASE_ANON_KEY"),
+    runtimeTlsValidated,
+    runtimePoolerOptionsValidated,
   };
 }
 
@@ -641,7 +707,13 @@ export function probeTcp(
   timeoutMs = 5000,
 ): Promise<string> {
   return new Promise((resolve) => {
-    const socket = createConnection({ host: address, port });
+    let socket: ReturnType<typeof createConnection>;
+    try {
+      socket = createConnection({ host: address, port });
+    } catch {
+      resolve("unknown");
+      return;
+    }
     let settled = false;
     const finish = (result: string) => {
       if (settled) return;
@@ -661,6 +733,99 @@ export function probeTcp(
       );
     });
   });
+}
+
+function safeEndpointHostIdentifier(host: string): string {
+  if (host.endsWith(".pooler.supabase.com")) return "supabase-pooler";
+  if (/^db\.[a-z0-9-]+\.supabase\.co$/.test(host)) {
+    return "supabase-direct";
+  }
+  return "unrecognized-host";
+}
+
+export function formatRuntimeEndpointObservation(
+  input: Readonly<{
+    host: string;
+    port: number;
+    tlsValidated: boolean;
+    poolerOptionsValidated: boolean;
+    dnsOutcome: string;
+    ipv4Count: number;
+    ipv6Count: number;
+    tcpOutcome: string;
+    addressesTested: number;
+  }>,
+): string {
+  const safeDnsOutcomes = new Set([
+    "resolved",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "unknown",
+  ]);
+  const safeTcpOutcomes = new Set([
+    "connected",
+    "tcp_timeout",
+    "connection_refused",
+    "server_unreachable",
+    "connection_closed",
+    "connection_reset",
+    "server_unavailable",
+    "unknown",
+    "skipped_dns_failed",
+  ]);
+  const safeCount = (value: number) =>
+    Number.isSafeInteger(value) && value >= 0 ? value : 0;
+
+  return [
+    `host=${safeEndpointHostIdentifier(input.host)}`,
+    `port=${Number.isInteger(input.port) && input.port > 0 && input.port <= 65535 ? input.port : "unknown"}`,
+    `tls_validation=${input.tlsValidated ? "pass" : "fail"}`,
+    `pooler_validation=${input.poolerOptionsValidated ? "pass" : "fail"}`,
+    `dns=${safeDnsOutcomes.has(input.dnsOutcome) ? input.dnsOutcome : "unknown"}`,
+    `ipv4=${safeCount(input.ipv4Count)}`,
+    `ipv6=${safeCount(input.ipv6Count)}`,
+    `tcp=${safeTcpOutcomes.has(input.tcpOutcome) ? input.tcpOutcome : "unknown"}`,
+    `addresses_tested=${safeCount(input.addressesTested)}`,
+  ].join(" ");
+}
+
+async function reportRuntimeEndpointObservation(
+  config: TestDatabaseConfig,
+): Promise<void> {
+  const endpoint = endpointProbe("runtime", config.databaseUrl);
+  const dns = await probeDns(endpoint.host);
+  const addresses = dns.addresses.slice(0, 8);
+  let tcpResults: string[] = [];
+  if (addresses.length > 0) {
+    try {
+      tcpResults = await Promise.all(
+        addresses.map(({ address }) => probeTcp(address, endpoint.port, 5000)),
+      );
+    } catch {
+      tcpResults = addresses.map(() => "unknown");
+    }
+  }
+  const connected = tcpResults.filter((result) => result === "connected");
+  const tcpOutcome =
+    connected.length > 0
+      ? "connected"
+      : dns.addresses.length === 0
+        ? "skipped_dns_failed"
+        : (tcpResults[0] ?? "unknown");
+
+  console.info(
+    `Connection diagnostic runtime: ${formatRuntimeEndpointObservation({
+      host: endpoint.host,
+      port: endpoint.port,
+      tlsValidated: config.runtimeTlsValidated,
+      poolerOptionsValidated: config.runtimePoolerOptionsValidated,
+      dnsOutcome: dns.errorCode ?? "resolved",
+      ipv4Count: dns.addresses.filter(({ family }) => family === 4).length,
+      ipv6Count: dns.addresses.filter(({ family }) => family === 6).length,
+      tcpOutcome,
+      addressesTested: tcpResults.length,
+    })}.`,
+  );
 }
 
 async function reportEndpointProbes(endpoints: readonly EndpointProbe[]) {
@@ -699,9 +864,9 @@ async function reportEndpointProbes(endpoints: readonly EndpointProbe[]) {
 async function runConnectionDiagnostic(
   config: TestDatabaseConfig,
 ): Promise<void> {
-  const runtimeEndpoint = endpointProbe("runtime", config.databaseUrl);
   const migrationEndpoint = endpointProbe("migration", config.directUrl);
-  await reportEndpointProbes([runtimeEndpoint, migrationEndpoint]);
+  await reportEndpointProbes([migrationEndpoint]);
+  await reportRuntimeEndpointObservation(config);
 
   const identity = await verifyDatabaseTarget(config, config.databaseUrl);
   console.info(
@@ -725,6 +890,28 @@ export async function runIntegrationCommand(
     return;
   }
 
+  if (command === "diagnose-migrate") {
+    if (!operations.diagnoseMigrationEngine) {
+      throw new IntegrationTestError(
+        "The migration diagnostic operation is not configured.",
+      );
+    }
+    await (
+      operations.observeRuntimeEndpoint ?? reportRuntimeEndpointObservation
+    )(config);
+    await runDiagnosticStage("runtime_identity", () =>
+      operations.verifyDatabaseTarget(config),
+    );
+    const target = await runDiagnosticStage("migration_identity", () =>
+      operations.verifyDatabaseTarget(config, config.directUrl),
+    );
+    onTargetVerified(target);
+    runSynchronousDiagnosticStage("schema_engine_diff", () =>
+      operations.diagnoseMigrationEngine!(config),
+    );
+    return;
+  }
+
   const target = await operations.verifyDatabaseTarget(config);
   onTargetVerified(target);
 
@@ -736,7 +923,9 @@ export async function runIntegrationCommand(
   }
 
   await operations.verifyMigrations();
-  operations.runTests(config);
+  runSynchronousDiagnosticStage("integration_suite", () =>
+    operations.runTests(config),
+  );
 }
 
 function runPrismaCli(config: TestDatabaseConfig, args: string[]): void {
@@ -753,6 +942,58 @@ function runPrismaCli(config: TestDatabaseConfig, args: string[]): void {
     env: process.env,
     stdio: "inherit",
   });
+}
+
+function runReadOnlyMigrationEngineDiagnostic(
+  config: TestDatabaseConfig,
+): void {
+  const prismaCli = path.join(
+    rootDirectory,
+    "node_modules",
+    "prisma",
+    "build",
+    "index.js",
+  );
+  const environment = {
+    ...process.env,
+    DATABASE_URL: config.directUrl,
+    DIRECT_URL: config.directUrl,
+  };
+
+  try {
+    execFileSync(
+      process.execPath,
+      [prismaCli, ...migrationEngineDiagnosticArgs()],
+      {
+        cwd: rootDirectory,
+        env: environment,
+        stdio: ["ignore", "ignore", "pipe"],
+      },
+    );
+  } catch (error) {
+    const stderr = readOwnDataProperty(error, "stderr");
+    const output =
+      typeof stderr === "string"
+        ? stderr
+        : Buffer.isBuffer(stderr)
+          ? stderr.toString("utf8")
+          : "";
+    const reportedCode = output.match(/\bP\d{4}\b/)?.[0];
+    const errorCode =
+      reportedCode && causeCategories.has(reportedCode)
+        ? reportedCode
+        : undefined;
+    throw Object.assign(
+      new Error(
+        "Prisma Schema Engine read-only migration connectivity diagnostic failed.",
+      ),
+      errorCode ? { errorCode } : {},
+    );
+  }
+
+  console.info(
+    "Prisma Schema Engine read-only migration datasource check succeeded.",
+  );
 }
 
 async function verifyAllMigrationsApplied(): Promise<void> {
@@ -829,8 +1070,15 @@ function runIntegrationSuite(config: TestDatabaseConfig): void {
 
 async function main(): Promise<void> {
   const command = process.argv[2];
-  if (command !== "diagnose" && command !== "prepare" && command !== "test") {
-    throw new IntegrationTestError("Use `diagnose`, `prepare`, or `test`.");
+  if (
+    command !== "diagnose" &&
+    command !== "diagnose-migrate" &&
+    command !== "prepare" &&
+    command !== "test"
+  ) {
+    throw new IntegrationTestError(
+      "Use `diagnose`, `diagnose-migrate`, `prepare`, or `test`.",
+    );
   }
 
   const config = loadAndValidateTestConfig();
@@ -839,6 +1087,8 @@ async function main(): Promise<void> {
     config,
     {
       diagnose: runConnectionDiagnostic,
+      diagnoseMigrationEngine: runReadOnlyMigrationEngineDiagnostic,
+      observeRuntimeEndpoint: reportRuntimeEndpointObservation,
       verifyDatabaseTarget,
       runMigrations: (testConfig) =>
         runPrismaCli(testConfig, ["migrate", "deploy"]),
@@ -852,6 +1102,10 @@ async function main(): Promise<void> {
       if (command === "diagnose") {
         console.info(
           "Integration connection diagnostic succeeded (read-only SELECT 1 and identity check only).",
+        );
+      } else if (command === "diagnose-migrate") {
+        console.info(
+          "Verified the disposable test migration datasource before the read-only Schema Engine check.",
         );
       }
     },

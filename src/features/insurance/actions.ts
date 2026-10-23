@@ -280,9 +280,7 @@ export async function updateInsuranceClaimDetailsAction(formData: FormData) {
       error,
     );
   }
-  redirect(
-    `/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`,
-  );
+  redirect(`/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`);
 }
 
 export async function updateInsuranceClaimStatusAction(formData: FormData) {
@@ -310,9 +308,7 @@ export async function updateInsuranceClaimStatusAction(formData: FormData) {
       error,
     );
   }
-  redirect(
-    `/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`,
-  );
+  redirect(`/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`);
 }
 
 export async function scheduleInsuranceFollowUpAction(formData: FormData) {
@@ -338,9 +334,7 @@ export async function scheduleInsuranceFollowUpAction(formData: FormData) {
       error,
     );
   }
-  redirect(
-    `/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`,
-  );
+  redirect(`/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`);
 }
 
 export async function createInsurancePaymentAction(formData: FormData) {
@@ -370,9 +364,7 @@ export async function createInsurancePaymentAction(formData: FormData) {
       error,
     );
   }
-  redirect(
-    `/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`,
-  );
+  redirect(`/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`);
 }
 
 export async function createInsurancePreAuthorizationAction(
@@ -445,9 +437,7 @@ export async function updateInsurancePreAuthorizationStatusAction(
       error,
     );
   }
-  redirect(
-    `/clinic/${membership.clinicId}/insurance/pre-authorizations`,
-  );
+  redirect(`/clinic/${membership.clinicId}/insurance/pre-authorizations`);
 }
 
 export async function createInsuranceDocumentRequirementAction(
@@ -480,9 +470,7 @@ export async function createInsuranceDocumentRequirementAction(
       error,
     );
   }
-  redirect(
-    `/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`,
-  );
+  redirect(`/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`);
 }
 
 export async function registerInsuranceDocumentUploadAction(
@@ -544,9 +532,7 @@ export async function updateInsuranceDocumentStatusAction(formData: FormData) {
       error,
     );
   }
-  redirect(
-    `/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`,
-  );
+  redirect(`/clinic/${membership.clinicId}/insurance/claims/${claimId.data}`);
 }
 
 export async function getInsuranceDocumentPathAction(

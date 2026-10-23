@@ -7,6 +7,7 @@ import {
   InsuranceClaimType,
   InsuranceDocumentType,
   InsurancePreAuthorizationStatus,
+  AppointmentStatus,
   PreventiveRecallStatus,
   PreventiveRecallType,
   TreatmentType,
@@ -16,6 +17,17 @@ import {
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  AppointmentConflictError,
+  AppointmentPatientNotFoundError,
+  AppointmentVisitNotFoundError,
+  createClinicAppointment,
+  countClinicAppointments,
+  listClinicAppointments,
+  updateClinicAppointment,
+  updateClinicAppointmentStatus,
+} from "@/features/appointments/lib/appointment-repository";
+import { createAppointmentSchema } from "@/features/appointments/lib/appointment-validation";
+import {
   createClinicPatient,
   getClinicPatient,
   updateClinicPatient,
@@ -24,10 +36,7 @@ import {
   authorizeClinicMembership,
   ClinicAccessDeniedError,
 } from "@/features/auth/lib/authorization";
-import {
-  PatientWhatsAppConsentRequiredError,
-  patientInputSchema,
-} from "@/features/patients/lib/patient-validation";
+import { patientInputSchema } from "@/features/patients/lib/patient-validation";
 import {
   createClinicTreatmentPlan,
   getClinicTreatmentPlan,
@@ -42,8 +51,10 @@ import {
   RecallPatientNotFoundError,
   updateClinicRecallStatus,
 } from "@/features/recalls/lib/recall-repository";
+import { getClinicToday } from "@/features/follow-ups/lib/follow-up-validation";
 import { isDuplicateActiveRecall } from "@/features/recalls/lib/recall-validation";
 import { listFollowUpQueue } from "@/features/follow-ups/lib/follow-up-repository";
+import { WhatsAppConsentRequiredError } from "@/features/messages/lib/whatsapp";
 import {
   recordManualWhatsAppReminder,
   ReminderIdempotencyConflictError,
@@ -70,6 +81,21 @@ import {
   policyInputSchema,
   providerInputSchema,
 } from "@/features/insurance/lib/insurance-validation";
+import {
+  createTreatmentPlanFinancialEntry,
+  getClinicTreatmentFinanceSummary,
+  getTreatmentPaymentReceipt,
+  listClinicTreatmentCatalogue,
+  saveClinicTreatmentCatalogueItem,
+  updateTreatmentPlanFinance,
+} from "@/features/treatments/lib/treatment-finance";
+import {
+  treatmentCatalogueItemSchema,
+  treatmentFinancialEntrySchema,
+  treatmentPlanFinanceSchema,
+} from "@/features/treatments/lib/treatment-finance-validation";
+import { getClinicReportMetrics } from "@/features/reports/lib/report-repository";
+import { getClinicReportDateRange } from "@/features/reports/lib/report-validation";
 import { createSupabaseTestClient } from "./test-supabase-client";
 
 if (
@@ -100,6 +126,19 @@ function env(name: string): string {
 
 function syntheticPhone(): string {
   return `+919${randomInt(100_000_000, 999_999_999)}`;
+}
+
+function safePrismaErrorCode(error: unknown): string | undefined {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    /^P\d{4}$/.test(error.code)
+  ) {
+    return error.code;
+  }
+  return undefined;
 }
 
 async function signInTestUser(
@@ -341,6 +380,282 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
   assert.equal(persistedPlan.visits.length, 2);
 
   await t.test(
+    "appointments persist, link only same-clinic visits, enforce conflicts and update reports",
+    async () => {
+      const appointmentDate = getClinicToday();
+      const appointmentInput = createAppointmentSchema.parse({
+        patientId: patientA.id,
+        treatmentVisitId: persistedPlan.visits[0].id,
+        date: appointmentDate,
+        time: "23:00",
+        durationMinutes: 30,
+        dentistName: `${marker} Dentist`,
+        chairLabel: `${marker} Chair`,
+        type: "Synthetic appointment",
+        notes: "Synthetic appointment record.",
+      });
+      const appointment = await createClinicAppointment(
+        clinicAId,
+        appointmentInput,
+      );
+      const persistedAppointment =
+        await freshReader.appointment.findFirstOrThrow({
+          where: { id: appointment.id, clinicId: clinicAId },
+          include: { patient: true, treatmentVisit: true },
+        });
+      assert.equal(persistedAppointment.patientId, patientA.id);
+      assert.equal(
+        persistedAppointment.treatmentVisitId,
+        persistedPlan.visits[0].id,
+      );
+      assert.equal(
+        await listClinicAppointments(clinicBId, appointmentDate).then((rows) =>
+          rows.some((row) => row.id === appointment.id),
+        ),
+        false,
+      );
+      assert.equal(
+        await countClinicAppointments(clinicAId, appointmentDate),
+        1,
+      );
+
+      const crossClinicPatient = await createClinicPatient(
+        clinicBId,
+        patientInputSchema.parse({
+          fullName: `${marker} Cross-clinic appointment patient`,
+          phoneNumber: syntheticPhone(),
+          whatsappOptIn: false,
+          notes: "",
+        }),
+      );
+      await assert.rejects(
+        createClinicAppointment(clinicAId, {
+          ...appointmentInput,
+          patientId: crossClinicPatient.id,
+        }),
+        AppointmentPatientNotFoundError,
+      );
+      await assert.rejects(
+        createClinicAppointment(clinicAId, {
+          ...appointmentInput,
+          treatmentVisitId: randomUUID(),
+        }),
+        AppointmentVisitNotFoundError,
+      );
+      await assert.rejects(
+        createClinicAppointment(clinicAId, {
+          ...appointmentInput,
+          time: "23:15",
+        }),
+        AppointmentConflictError,
+      );
+
+      await updateClinicAppointment(clinicAId, appointment.id, {
+        ...appointmentInput,
+        time: "22:00",
+        notes: "Appointment details updated.",
+      });
+      await updateClinicAppointmentStatus(
+        clinicAId,
+        appointment.id,
+        AppointmentStatus.CONFIRMED,
+      );
+      assert.equal(
+        (
+          await freshReader.appointment.findFirstOrThrow({
+            where: { id: appointment.id, clinicId: clinicAId },
+          })
+        ).status,
+        AppointmentStatus.CONFIRMED,
+      );
+
+      const range = getClinicReportDateRange(new Date(), "Asia/Kolkata");
+      const metrics = await getClinicReportMetrics(clinicAId, range);
+      assert.ok(metrics.appointments >= 1);
+    },
+  );
+
+  await t.test(
+    "treatment catalogue, payment, refund and receipt persist in the financial ledger",
+    async () => {
+      const catalogueInput = treatmentCatalogueItemSchema.parse({
+        name: `${marker} Synthetic treatment`,
+        description: "Synthetic integration test catalogue item.",
+        defaultPrice: "12000.00",
+      });
+      const catalogueItem = await saveClinicTreatmentCatalogueItem(
+        clinicAId,
+        catalogueInput,
+      );
+      assert.ok(
+        (await listClinicTreatmentCatalogue(clinicAId)).some(
+          (item) => item.id === catalogueItem.id,
+        ),
+      );
+      await updateTreatmentPlanFinance(
+        clinicAId,
+        patientA.id,
+        plan.id,
+        treatmentPlanFinanceSchema.parse({
+          estimatedAmount: "12000.00",
+          finalAmount: "10000.00",
+          catalogItemId: catalogueItem.id,
+          status: "ACTIVE",
+        }),
+      );
+
+      const paymentInput = treatmentFinancialEntrySchema.parse({
+        entryType: "PAYMENT",
+        amount: "1500.00",
+        paymentMethod: "UPI",
+        paidAt: new Date().toISOString(),
+        reference: `PAY-${randomUUID()}`,
+        notes: "",
+        requestKey: randomUUID(),
+      });
+      const payment = await createTreatmentPlanFinancialEntry(
+        clinicAId,
+        patientA.id,
+        plan.id,
+        userAId,
+        paymentInput,
+      );
+      const receipt = await getTreatmentPaymentReceipt(
+        clinicAId,
+        patientA.id,
+        plan.id,
+        payment.id,
+      );
+      assert.ok(receipt);
+      assert.equal(receipt.receiptNumber, payment.receiptNumber);
+      assert.equal(receipt.patient.fullName, patientInput.fullName);
+
+      const refundInput = treatmentFinancialEntrySchema.parse({
+        entryType: "REFUND",
+        amount: "250.00",
+        paidAt: new Date().toISOString(),
+        notes: "Synthetic partial refund.",
+        requestKey: randomUUID(),
+      });
+      await createTreatmentPlanFinancialEntry(
+        clinicAId,
+        patientA.id,
+        plan.id,
+        userAId,
+        refundInput,
+      );
+      const summary = await getClinicTreatmentFinanceSummary(clinicAId);
+      assert.equal(summary.collectionsThisMonth, 1250);
+      const persistedEntries =
+        await freshReader.treatmentFinancialEntry.findMany({
+          where: { clinicId: clinicAId, treatmentPlanId: plan.id },
+        });
+      assert.equal(persistedEntries.length, 2);
+
+      const paymentArmPlan = await createClinicTreatmentPlan(
+        clinicAId,
+        patientA.id,
+        planInput,
+      );
+      const refundArmPlan = await createClinicTreatmentPlan(
+        clinicAId,
+        patientA.id,
+        planInput,
+      );
+      const reproductionPlanFinance = treatmentPlanFinanceSchema.parse({
+        estimatedAmount: "12000.00",
+        finalAmount: "10000.00",
+        catalogItemId: catalogueItem.id,
+        status: "ACTIVE",
+      });
+      await updateTreatmentPlanFinance(
+        clinicAId,
+        patientA.id,
+        paymentArmPlan.id,
+        reproductionPlanFinance,
+      );
+      await updateTreatmentPlanFinance(
+        clinicAId,
+        patientA.id,
+        refundArmPlan.id,
+        reproductionPlanFinance,
+      );
+
+      const reproductionPaidAt = new Date().toISOString();
+      const paymentArmBaselineInput = treatmentFinancialEntrySchema.parse({
+        entryType: "PAYMENT",
+        amount: "1500.00",
+        paymentMethod: "UPI",
+        paidAt: reproductionPaidAt,
+        notes: "",
+        requestKey: randomUUID(),
+      });
+      console.info("[financial-ledger-repro] baseline-payment.payment-arm");
+      await createTreatmentPlanFinancialEntry(
+        clinicAId,
+        patientA.id,
+        paymentArmPlan.id,
+        userAId,
+        paymentArmBaselineInput,
+      );
+
+      const refundArmBaselineInput = treatmentFinancialEntrySchema.parse({
+        entryType: "PAYMENT",
+        amount: "1500.00",
+        paymentMethod: "UPI",
+        paidAt: reproductionPaidAt,
+        notes: "",
+        requestKey: randomUUID(),
+      });
+      console.info("[financial-ledger-repro] baseline-payment.refund-arm");
+      await createTreatmentPlanFinancialEntry(
+        clinicAId,
+        patientA.id,
+        refundArmPlan.id,
+        userAId,
+        refundArmBaselineInput,
+      );
+
+      const measuredPaymentInput = treatmentFinancialEntrySchema.parse({
+        entryType: "PAYMENT",
+        amount: "250.00",
+        paymentMethod: "UPI",
+        paidAt: reproductionPaidAt,
+        notes: "",
+        requestKey: randomUUID(),
+      });
+      console.info("[financial-ledger-repro] measured-payment");
+      const measuredPayment = await createTreatmentPlanFinancialEntry(
+        clinicAId,
+        patientA.id,
+        paymentArmPlan.id,
+        userAId,
+        measuredPaymentInput,
+      );
+      assert.ok(measuredPayment.id);
+      assert.ok(measuredPayment.receiptNumber);
+
+      const measuredRefundInput = treatmentFinancialEntrySchema.parse({
+        entryType: "REFUND",
+        amount: "250.00",
+        paidAt: reproductionPaidAt,
+        notes: "Synthetic controlled reproduction refund.",
+        requestKey: randomUUID(),
+      });
+      console.info("[financial-ledger-repro] measured-refund");
+      const measuredRefund = await createTreatmentPlanFinancialEntry(
+        clinicAId,
+        patientA.id,
+        refundArmPlan.id,
+        userAId,
+        measuredRefundInput,
+      );
+      assert.ok(measuredRefund.id);
+      assert.equal(measuredRefund.receiptNumber, null);
+    },
+  );
+
+  await t.test(
     "treatment visits persist status changes, deny foreign IDs and handle concurrent updates",
     async () => {
       assert.equal(
@@ -408,11 +723,18 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       });
       for (const result of updates) {
         if (result.status === "rejected") {
+          const reason = result.reason;
+          const errorDetails =
+            reason instanceof Error
+              ? `name=${reason.name}, message=${reason.message}, code=${
+                  "code" in reason ? String(reason.code) : "unavailable"
+                }`
+              : `name=unknown, message=${String(reason)}, code=unavailable`;
           assert.ok(
-            result.reason instanceof Error &&
-              "code" in result.reason &&
-              result.reason.code === "P2034",
-            "Concurrent treatment update may fail only on a serialization conflict.",
+            reason instanceof Error &&
+              "code" in reason &&
+              reason.code === "P2034",
+            `Concurrent treatment update may fail only on a serialization conflict. ${errorDetails}`,
           );
         }
       }
@@ -566,7 +888,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           clientRequestId: randomUUID(),
           relatedRecordId: noConsentVisit.id,
         }),
-        PatientWhatsAppConsentRequiredError,
+        WhatsAppConsentRequiredError,
       );
     },
   );
@@ -684,7 +1006,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         userAId,
         preAuthorization.id,
         {
-          status: InsurancePreAuthorizationStatus.APPROVED,
+          status: InsurancePreAuthorizationStatus.PARTIALLY_APPROVED,
           approvedAmount: "7000.00",
           conditions: "Synthetic approval conditions.",
           expiresAt: new Date("2099-12-31T23:59:59.999Z"),
@@ -697,7 +1019,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
             where: { id: preAuthorization.id },
           })
         ).status,
-        InsurancePreAuthorizationStatus.APPROVED,
+        InsurancePreAuthorizationStatus.PARTIALLY_APPROVED,
       );
 
       const claimData = claimInputSchema.parse({
@@ -860,6 +1182,20 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.equal(resubmittedClaim.resubmissionCount, 1);
       assert.equal(resubmittedClaim.payments.length, 1);
       assert.equal(resubmittedClaim.payments[0].kind, "PATIENT_PAYMENT");
+    },
+  );
+
+  await t.test(
+    "synthetic Supabase Auth session can be signed out",
+    async () => {
+      const authenticated = await supabaseB.auth.getUser();
+      assert.equal(authenticated.data.user?.id, userBId);
+
+      const signOutResult = await supabaseB.auth.signOut();
+      assert.equal(signOutResult.error, null);
+
+      const signedOut = await supabaseB.auth.getUser();
+      assert.equal(signedOut.data.user, null);
     },
   );
 });

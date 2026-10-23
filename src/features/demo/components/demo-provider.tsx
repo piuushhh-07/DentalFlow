@@ -63,12 +63,9 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     }
   }, [data, ready]);
 
-  const updateData = useCallback(
-    (updater: (current: DemoData) => DemoData) => {
-      setData(updater);
-    },
-    [],
-  );
+  const updateData = useCallback((updater: (current: DemoData) => DemoData) => {
+    setData(updater);
+  }, []);
 
   const reset = useCallback(() => {
     const freshData = createInitialDemoData();

@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isExpectedUnauthenticatedAuthError } from "@/features/auth/lib/auth-session";
+import { isLocalDemoEnabled } from "@/features/demo/lib/demo-mode";
 import { getSupabasePublicEnvironment } from "@/lib/supabase/config";
 
 export async function middleware(request: NextRequest) {
@@ -10,8 +11,10 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/demo/");
   if (isDemoRoute) {
     if (
-      process.env.NODE_ENV === "development" &&
-      process.env.NEXT_PUBLIC_DENTALFLOW_DEMO_MODE === "true"
+      isLocalDemoEnabled(
+        process.env.NODE_ENV,
+        process.env.NEXT_PUBLIC_DENTALFLOW_DEMO_MODE,
+      )
     ) {
       return NextResponse.next();
     }

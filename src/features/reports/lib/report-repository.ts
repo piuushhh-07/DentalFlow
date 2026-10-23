@@ -12,6 +12,7 @@ import type { ClinicReportDateRange } from "@/features/reports/lib/report-valida
 
 export type ClinicReportMetrics = Readonly<{
   activePatients: number;
+  appointments: number;
   pendingTreatmentVisits: number;
   overdueTreatmentVisits: number;
   pendingPreventiveRecalls: number;
@@ -23,6 +24,7 @@ export type ClinicReportMetrics = Readonly<{
 
 type DatabaseReportMetrics = Readonly<{
   activePatients: bigint;
+  appointments: bigint;
   pendingTreatmentVisits: bigint;
   overdueTreatmentVisits: bigint;
   pendingPreventiveRecalls: bigint;
@@ -51,6 +53,14 @@ export async function getClinicReportMetrics(
         FROM "patients" p
         WHERE p."clinicId" = ${clinicId}::uuid
       ) AS "activePatients",
+      (
+        SELECT COUNT(*)
+        FROM "appointments" a
+        WHERE a."clinicId" = ${clinicId}::uuid
+          AND a."scheduledAt" >= ${range.startAt}::timestamptz
+          AND a."scheduledAt" < ${range.endExclusiveAt}::timestamptz
+          AND a."status" NOT IN ('CANCELLED'::"AppointmentStatus", 'NO_SHOW'::"AppointmentStatus")
+      ) AS "appointments",
       (
         SELECT COUNT(*)
         FROM "treatment_visits" tv
@@ -139,6 +149,7 @@ export async function getClinicReportMetrics(
   if (!counts) throw new Error("The clinic report query returned no result.");
   return {
     activePatients: toSafeCount(counts.activePatients),
+    appointments: toSafeCount(counts.appointments),
     pendingTreatmentVisits: toSafeCount(counts.pendingTreatmentVisits),
     overdueTreatmentVisits: toSafeCount(counts.overdueTreatmentVisits),
     pendingPreventiveRecalls: toSafeCount(counts.pendingPreventiveRecalls),

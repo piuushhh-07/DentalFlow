@@ -14,6 +14,7 @@ const navigationGroups = [
     label: "Workspace",
     items: [
       { label: "Dashboard", icon: LayoutDashboard, href: "" },
+      { label: "Appointments", icon: CalendarClock, href: "appointments" },
       { label: "Patients", icon: UsersRound, href: "patients" },
       { label: "Treatments", icon: Stethoscope, href: "treatments/catalogue" },
       { label: "Follow-ups", icon: ClipboardList, href: "#follow-up-queue" },
@@ -30,6 +31,7 @@ type AppNavigationProps = Readonly<{
   clinicId: string;
   activeSection?:
     | "dashboard"
+    | "appointments"
     | "patients"
     | "treatments"
     | "recalls"
@@ -67,6 +69,8 @@ export function AppNavigation({
             {group.items.map(({ label, icon: Icon, href }) => {
               const isActive =
                 (label === "Dashboard" && activeSection === "dashboard") ||
+                (label === "Appointments" &&
+                  activeSection === "appointments") ||
                 (label === "Patients" && activeSection === "patients") ||
                 (label === "Treatments" && activeSection === "treatments") ||
                 (label === "Recalls" && activeSection === "recalls") ||
@@ -83,9 +87,11 @@ export function AppNavigation({
                       ? "/insurance"
                       : label === "Reports"
                         ? "/reports"
-                        : label === "Treatments"
-                          ? "/treatments/catalogue"
-                          : "";
+                        : label === "Appointments"
+                          ? "/appointments"
+                          : label === "Treatments"
+                            ? "/treatments/catalogue"
+                            : "";
 
               return (
                 <li key={label}>

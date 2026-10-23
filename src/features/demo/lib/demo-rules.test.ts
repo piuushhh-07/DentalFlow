@@ -62,12 +62,42 @@ const plans: DemoTreatmentPlan[] = [
     acceptance: "ACCEPTED",
     acceptanceDate: "2026-09-13",
     procedures: [
-      { id: "proc-1", name: "Root canal", treatmentArea: "Tooth 16", amount: 15000, acceptance: "ACCEPTED" },
-      { id: "proc-2", name: "Crown", treatmentArea: "Tooth 16", amount: 12000, acceptance: "DEFERRED" },
+      {
+        id: "proc-1",
+        name: "Root canal",
+        treatmentArea: "Tooth 16",
+        amount: 15000,
+        acceptance: "ACCEPTED",
+      },
+      {
+        id: "proc-2",
+        name: "Crown",
+        treatmentArea: "Tooth 16",
+        amount: 12000,
+        acceptance: "DEFERRED",
+      },
     ],
     stages: [
-      { id: "stage-1", name: "Root canal", description: "", sequence: 1, plannedDate: "2026-09-20", status: "COMPLETED", appointmentId: null, notes: "" },
-      { id: "stage-2", name: "Crown", description: "", sequence: 2, plannedDate: "2026-10-25", status: "PLANNED", appointmentId: null, notes: "" },
+      {
+        id: "stage-1",
+        name: "Root canal",
+        description: "",
+        sequence: 1,
+        plannedDate: "2026-09-20",
+        status: "COMPLETED",
+        appointmentId: null,
+        notes: "",
+      },
+      {
+        id: "stage-2",
+        name: "Crown",
+        description: "",
+        sequence: 2,
+        plannedDate: "2026-10-25",
+        status: "PLANNED",
+        appointmentId: null,
+        notes: "",
+      },
     ],
   },
 ];
@@ -219,16 +249,46 @@ test("WhatsApp prep only allows consented patients and renders templates safely"
     createWhatsAppUrl("+91 98765 43210", "Hi there", "GRANTED"),
     "https://wa.me/919876543210?text=Hi%20there",
   );
-  assert.throws(() => createWhatsAppUrl("+91 98765 43210", "Hi there", "NOT_RECORDED"), /consent/i);
+  assert.throws(
+    () => createWhatsAppUrl("+91 98765 43210", "Hi there", "NOT_RECORDED"),
+    /consent/i,
+  );
 });
 
 test("pending recall count only includes active due recalls", () => {
   assert.equal(
     pendingRecallCount(
       [
-        { id: "rec-1", patientId: "pt-1", type: "Cleaning", lastVisit: "2026-04-05", intervalMonths: 6, dueDate: "2026-10-18", status: "ACTIVE", dentistConfirmed: true },
-        { id: "rec-2", patientId: "pt-2", type: "Checkup", lastVisit: "2026-04-05", intervalMonths: 6, dueDate: "2026-10-20", status: "ACTIVE", dentistConfirmed: false },
-        { id: "rec-3", patientId: "pt-3", type: "Recall", lastVisit: "2026-04-05", intervalMonths: 6, dueDate: "2026-10-21", status: "COMPLETED", dentistConfirmed: true },
+        {
+          id: "rec-1",
+          patientId: "pt-1",
+          type: "Cleaning",
+          lastVisit: "2026-04-05",
+          intervalMonths: 6,
+          dueDate: "2026-10-18",
+          status: "ACTIVE",
+          dentistConfirmed: true,
+        },
+        {
+          id: "rec-2",
+          patientId: "pt-2",
+          type: "Checkup",
+          lastVisit: "2026-04-05",
+          intervalMonths: 6,
+          dueDate: "2026-10-20",
+          status: "ACTIVE",
+          dentistConfirmed: false,
+        },
+        {
+          id: "rec-3",
+          patientId: "pt-3",
+          type: "Recall",
+          lastVisit: "2026-04-05",
+          intervalMonths: 6,
+          dueDate: "2026-10-21",
+          status: "COMPLETED",
+          dentistConfirmed: true,
+        },
       ],
       "2026-10-19",
     ),

@@ -4,7 +4,9 @@ import { Prisma } from "@prisma/client";
 import {
   classifyErrorCause,
   describeSupabaseHost,
+  formatRuntimeEndpointObservation,
   loadEnvironmentContents,
+  migrationEngineDiagnosticArgs,
   probeTcp,
   runIntegrationCommand,
   sanitizeDiagnosticMessage,
@@ -26,6 +28,8 @@ test("diagnostic command runs only the dedicated read-only diagnostic", async ()
     directUrl: "direct-url",
     supabaseUrl: "https://synthetic-test-project.supabase.co",
     anonKey: "synthetic-test-key",
+    runtimeTlsValidated: true,
+    runtimePoolerOptionsValidated: true,
   };
   const calls: string[] = [];
   let reportedIdentity = false;
@@ -53,6 +57,289 @@ test("diagnostic command runs only the dedicated read-only diagnostic", async ()
 
   assert.deepEqual(calls, ["dns-tcp-prisma-select"]);
   assert.equal(reportedIdentity, false);
+});
+
+test("migration diagnostic verifies the migration target and cannot migrate or run tests", async () => {
+  const config = {
+    projectRef: "synthetic-test-project",
+    databaseUrl: "runtime-url",
+    directUrl: "validated-migration-url",
+    supabaseUrl: "https://synthetic-test-project.supabase.co",
+    anonKey: "synthetic-test-key",
+    runtimeTlsValidated: true,
+    runtimePoolerOptionsValidated: true,
+  };
+  const calls: string[] = [];
+  let reportedIdentity = false;
+
+  await runIntegrationCommand(
+    "diagnose-migrate",
+    config,
+    {
+      diagnoseMigrationEngine: () => {
+        calls.push("schema-engine-read-only-diff");
+      },
+      observeRuntimeEndpoint: async () => {
+        calls.push("runtime-endpoint-observations");
+      },
+      verifyDatabaseTarget: async (_config, connectionUrl) => {
+        if (connectionUrl) {
+          assert.equal(connectionUrl, config.directUrl);
+          calls.push("migration-target-identity");
+        } else {
+          calls.push("runtime-target-identity");
+        }
+        return { databaseName: "postgres", serverVersion: "synthetic" };
+      },
+      runMigrations: () => calls.push("migrations"),
+      verifyMigrations: async () => {
+        calls.push("migration-ledger");
+      },
+      runTests: () => calls.push("integration-tests"),
+    },
+    () => {
+      reportedIdentity = true;
+    },
+  );
+
+  assert.deepEqual(calls, [
+    "runtime-endpoint-observations",
+    "runtime-target-identity",
+    "migration-target-identity",
+    "schema-engine-read-only-diff",
+  ]);
+  assert.equal(reportedIdentity, true);
+});
+
+test("migration diagnostic reports only the failing stage and preserves safe error metadata", async () => {
+  const config = {
+    projectRef: "synthetic-test-project",
+    databaseUrl: "runtime-url",
+    directUrl: "validated-migration-url",
+    supabaseUrl: "https://synthetic-test-project.supabase.co",
+    anonKey: "synthetic-test-key",
+    runtimeTlsValidated: true,
+    runtimePoolerOptionsValidated: true,
+  };
+  const runtimeError = new PrismaClientInitializationError(
+    "Can't reach synthetic database host",
+  );
+
+  await assert.rejects(
+    runIntegrationCommand(
+      "diagnose-migrate",
+      config,
+      {
+        diagnoseMigrationEngine: () => {
+          throw new Error("Schema Engine should not be reached");
+        },
+        observeRuntimeEndpoint: async () => undefined,
+        verifyDatabaseTarget: async () => {
+          throw runtimeError;
+        },
+        runMigrations: () => assert.fail("Must not run migrations"),
+        verifyMigrations: async () =>
+          assert.fail("Must not inspect migrations"),
+        runTests: () => assert.fail("Must not run integration tests"),
+      },
+      () => assert.fail("Target should not be reported as verified"),
+    ),
+  );
+
+  assert.deepEqual(safeErrorDiagnostics(runtimeError), {
+    type: "PrismaClientInitializationError",
+    prismaCode: "none",
+    networkCode: "none",
+    cause: "server_unreachable",
+    stage: "runtime_identity",
+  });
+});
+
+test("migration identity failures are distinguished from runtime identity failures", async () => {
+  const config = {
+    projectRef: "synthetic-test-project",
+    databaseUrl: "runtime-url",
+    directUrl: "validated-migration-url",
+    supabaseUrl: "https://synthetic-test-project.supabase.co",
+    anonKey: "synthetic-test-key",
+    runtimeTlsValidated: true,
+    runtimePoolerOptionsValidated: true,
+  };
+  const migrationError = new PrismaClientInitializationError(
+    "Can't reach synthetic migration host",
+  );
+
+  await assert.rejects(
+    runIntegrationCommand(
+      "diagnose-migrate",
+      config,
+      {
+        diagnoseMigrationEngine: () => {
+          throw new Error("Schema Engine should not be reached");
+        },
+        observeRuntimeEndpoint: async () => undefined,
+        verifyDatabaseTarget: async (_config, connectionUrl) => {
+          if (!connectionUrl) {
+            return {
+              databaseName: "postgres",
+              serverVersion: "synthetic",
+            };
+          }
+          throw migrationError;
+        },
+        runMigrations: () => assert.fail("Must not run migrations"),
+        verifyMigrations: async () =>
+          assert.fail("Must not inspect migrations"),
+        runTests: () => assert.fail("Must not run integration tests"),
+      },
+      () => assert.fail("Target should not be reported as verified"),
+    ),
+  );
+
+  assert.equal(
+    safeErrorDiagnostics(migrationError).stage,
+    "migration_identity",
+  );
+});
+
+test("integration suite failures are attributed to suite execution", async () => {
+  const config = {
+    projectRef: "synthetic-test-project",
+    databaseUrl: "runtime-url",
+    directUrl: "validated-migration-url",
+    supabaseUrl: "https://synthetic-test-project.supabase.co",
+    anonKey: "synthetic-test-key",
+    runtimeTlsValidated: true,
+    runtimePoolerOptionsValidated: true,
+  };
+  const suiteError = new Error("Synthetic test process failure");
+
+  await assert.rejects(
+    runIntegrationCommand(
+      "test",
+      config,
+      {
+        verifyDatabaseTarget: async () => ({
+          databaseName: "postgres",
+          serverVersion: "synthetic",
+        }),
+        runMigrations: () => assert.fail("Must not run migrations"),
+        verifyMigrations: async () => undefined,
+        runTests: () => {
+          throw suiteError;
+        },
+      },
+      () => undefined,
+    ),
+    suiteError,
+  );
+
+  assert.equal(safeErrorDiagnostics(suiteError).stage, "integration_suite");
+});
+
+test("Schema Engine failures are distinguished from Prisma Client identity failures", async () => {
+  const config = {
+    projectRef: "synthetic-test-project",
+    databaseUrl: "runtime-url",
+    directUrl: "validated-migration-url",
+    supabaseUrl: "https://synthetic-test-project.supabase.co",
+    anonKey: "synthetic-test-key",
+    runtimeTlsValidated: true,
+    runtimePoolerOptionsValidated: true,
+  };
+  const engineError = new Error(
+    "Prisma Schema Engine read-only diagnostic failed",
+  );
+
+  await assert.rejects(
+    runIntegrationCommand(
+      "diagnose-migrate",
+      config,
+      {
+        diagnoseMigrationEngine: () => {
+          throw engineError;
+        },
+        observeRuntimeEndpoint: async () => undefined,
+        verifyDatabaseTarget: async () => ({
+          databaseName: "postgres",
+          serverVersion: "synthetic",
+        }),
+        runMigrations: () => assert.fail("Must not run migrations"),
+        verifyMigrations: async () =>
+          assert.fail("Must not inspect migrations"),
+        runTests: () => assert.fail("Must not run integration tests"),
+      },
+      () => undefined,
+    ),
+  );
+
+  assert.equal(safeErrorDiagnostics(engineError).stage, "schema_engine_diff");
+});
+
+test("Schema Engine diagnostic uses Prisma's read-only datasource-to-empty diff", () => {
+  const args = migrationEngineDiagnosticArgs();
+
+  assert.deepEqual(args.slice(0, 3), [
+    "migrate",
+    "diff",
+    "--from-schema-datasource",
+  ]);
+  assert.match(args[3], /prisma[\\/]schema\.prisma$/);
+  assert.deepEqual(args.slice(4), ["--to-empty"]);
+  assert.equal(
+    args.some((argument) => argument.includes("://")),
+    false,
+  );
+  assert.equal(args.includes("deploy"), false);
+});
+
+test("runtime observations expose only safe host shapes and fixed probe categories", () => {
+  const host = "project-secret.aws-0-region.pooler.supabase.com";
+  const observation = formatRuntimeEndpointObservation({
+    host,
+    port: 6543,
+    tlsValidated: true,
+    poolerOptionsValidated: true,
+    dnsOutcome: "resolved",
+    ipv4Count: 2,
+    ipv6Count: 1,
+    tcpOutcome: "connected",
+    addressesTested: 3,
+  });
+
+  assert.equal(
+    observation,
+    "host=supabase-pooler port=6543 tls_validation=pass pooler_validation=pass dns=resolved ipv4=2 ipv6=1 tcp=connected addresses_tested=3",
+  );
+  for (const sensitiveValue of [
+    host,
+    "project-secret",
+    "aws-0-region",
+    "supabase.com",
+  ]) {
+    assert.equal(observation.includes(sensitiveValue), false);
+  }
+});
+
+test("runtime observation formatting safely handles probe failures and unsafe values", () => {
+  const observation = formatRuntimeEndpointObservation({
+    host: "unknown-host.example.invalid",
+    port: 6543,
+    tlsValidated: false,
+    poolerOptionsValidated: false,
+    dnsOutcome: "getaddrinfo failed for secret-host",
+    ipv4Count: -1,
+    ipv6Count: Number.NaN,
+    tcpOutcome: "raw connection error containing a password",
+    addressesTested: -5,
+  });
+
+  assert.equal(
+    observation,
+    "host=unrecognized-host port=6543 tls_validation=fail pooler_validation=fail dns=unknown ipv4=0 ipv6=0 tcp=unknown addresses_tested=0",
+  );
+  assert.equal(observation.includes("secret-host"), false);
+  assert.equal(observation.includes("password"), false);
 });
 
 test("formats supported Supabase endpoint shapes without exposing project refs", () => {

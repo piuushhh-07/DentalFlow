@@ -1,11 +1,13 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { redirect } from "next/navigation";
 
 import {
   classifySignInResult,
   getSafeAuthErrorMetadata,
+  persistSignInProfile,
 } from "@/features/auth/lib/auth-login";
 import { prisma } from "@/lib/db/prisma";
 import { createSupabaseServerActionClient } from "@/lib/supabase/server";
@@ -14,6 +16,17 @@ const signInSchema = z.object({
   email: z.string().trim().email().max(254),
   password: z.string().min(1).max(256),
 });
+
+function logUserProfilePersistenceFailure(error: unknown): void {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    console.error("Sign-in profile persistence failed", { code: error.code });
+    return;
+  }
+
+  console.error("Sign-in profile persistence failed", {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+  });
+}
 
 export async function signIn(formData: FormData) {
   const result = signInSchema.safeParse({
@@ -59,11 +72,27 @@ export async function signIn(formData: FormData) {
   }
 
   const user = authResult.data.user;
-  await prisma.userProfile.upsert({
-    where: { id: user.id },
-    create: { id: user.id },
-    update: {},
-  });
+  const profileResult = await persistSignInProfile(
+    async () =>
+      prisma.userProfile.upsert({
+        where: { id: user.id },
+        create: { id: user.id },
+        update: {},
+      }),
+    async () => (await supabase.auth.signOut()).error,
+  );
+  if (profileResult.status === "failed") {
+    logUserProfilePersistenceFailure(profileResult.persistenceError);
+    if (profileResult.cleanupError) {
+      console.error("Sign-in session cleanup failed", {
+        ...getSafeAuthErrorMetadata(profileResult.cleanupError),
+      });
+      throw new Error(
+        "Sign-in could not complete because clinic profile storage failed and the Supabase session could not be cleared.",
+      );
+    }
+    redirect("/login?error=database");
+  }
 
   redirect("/");
 }

@@ -27,7 +27,10 @@ export class ClinicRoleDeniedError extends Error {
 }
 
 function isValidClinicRole(value: unknown): value is ClinicRole {
-  return typeof value === "string" && Object.values(ClinicRole).includes(value as ClinicRole);
+  return (
+    typeof value === "string" &&
+    Object.values(ClinicRole).includes(value as ClinicRole)
+  );
 }
 
 export function authorizeClinicMembership(

@@ -17,7 +17,9 @@ export function SignInForm({ error }: SignInFormProps) {
             ? "We could not verify your session. Please sign in again."
             : error === "unavailable"
               ? "Sign-in is temporarily unavailable. Please try again."
-              : null;
+              : error === "database"
+                ? "We couldn't complete sign-in because clinic profile storage is unavailable. Please try again later."
+                : null;
 
   return (
     <form action={signIn} className="space-y-5">

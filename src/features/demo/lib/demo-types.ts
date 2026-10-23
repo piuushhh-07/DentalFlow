@@ -8,11 +8,7 @@ export type DemoAppointmentStatus =
   | "CANCELLED"
   | "NO_SHOW";
 export type DemoStageStatus =
-  | "PLANNED"
-  | "SCHEDULED"
-  | "IN_PROGRESS"
-  | "COMPLETED"
-  | "SKIPPED";
+  "PLANNED" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "SKIPPED";
 export type DemoAcceptance =
   | "DRAFT"
   | "PRESENTED"

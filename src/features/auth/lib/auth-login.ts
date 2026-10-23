@@ -2,6 +2,31 @@ import { AuthApiError, AuthError, type User } from "@supabase/supabase-js";
 
 export type SignInFailureCode = "credentials" | "unconfirmed" | "unavailable";
 
+export type SignInProfilePersistenceResult =
+  | Readonly<{ status: "saved" }>
+  | Readonly<{
+      status: "failed";
+      persistenceError: unknown;
+      cleanupError: unknown | null;
+    }>;
+
+export async function persistSignInProfile(
+  persist: () => Promise<unknown>,
+  clearSession: () => Promise<unknown>,
+): Promise<SignInProfilePersistenceResult> {
+  try {
+    await persist();
+    return { status: "saved" };
+  } catch (persistenceError) {
+    try {
+      const cleanupError = await clearSession();
+      return { status: "failed", persistenceError, cleanupError };
+    } catch (cleanupError) {
+      return { status: "failed", persistenceError, cleanupError };
+    }
+  }
+}
+
 export function classifySignInResult(
   user: User | null,
   error: unknown,

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { DemoWorkspace } from "@/features/demo/components/demo-workspace";
+import { isLocalDemoEnabled } from "@/features/demo/lib/demo-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,10 @@ export const metadata = {
 
 export default function DemoPage() {
   if (
-    process.env.NODE_ENV !== "development" ||
-    process.env.NEXT_PUBLIC_DENTALFLOW_DEMO_MODE !== "true"
+    !isLocalDemoEnabled(
+      process.env.NODE_ENV,
+      process.env.NEXT_PUBLIC_DENTALFLOW_DEMO_MODE,
+    )
   ) {
     notFound();
   }

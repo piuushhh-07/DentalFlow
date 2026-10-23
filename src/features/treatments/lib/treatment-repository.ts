@@ -8,6 +8,12 @@ import {
 
 import { prisma } from "@/lib/db/prisma";
 import {
+  measureTransactionQuery,
+  recordTransactionPhase,
+  startTransactionDiagnostic,
+  type TransactionDiagnostic,
+} from "@/lib/db/transaction-diagnostics";
+import {
   canTransitionTreatmentVisit,
   toDatabaseDate,
   validateAdditionalVisits,
@@ -115,8 +121,7 @@ export async function createClinicTreatmentPlan(
           totalVisits: input.totalVisits,
           visits: {
             create: input.dueDates.map((dueDate, index) => ({
-              clinicId,
-              patientId,
+              clinic: { connect: { id: clinicId } },
               visitNumber: index + 1,
               dueDate: toDatabaseDate(dueDate),
             })),
@@ -125,7 +130,10 @@ export async function createClinicTreatmentPlan(
         select: { id: true },
       });
     },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      timeout: 10_000,
+    },
   );
 }
 
@@ -254,39 +262,70 @@ export async function updateClinicTreatmentVisitStatus(
   visitId: string,
   nextStatus: TreatmentVisitStatus,
 ) {
-  return prisma.$transaction(
-    async (transaction) => {
-      const visit = await transaction.treatmentVisit.findFirst({
-        where: {
-          id: visitId,
-          clinicId,
-          patientId,
-          treatmentPlanId,
-        },
-        select: { id: true, status: true },
-      });
+  const diagnostic = startTransactionDiagnostic("treatmentVisitStatus.update");
+  try {
+    await prisma.$transaction(
+      async (transaction) => {
+        recordTransactionPhase(diagnostic, "callback_entry");
+        try {
+          const visit = await measureTransactionQuery(
+            diagnostic,
+            "findVisit",
+            () =>
+              transaction.treatmentVisit.findFirst({
+                where: {
+                  id: visitId,
+                  clinicId,
+                  patientId,
+                  treatmentPlanId,
+                },
+                select: { id: true, status: true },
+              }),
+          );
 
-      if (!visit) {
-        throw new TreatmentVisitNotFoundError();
-      }
+          if (!visit) {
+            throw new TreatmentVisitNotFoundError();
+          }
 
-      if (!canTransitionTreatmentVisit(visit.status, nextStatus)) {
-        throw new TreatmentVisitTransitionError();
-      }
+          if (!canTransitionTreatmentVisit(visit.status, nextStatus)) {
+            throw new TreatmentVisitTransitionError();
+          }
 
-      await transaction.treatmentVisit.update({
-        where: { id: visit.id },
-        data: {
-          status: nextStatus,
-          completedAt:
-            nextStatus === TreatmentVisitStatus.COMPLETED ? new Date() : null,
-        },
-      });
+          await measureTransactionQuery(diagnostic, "updateVisit", () =>
+            transaction.treatmentVisit.update({
+              where: { id: visit.id },
+              data: {
+                status: nextStatus,
+                completedAt:
+                  nextStatus === TreatmentVisitStatus.COMPLETED
+                    ? new Date()
+                    : null,
+              },
+            }),
+          );
 
-      await syncTreatmentPlanStatus(transaction, clinicId, treatmentPlanId);
-    },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-  );
+          await syncTreatmentPlanStatus(
+            transaction,
+            clinicId,
+            treatmentPlanId,
+            diagnostic,
+          );
+          recordTransactionPhase(diagnostic, "callback_completed");
+        } catch (error) {
+          recordTransactionPhase(diagnostic, "callback_failed", error);
+          throw error;
+        }
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 5_000,
+      },
+    );
+    recordTransactionPhase(diagnostic, "outer_resolved");
+  } catch (error) {
+    recordTransactionPhase(diagnostic, "outer_rejected", error);
+    throw error;
+  }
 }
 
 export async function cancelClinicTreatmentPlan(
@@ -328,18 +367,28 @@ async function syncTreatmentPlanStatus(
   transaction: Prisma.TransactionClient,
   clinicId: string,
   treatmentPlanId: string,
+  diagnostic?: TransactionDiagnostic,
 ): Promise<void> {
-  const [visits, plan] = await Promise.all([
-    transaction.treatmentVisit.findMany({
-      where: { clinicId, treatmentPlanId },
-      select: { status: true },
-    }),
+  const query = () =>
     transaction.treatmentPlan.findFirst({
       where: { id: treatmentPlanId, clinicId },
-      select: { completedAt: true },
-    }),
-  ]);
+      select: {
+        completedAt: true,
+        visits: {
+          where: { clinicId },
+          select: { status: true },
+        },
+      },
+    });
+  const plan = diagnostic
+    ? await measureTransactionQuery(
+        diagnostic,
+        "syncPlan.findPlanAndVisits",
+        query,
+      )
+    : await query();
   if (!plan) throw new TreatmentPlanNotFoundError();
+  const { visits } = plan;
   const allCompleted =
     visits.length > 0 &&
     visits.every(({ status }) => status === TreatmentVisitStatus.COMPLETED);
@@ -351,15 +400,25 @@ async function syncTreatmentPlanStatus(
         status === TreatmentVisitStatus.CANCELLED,
     );
 
-  await transaction.treatmentPlan.updateMany({
-    where: { id: treatmentPlanId, clinicId },
-    data: {
-      status: allCompleted
-        ? TreatmentPlanStatus.COMPLETED
-        : allClosed
-          ? TreatmentPlanStatus.CANCELLED
-          : TreatmentPlanStatus.ACTIVE,
-      completedAt: allCompleted ? (plan.completedAt ?? new Date()) : null,
-    },
-  });
+  const updatePlan = () =>
+    transaction.treatmentPlan.updateMany({
+      where: { id: treatmentPlanId, clinicId },
+      data: {
+        status: allCompleted
+          ? TreatmentPlanStatus.COMPLETED
+          : allClosed
+            ? TreatmentPlanStatus.CANCELLED
+            : TreatmentPlanStatus.ACTIVE,
+        completedAt: allCompleted ? (plan.completedAt ?? new Date()) : null,
+      },
+    });
+  if (diagnostic) {
+    await measureTransactionQuery(
+      diagnostic,
+      "syncPlan.updatePlan",
+      updatePlan,
+    );
+  } else {
+    await updatePlan();
+  }
 }

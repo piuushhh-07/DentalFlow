@@ -4,12 +4,20 @@ import {
   InsuranceActivityType,
   InsuranceClaimStatus,
   InsuranceDocumentStatus,
+  InsuranceDocumentExtractionStatus,
   InsurancePaymentKind,
   InsurancePreAuthorizationStatus,
   Prisma,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import {
+  insuranceClaimSummarySourcesSchema,
+  insuranceDocumentExtractionSchema,
+  insuranceExtractionFieldsSchema,
+  validateInsuranceClaimSummary,
+  type InsuranceExtractionFields,
+} from "@/features/insurance/lib/insurance-document-ai";
 import {
   calculateOutstandingPaise,
   formatPaise,
@@ -108,6 +116,206 @@ function addActivity(
       summary: input.summary,
       details: input.details,
     },
+  });
+}
+
+export async function saveInsuranceClaimSummaryDraft(
+  clinicId: string,
+  actorUserId: string,
+  claimId: string,
+  input: {
+    summary: string;
+    fields: InsuranceExtractionFields;
+    sourceDocumentId: string | null;
+  },
+) {
+  return prisma.$transaction(async (transaction) => {
+    await lockClaim(transaction, clinicId, claimId);
+    const claim = await transaction.insuranceClaim.findFirst({
+      where: { id: claimId, clinicId },
+      include: {
+        patient: { select: { fullName: true } },
+        policy: {
+          include: { provider: { select: { name: true } } },
+        },
+      },
+    });
+    if (!claim) throw new InsuranceRecordNotFoundError();
+
+    let sourceReferences: Prisma.InputJsonValue = [];
+    if (input.sourceDocumentId) {
+      const document = await transaction.insuranceDocument.findFirst({
+        where: {
+          id: input.sourceDocumentId,
+          clinicId,
+          claimId,
+          extractionStatus: InsuranceDocumentExtractionStatus.NEEDS_REVIEW,
+          extractionData: { not: Prisma.DbNull },
+        },
+        select: { extractionData: true },
+      });
+      const parsedExtraction = insuranceDocumentExtractionSchema.safeParse(
+        document?.extractionData,
+      );
+      if (!document || !parsedExtraction.success) {
+        throw new InsuranceRecordNotFoundError();
+      }
+      sourceReferences = parsedExtraction.data.sources.map((source) => ({
+        ...source,
+        documentId: input.sourceDocumentId!,
+      }));
+    }
+
+    const expectedFields = {
+      patientName: claim.patient.fullName,
+      providerName: claim.policy.provider.name,
+      policyNumber: claim.policy.policyNumber,
+      policyValidFrom: claim.policy.validFrom.toISOString().slice(0, 10),
+      policyValidUntil: claim.policy.validUntil.toISOString().slice(0, 10),
+      treatmentDate: claim.treatmentDate.toISOString().slice(0, 10),
+      estimatedCost: claim.estimatedCost.toFixed(2),
+      amountClaimed: claim.amountClaimed.toFixed(2),
+    };
+    const issues = validateInsuranceClaimSummary(input.fields, expectedFields);
+    if (issues.length > 0) {
+      throw new InsuranceValidationError(issues.join(" "));
+    }
+
+    await transaction.insuranceClaim.updateMany({
+      where: { id: claimId, clinicId },
+      data: {
+        claimSummary: input.summary,
+        claimSummaryFields: input.fields,
+        claimSummarySources: sourceReferences,
+        summaryReviewedAt: null,
+        summaryReviewedById: null,
+      },
+    });
+    await addActivity(transaction, {
+      clinicId,
+      actorUserId,
+      claimId,
+      type: InsuranceActivityType.CLAIM_SUMMARY_UPDATED,
+      summary: "Draft claim summary saved for staff review",
+      details: {
+        sourceDocumentId: input.sourceDocumentId,
+        sourceCount: Array.isArray(sourceReferences)
+          ? sourceReferences.length
+          : 0,
+      },
+    });
+  });
+}
+
+export async function reviewInsuranceClaimSummary(
+  clinicId: string,
+  actorUserId: string,
+  claimId: string,
+) {
+  return prisma.$transaction(async (transaction) => {
+    await lockClaim(transaction, clinicId, claimId);
+    const claim = await transaction.insuranceClaim.findFirst({
+      where: { id: claimId, clinicId },
+      include: {
+        patient: { select: { fullName: true } },
+        policy: {
+          include: { provider: { select: { name: true } } },
+        },
+      },
+    });
+    if (!claim) throw new InsuranceRecordNotFoundError();
+    const fieldsResult = insuranceExtractionFieldsSchema.safeParse(
+      claim.claimSummaryFields,
+    );
+    const sourcesResult = insuranceClaimSummarySourcesSchema.safeParse(
+      claim.claimSummarySources ?? [],
+    );
+    if (
+      !claim.claimSummary?.trim() ||
+      !fieldsResult.success ||
+      !sourcesResult.success
+    ) {
+      throw new InsuranceValidationError(
+        "Save a complete claim summary before marking it reviewed.",
+      );
+    }
+
+    const expectedFields = {
+      patientName: claim.patient.fullName,
+      providerName: claim.policy.provider.name,
+      policyNumber: claim.policy.policyNumber,
+      policyValidFrom: claim.policy.validFrom.toISOString().slice(0, 10),
+      policyValidUntil: claim.policy.validUntil.toISOString().slice(0, 10),
+      treatmentDate: claim.treatmentDate.toISOString().slice(0, 10),
+      estimatedCost: claim.estimatedCost.toFixed(2),
+      amountClaimed: claim.amountClaimed.toFixed(2),
+    };
+    const issues = validateInsuranceClaimSummary(
+      fieldsResult.data,
+      expectedFields,
+    );
+    if (issues.length > 0) {
+      throw new InsuranceValidationError(issues.join(" "));
+    }
+
+    const sourceIds = Array.from(
+      new Set(sourcesResult.data.map((source) => source.documentId)),
+    );
+    if (sourceIds.length > 0) {
+      const documents = await transaction.insuranceDocument.findMany({
+        where: {
+          id: { in: sourceIds },
+          clinicId,
+          claimId,
+          extractionStatus: InsuranceDocumentExtractionStatus.NEEDS_REVIEW,
+        },
+        select: { id: true, extractionData: true },
+      });
+      if (documents.length !== sourceIds.length) {
+        throw new InsuranceValidationError(
+          "A cited source document is no longer available for review.",
+        );
+      }
+      const extractionByDocument = new Map(
+        documents.map((document) => [
+          document.id,
+          insuranceDocumentExtractionSchema.safeParse(document.extractionData),
+        ]),
+      );
+      for (const reference of sourcesResult.data) {
+        const extraction = extractionByDocument.get(reference.documentId);
+        if (
+          !extraction?.success ||
+          !extraction.data.sources.some(
+            (source) =>
+              source.field === reference.field &&
+              source.page === reference.page &&
+              source.quote === reference.quote,
+          )
+        ) {
+          throw new InsuranceValidationError(
+            "A source-page reference no longer matches its extracted document.",
+          );
+        }
+      }
+    }
+
+    const reviewedAt = new Date();
+    await transaction.insuranceClaim.updateMany({
+      where: { id: claimId, clinicId },
+      data: {
+        summaryReviewedAt: reviewedAt,
+        summaryReviewedById: actorUserId,
+      },
+    });
+    await addActivity(transaction, {
+      clinicId,
+      actorUserId,
+      claimId,
+      type: InsuranceActivityType.CLAIM_SUMMARY_REVIEWED,
+      summary: "Claim summary reviewed by clinic staff",
+      details: { sourceCount: sourcesResult.data.length },
+    });
   });
 }
 
@@ -422,121 +630,133 @@ export async function createInsuranceClaim(
     notes: string | null;
   },
 ) {
-  return prisma.$transaction(async (transaction) => {
-    const policy = await transaction.insurancePolicy.findFirst({
-      where: { id: input.policyId, clinicId, patientId: input.patientId },
-      select: {
-        id: true,
-        validFrom: true,
-        validUntil: true,
-        patientId: true,
-      },
-    });
-    if (!policy) throw new InsuranceRecordNotFoundError();
-
-    const treatmentDate = input.treatmentDate;
-    const validFrom = policy.validFrom.toISOString().slice(0, 10);
-    const validUntil = policy.validUntil.toISOString().slice(0, 10);
-    if (!isPolicyUsableOn(validFrom, validUntil, treatmentDate)) {
-      throw new InsuranceValidationError(
-        "The selected policy was not valid on the treatment date. Verify the policy dates before continuing.",
-      );
-    }
-
-    if (input.treatmentPlanId) {
-      const plan = await transaction.treatmentPlan.findFirst({
+  return prisma.$transaction(
+    async (transaction) => {
+      const policy = await transaction.insurancePolicy.findFirst({
         where: {
-          id: input.treatmentPlanId,
+          id: input.policyId,
           clinicId,
           patientId: input.patientId,
         },
-        select: { id: true },
+        select: {
+          id: true,
+          validFrom: true,
+          validUntil: true,
+          patientId: true,
+        },
       });
-      if (!plan) throw new InsuranceRecordNotFoundError();
-    }
+      if (!policy) throw new InsuranceRecordNotFoundError();
 
-    if (input.preAuthorizationId) {
-      const preAuthorization =
-        await transaction.insurancePreAuthorization.findFirst({
-          where: {
-            id: input.preAuthorizationId,
-            clinicId,
-            patientId: input.patientId,
-            policyId: input.policyId,
-            status: {
-              in: [
-                InsurancePreAuthorizationStatus.APPROVED,
-                InsurancePreAuthorizationStatus.PARTIALLY_APPROVED,
-              ],
-            },
-          },
-          select: { id: true, expiresAt: true },
-        });
-      if (!preAuthorization) throw new InsuranceRecordNotFoundError();
-      if (
-        preAuthorization.expiresAt &&
-        preAuthorization.expiresAt.getTime() < Date.now()
-      ) {
+      const treatmentDate = input.treatmentDate;
+      const validFrom = policy.validFrom.toISOString().slice(0, 10);
+      const validUntil = policy.validUntil.toISOString().slice(0, 10);
+      if (!isPolicyUsableOn(validFrom, validUntil, treatmentDate)) {
         throw new InsuranceValidationError(
-          "The linked pre-authorization has expired.",
+          "The selected policy was not valid on the treatment date. Verify the policy dates before continuing.",
         );
       }
-    }
 
-    const claim = await transaction.insuranceClaim.create({
-      data: {
-        clinicId,
-        patientId: input.patientId,
-        policyId: input.policyId,
-        treatmentPlanId: input.treatmentPlanId,
-        preAuthorizationId: input.preAuthorizationId,
-        type: input.type,
-        treatmentDetails: input.treatmentDetails,
-        treatmentDate: databaseDate(treatmentDate),
-        estimatedCost: new Prisma.Decimal(input.estimatedCost),
-        amountClaimed: new Prisma.Decimal(input.amountClaimed),
-        claimReference: input.claimReference,
-        notes: input.notes,
-      },
-      select: { id: true },
-    });
+      const treatmentPlanId = input.treatmentPlanId;
+      if (treatmentPlanId) {
+        const plan = await transaction.treatmentPlan.findFirst({
+          where: {
+            id: treatmentPlanId,
+            clinicId,
+            patientId: input.patientId,
+          },
+          select: { id: true },
+        });
+        if (!plan) throw new InsuranceRecordNotFoundError();
+      }
 
-    const requiredTypes =
-      input.type === "REIMBURSEMENT"
-        ? ["CLAIM_FORM", "POLICY_COPY", "INVOICE"]
-        : ["CLAIM_FORM", "POLICY_COPY", "TREATMENT_ESTIMATE"];
-    await transaction.insuranceDocument.createMany({
-      data: requiredTypes.map((type) => ({
-        clinicId,
-        claimId: claim.id,
-        type: type as
-          "CLAIM_FORM" | "POLICY_COPY" | "INVOICE" | "TREATMENT_ESTIMATE",
-        name: type.replaceAll("_", " ").toLowerCase(),
-      })),
-    });
+      const preAuthorizationId = input.preAuthorizationId;
+      if (preAuthorizationId) {
+        const preAuthorization =
+          await transaction.insurancePreAuthorization.findFirst({
+            where: {
+              id: preAuthorizationId,
+              clinicId,
+              patientId: input.patientId,
+              policyId: input.policyId,
+              status: {
+                in: [
+                  InsurancePreAuthorizationStatus.APPROVED,
+                  InsurancePreAuthorizationStatus.PARTIALLY_APPROVED,
+                ],
+              },
+            },
+            select: { id: true, expiresAt: true },
+          });
+        if (!preAuthorization) throw new InsuranceRecordNotFoundError();
+        if (
+          preAuthorization.expiresAt &&
+          preAuthorization.expiresAt.getTime() < Date.now()
+        ) {
+          throw new InsuranceValidationError(
+            "The linked pre-authorization has expired.",
+          );
+        }
+      }
 
-    await addActivity(transaction, {
-      clinicId,
-      actorUserId,
-      claimId: claim.id,
-      type: InsuranceActivityType.CLAIM_CREATED,
-      summary: `${input.type === "CASHLESS" ? "Cashless" : "Reimbursement"} claim created`,
-      details: {
-        type: input.type,
-        status: InsuranceClaimStatus.DRAFT,
-      },
-    });
-    for (const type of requiredTypes) {
-      await addActivity(transaction, {
-        clinicId,
-        actorUserId,
-        claimId: claim.id,
-        type: InsuranceActivityType.DOCUMENT_REQUIRED,
-        summary: `Required document added: ${type.replaceAll("_", " ").toLowerCase()}`,
+      const claim = await transaction.insuranceClaim.create({
+        data: {
+          clinicId,
+          patientId: input.patientId,
+          policyId: input.policyId,
+          treatmentPlanId: input.treatmentPlanId,
+          preAuthorizationId: input.preAuthorizationId,
+          type: input.type,
+          treatmentDetails: input.treatmentDetails,
+          treatmentDate: databaseDate(treatmentDate),
+          estimatedCost: new Prisma.Decimal(input.estimatedCost),
+          amountClaimed: new Prisma.Decimal(input.amountClaimed),
+          claimReference: input.claimReference,
+          notes: input.notes,
+        },
+        select: { id: true },
       });
-    }
-    return claim;
-  });
+
+      const requiredTypes =
+        input.type === "REIMBURSEMENT"
+          ? ["CLAIM_FORM", "POLICY_COPY", "INVOICE"]
+          : ["CLAIM_FORM", "POLICY_COPY", "TREATMENT_ESTIMATE"];
+      await transaction.insuranceDocument.createMany({
+        data: requiredTypes.map((type) => ({
+          clinicId,
+          claimId: claim.id,
+          type: type as
+            "CLAIM_FORM" | "POLICY_COPY" | "INVOICE" | "TREATMENT_ESTIMATE",
+          name: type.replaceAll("_", " ").toLowerCase(),
+        })),
+      });
+
+      const activityData: Prisma.InsuranceActivityCreateManyInput[] = [
+        {
+          clinicId,
+          actorUserId,
+          claimId: claim.id,
+          type: InsuranceActivityType.CLAIM_CREATED,
+          summary: `${input.type === "CASHLESS" ? "Cashless" : "Reimbursement"} claim created`,
+          details: {
+            type: input.type,
+            status: InsuranceClaimStatus.DRAFT,
+          },
+        },
+        ...requiredTypes.map((type) => ({
+          clinicId,
+          actorUserId,
+          claimId: claim.id,
+          type: InsuranceActivityType.DOCUMENT_REQUIRED,
+          summary: `Required document added: ${type.replaceAll("_", " ").toLowerCase()}`,
+        })),
+      ];
+      await transaction.insuranceActivity.createMany({
+        data: activityData,
+      });
+      return claim;
+    },
+    { timeout: 10_000 },
+  );
 }
 
 export async function updateInsuranceClaimDetails(
@@ -655,103 +875,106 @@ export async function updateInsuranceClaimStatus(
     rejectionReason: string | null;
   },
 ) {
-  return prisma.$transaction(async (transaction) => {
-    await lockClaim(transaction, clinicId, claimId);
-    const claim = await transaction.insuranceClaim.findFirst({
-      where: { id: claimId, clinicId },
-      include: {
-        payments: { select: { kind: true, amount: true } },
-        documents: { select: { status: true } },
-      },
-    });
-    if (!claim) throw new InsuranceRecordNotFoundError();
-    const patientPaid = claim.payments
-      .filter(
-        (payment) => payment.kind === InsurancePaymentKind.PATIENT_PAYMENT,
-      )
-      .reduce(
-        (total, payment) => total.plus(payment.amount),
-        new Prisma.Decimal(0),
-      )
-      .toString();
-    const insurerPaid = claim.payments
-      .filter(
-        (payment) => payment.kind === InsurancePaymentKind.INSURER_PAYMENT,
-      )
-      .reduce(
-        (total, payment) => total.plus(payment.amount),
-        new Prisma.Decimal(0),
-      )
-      .toString();
-    const context: ClaimTransitionContext = {
-      claimType: claim.type,
-      amountClaimed: claim.amountClaimed.toString(),
-      amountApproved: claim.amountApproved?.toString() ?? null,
-      patientPaid,
-      insurerPaid,
-      hasRequiredDocuments: claim.documents.every(
-        ({ status }) =>
-          status !== InsuranceDocumentStatus.REQUIRED &&
-          status !== InsuranceDocumentStatus.REJECTED,
-      ),
-    };
-    const issue = validateClaimTransition(
-      claim.status,
-      input.status,
-      context,
-      input.approvedAmount,
-      input.rejectionReason,
-    );
-    if (issue) throw new InsuranceValidationError(issue);
+  await prisma.$transaction(
+    async (transaction) => {
+      await lockClaim(transaction, clinicId, claimId);
+      const claim = await transaction.insuranceClaim.findFirst({
+        where: { id: claimId, clinicId },
+        include: {
+          payments: { select: { kind: true, amount: true } },
+          documents: { select: { status: true } },
+        },
+      });
+      if (!claim) throw new InsuranceRecordNotFoundError();
+      const patientPaid = claim.payments
+        .filter(
+          (payment) => payment.kind === InsurancePaymentKind.PATIENT_PAYMENT,
+        )
+        .reduce(
+          (total, payment) => total.plus(payment.amount),
+          new Prisma.Decimal(0),
+        )
+        .toString();
+      const insurerPaid = claim.payments
+        .filter(
+          (payment) => payment.kind === InsurancePaymentKind.INSURER_PAYMENT,
+        )
+        .reduce(
+          (total, payment) => total.plus(payment.amount),
+          new Prisma.Decimal(0),
+        )
+        .toString();
+      const context: ClaimTransitionContext = {
+        claimType: claim.type,
+        amountClaimed: claim.amountClaimed.toString(),
+        amountApproved: claim.amountApproved?.toString() ?? null,
+        patientPaid,
+        insurerPaid,
+        hasRequiredDocuments: claim.documents.every(
+          ({ status }) =>
+            status !== InsuranceDocumentStatus.REQUIRED &&
+            status !== InsuranceDocumentStatus.REJECTED,
+        ),
+      };
+      const issue = validateClaimTransition(
+        claim.status,
+        input.status,
+        context,
+        input.approvedAmount,
+        input.rejectionReason,
+      );
+      if (issue) throw new InsuranceValidationError(issue);
 
-    const now = new Date();
-    await transaction.insuranceClaim.updateMany({
-      where: { id: claim.id, clinicId },
-      data: {
-        status: input.status,
-        amountApproved:
-          input.status === InsuranceClaimStatus.APPROVED ||
-          input.status === InsuranceClaimStatus.PARTIALLY_APPROVED
-            ? new Prisma.Decimal(input.approvedAmount!)
-            : input.status === InsuranceClaimStatus.SUBMITTED
-              ? null
-              : claim.amountApproved,
-        rejectionReason:
+      const now = new Date();
+      await transaction.insuranceClaim.updateMany({
+        where: { id: claim.id, clinicId },
+        data: {
+          status: input.status,
+          amountApproved:
+            input.status === InsuranceClaimStatus.APPROVED ||
+            input.status === InsuranceClaimStatus.PARTIALLY_APPROVED
+              ? new Prisma.Decimal(input.approvedAmount!)
+              : input.status === InsuranceClaimStatus.SUBMITTED
+                ? null
+                : claim.amountApproved,
+          rejectionReason:
+            input.status === InsuranceClaimStatus.REJECTED
+              ? input.rejectionReason
+              : input.status === InsuranceClaimStatus.SUBMITTED
+                ? null
+                : claim.rejectionReason,
+          ...(input.status === InsuranceClaimStatus.SUBMITTED
+            ? {
+                submittedAt: now,
+                resubmissionCount:
+                  claim.status === InsuranceClaimStatus.REJECTED
+                    ? { increment: 1 }
+                    : claim.resubmissionCount,
+              }
+            : {}),
+          ...(input.status === InsuranceClaimStatus.APPROVED ||
+          input.status === InsuranceClaimStatus.PARTIALLY_APPROVED ||
           input.status === InsuranceClaimStatus.REJECTED
-            ? input.rejectionReason
-            : input.status === InsuranceClaimStatus.SUBMITTED
-              ? null
-              : claim.rejectionReason,
-        ...(input.status === InsuranceClaimStatus.SUBMITTED
-          ? {
-              submittedAt: now,
-              resubmissionCount:
-                claim.status === InsuranceClaimStatus.REJECTED
-                  ? { increment: 1 }
-                  : claim.resubmissionCount,
-            }
-          : {}),
-        ...(input.status === InsuranceClaimStatus.APPROVED ||
-        input.status === InsuranceClaimStatus.PARTIALLY_APPROVED ||
-        input.status === InsuranceClaimStatus.REJECTED
-          ? { insurerRespondedAt: now }
-          : {}),
-      },
-    });
-    await addActivity(transaction, {
-      clinicId,
-      actorUserId,
-      claimId,
-      type: InsuranceActivityType.STATUS_CHANGED,
-      summary: `Claim status changed: ${claim.status} → ${input.status}`,
-      details: {
-        from: claim.status,
-        to: input.status,
-        approvedAmount: input.approvedAmount,
-        rejectionReason: input.rejectionReason,
-      },
-    });
-  });
+            ? { insurerRespondedAt: now }
+            : {}),
+        },
+      });
+      await addActivity(transaction, {
+        clinicId,
+        actorUserId,
+        claimId,
+        type: InsuranceActivityType.STATUS_CHANGED,
+        summary: `Claim status changed: ${claim.status} → ${input.status}`,
+        details: {
+          from: claim.status,
+          to: input.status,
+          approvedAmount: input.approvedAmount,
+          rejectionReason: input.rejectionReason,
+        },
+      });
+    },
+    { timeout: 10_000 },
+  );
 }
 
 export async function scheduleInsuranceFollowUp(
@@ -796,112 +1019,116 @@ export async function createInsurancePayment(
     notes: string | null;
   },
 ) {
-  return prisma.$transaction(async (transaction) => {
-    await lockClaim(transaction, clinicId, claimId);
-    const claim = await transaction.insuranceClaim.findFirst({
-      where: { id: claimId, clinicId },
-      include: {
-        payments: { select: { kind: true, amount: true } },
-      },
-    });
-    if (!claim) throw new InsuranceRecordNotFoundError();
-    if (claim.status === InsuranceClaimStatus.CLOSED) {
-      throw new InsuranceValidationError(
-        "Payments cannot be recorded on a closed claim.",
-      );
-    }
-    if (input.kind === InsurancePaymentKind.PATIENT_PAYMENT) {
-      const paid = claim.payments
-        .filter(
-          (payment) => payment.kind === InsurancePaymentKind.PATIENT_PAYMENT,
-        )
-        .reduce(
-          (total, payment) => total.plus(payment.amount),
-          new Prisma.Decimal(0),
-        );
-      if (paid.plus(input.amount).gt(claim.amountClaimed)) {
+  return prisma.$transaction(
+    async (transaction) => {
+      await lockClaim(transaction, clinicId, claimId);
+      const claim = await transaction.insuranceClaim.findFirst({
+        where: { id: claimId, clinicId },
+        include: {
+          payments: { select: { kind: true, amount: true } },
+        },
+      });
+      if (!claim) throw new InsuranceRecordNotFoundError();
+      if (claim.status === InsuranceClaimStatus.CLOSED) {
         throw new InsuranceValidationError(
-          "Patient payments cannot exceed the amount claimed.",
+          "Payments cannot be recorded on a closed claim.",
         );
       }
-    }
-    if (input.kind === InsurancePaymentKind.INSURER_PAYMENT) {
-      if (!claim.amountApproved || claim.amountApproved.lte(0)) {
-        throw new InsuranceValidationError(
-          "Record an insurer decision before recording insurer payments.",
-        );
+      if (input.kind === InsurancePaymentKind.PATIENT_PAYMENT) {
+        const paid = claim.payments
+          .filter(
+            (payment) => payment.kind === InsurancePaymentKind.PATIENT_PAYMENT,
+          )
+          .reduce(
+            (total, payment) => total.plus(payment.amount),
+            new Prisma.Decimal(0),
+          );
+        if (paid.plus(input.amount).gt(claim.amountClaimed)) {
+          throw new InsuranceValidationError(
+            "Patient payments cannot exceed the amount claimed.",
+          );
+        }
       }
-      const paid = claim.payments
-        .filter(
-          (payment) => payment.kind === InsurancePaymentKind.INSURER_PAYMENT,
-        )
-        .reduce(
-          (total, payment) => total.plus(payment.amount),
-          new Prisma.Decimal(0),
-        );
-      const nextTotal = paid.plus(input.amount);
-      if (nextTotal.gt(claim.amountApproved)) {
-        throw new InsuranceValidationError(
-          "Insurer payments cannot exceed the approved amount.",
-        );
+      if (input.kind === InsurancePaymentKind.INSURER_PAYMENT) {
+        if (!claim.amountApproved || claim.amountApproved.lte(0)) {
+          throw new InsuranceValidationError(
+            "Record an insurer decision before recording insurer payments.",
+          );
+        }
+        const paid = claim.payments
+          .filter(
+            (payment) => payment.kind === InsurancePaymentKind.INSURER_PAYMENT,
+          )
+          .reduce(
+            (total, payment) => total.plus(payment.amount),
+            new Prisma.Decimal(0),
+          );
+        const nextTotal = paid.plus(input.amount);
+        if (nextTotal.gt(claim.amountApproved)) {
+          throw new InsuranceValidationError(
+            "Insurer payments cannot exceed the approved amount.",
+          );
+        }
       }
-    }
-    const payment = await transaction.insurancePayment.create({
-      data: {
-        clinicId,
-        claimId,
-        recordedById: actorUserId,
-        kind: input.kind,
-        amount: new Prisma.Decimal(input.amount),
-        paidAt: input.paidAt,
-        reference: input.reference,
-        notes: input.notes,
-      },
-      select: { id: true },
-    });
-    await addActivity(transaction, {
-      clinicId,
-      actorUserId,
-      claimId,
-      type: InsuranceActivityType.PAYMENT_RECORDED,
-      summary: `${input.kind === InsurancePaymentKind.INSURER_PAYMENT ? "Insurer" : "Patient"} payment recorded`,
-      details: {
-        kind: input.kind,
-        amount: input.amount,
-        paidAt: input.paidAt.toISOString(),
-      },
-    });
-    if (
-      input.kind === InsurancePaymentKind.INSURER_PAYMENT &&
-      claim.amountApproved &&
-      claim.status !== InsuranceClaimStatus.PAID
-    ) {
-      const insurerPayments = claim.payments
-        .filter((row) => row.kind === InsurancePaymentKind.INSURER_PAYMENT)
-        .map((row) => row.amount.toString());
-      insurerPayments.push(input.amount);
-      if (
-        calculateOutstandingPaise(
-          claim.amountApproved.toString(),
-          insurerPayments,
-        ) === BigInt(0)
-      ) {
-        await transaction.insuranceClaim.updateMany({
-          where: { id: claimId, clinicId },
-          data: { status: InsuranceClaimStatus.PAID },
-        });
-        await addActivity(transaction, {
+      const payment = await transaction.insurancePayment.create({
+        data: {
           clinicId,
-          actorUserId,
           claimId,
-          type: InsuranceActivityType.STATUS_CHANGED,
-          summary: "Claim marked paid after full insurer payment was recorded",
-          details: { from: claim.status, to: InsuranceClaimStatus.PAID },
-        });
+          recordedById: actorUserId,
+          kind: input.kind,
+          amount: new Prisma.Decimal(input.amount),
+          paidAt: input.paidAt,
+          reference: input.reference,
+          notes: input.notes,
+        },
+        select: { id: true },
+      });
+      await addActivity(transaction, {
+        clinicId,
+        actorUserId,
+        claimId,
+        type: InsuranceActivityType.PAYMENT_RECORDED,
+        summary: `${input.kind === InsurancePaymentKind.INSURER_PAYMENT ? "Insurer" : "Patient"} payment recorded`,
+        details: {
+          kind: input.kind,
+          amount: input.amount,
+          paidAt: input.paidAt.toISOString(),
+        },
+      });
+      if (
+        input.kind === InsurancePaymentKind.INSURER_PAYMENT &&
+        claim.amountApproved &&
+        claim.status !== InsuranceClaimStatus.PAID
+      ) {
+        const insurerPayments = claim.payments
+          .filter((row) => row.kind === InsurancePaymentKind.INSURER_PAYMENT)
+          .map((row) => row.amount.toString());
+        insurerPayments.push(input.amount);
+        if (
+          calculateOutstandingPaise(
+            claim.amountApproved.toString(),
+            insurerPayments,
+          ) === BigInt(0)
+        ) {
+          await transaction.insuranceClaim.updateMany({
+            where: { id: claimId, clinicId },
+            data: { status: InsuranceClaimStatus.PAID },
+          });
+          await addActivity(transaction, {
+            clinicId,
+            actorUserId,
+            claimId,
+            type: InsuranceActivityType.STATUS_CHANGED,
+            summary:
+              "Claim marked paid after full insurer payment was recorded",
+            details: { from: claim.status, to: InsuranceClaimStatus.PAID },
+          });
+        }
       }
-    }
-    return payment;
-  });
+      return payment;
+    },
+    { timeout: 10_000 },
+  );
 }
 
 export async function createInsurancePreAuthorization(
@@ -1375,6 +1602,11 @@ export async function registerInsuranceDocumentUpload(
         receivedAt: new Date(),
         verifiedAt: null,
         rejectionReason: null,
+        extractionStatus: InsuranceDocumentExtractionStatus.NOT_STARTED,
+        extractionData: Prisma.DbNull,
+        extractionIssues: Prisma.DbNull,
+        extractionCompletedAt: null,
+        extractionModel: null,
       },
     });
     if (!result.count) throw new InsuranceRecordNotFoundError();
@@ -1385,6 +1617,181 @@ export async function registerInsuranceDocumentUpload(
       type: InsuranceActivityType.DOCUMENT_RECEIVED,
       summary: "A required document was received",
       details: { documentId },
+    });
+  });
+}
+
+export async function resetUnverifiedInsuranceDocumentUpload(
+  clinicId: string,
+  claimId: string,
+  documentId: string,
+  storagePath: string,
+) {
+  const result = await prisma.insuranceDocument.updateMany({
+    where: {
+      id: documentId,
+      claimId,
+      clinicId,
+      storagePath,
+      status: InsuranceDocumentStatus.RECEIVED,
+    },
+    data: {
+      storagePath: null,
+      status: InsuranceDocumentStatus.REQUIRED,
+      receivedAt: null,
+      verifiedAt: null,
+      rejectionReason: null,
+      extractionStatus: InsuranceDocumentExtractionStatus.NOT_STARTED,
+      extractionData: Prisma.DbNull,
+      extractionIssues: Prisma.DbNull,
+      extractionCompletedAt: null,
+      extractionModel: null,
+    },
+  });
+  return result.count > 0;
+}
+
+export async function getInsuranceDocumentForProcessing(
+  clinicId: string,
+  claimId: string,
+  documentId: string,
+) {
+  return prisma.insuranceDocument.findFirst({
+    where: {
+      id: documentId,
+      clinicId,
+      claimId,
+      storagePath: { not: null },
+    },
+    include: {
+      claim: {
+        include: {
+          patient: { select: { fullName: true } },
+          policy: {
+            include: {
+              provider: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function startInsuranceDocumentExtraction(
+  clinicId: string,
+  claimId: string,
+  documentId: string,
+) {
+  return prisma.$transaction(async (transaction) => {
+    await lockDocument(transaction, clinicId, claimId, documentId);
+    const document = await transaction.insuranceDocument.findFirst({
+      where: {
+        id: documentId,
+        clinicId,
+        claimId,
+        storagePath: { not: null },
+        status: {
+          in: [
+            InsuranceDocumentStatus.RECEIVED,
+            InsuranceDocumentStatus.VERIFIED,
+          ],
+        },
+      },
+      select: { id: true, extractionStatus: true },
+    });
+    if (!document) throw new InsuranceRecordNotFoundError();
+    if (
+      document.extractionStatus === InsuranceDocumentExtractionStatus.PROCESSING
+    ) {
+      throw new InsuranceValidationError(
+        "This document is already being processed.",
+      );
+    }
+    await transaction.insuranceDocument.updateMany({
+      where: { id: documentId, clinicId, claimId },
+      data: {
+        extractionStatus: InsuranceDocumentExtractionStatus.PROCESSING,
+        extractionData: Prisma.DbNull,
+        extractionIssues: Prisma.DbNull,
+        extractionCompletedAt: null,
+        extractionModel: null,
+      },
+    });
+  });
+}
+
+export async function saveInsuranceDocumentExtraction(
+  clinicId: string,
+  actorUserId: string,
+  claimId: string,
+  documentId: string,
+  input: {
+    extractionData: Prisma.InputJsonValue;
+    extractionIssues: Prisma.InputJsonValue;
+    model: string;
+  },
+) {
+  return prisma.$transaction(async (transaction) => {
+    await lockDocument(transaction, clinicId, claimId, documentId);
+    const updated = await transaction.insuranceDocument.updateMany({
+      where: {
+        id: documentId,
+        clinicId,
+        claimId,
+        extractionStatus: InsuranceDocumentExtractionStatus.PROCESSING,
+      },
+      data: {
+        extractionStatus: InsuranceDocumentExtractionStatus.NEEDS_REVIEW,
+        extractionData: input.extractionData,
+        extractionIssues: input.extractionIssues,
+        extractionCompletedAt: new Date(),
+        extractionModel: input.model,
+      },
+    });
+    if (!updated.count) throw new InsuranceRecordNotFoundError();
+    await addActivity(transaction, {
+      clinicId,
+      actorUserId,
+      claimId,
+      type: InsuranceActivityType.DOCUMENT_EXTRACTION_COMPLETED,
+      summary: "Document extraction completed and is awaiting staff review",
+      details: { documentId },
+    });
+  });
+}
+
+export async function failInsuranceDocumentExtraction(
+  clinicId: string,
+  actorUserId: string,
+  claimId: string,
+  documentId: string,
+  issueCode: string,
+) {
+  return prisma.$transaction(async (transaction) => {
+    const updated = await transaction.insuranceDocument.updateMany({
+      where: {
+        id: documentId,
+        clinicId,
+        claimId,
+        extractionStatus: InsuranceDocumentExtractionStatus.PROCESSING,
+      },
+      data: {
+        extractionStatus: InsuranceDocumentExtractionStatus.FAILED,
+        extractionData: Prisma.DbNull,
+        extractionIssues: { issues: [issueCode] },
+        extractionCompletedAt: new Date(),
+        extractionModel: null,
+      },
+    });
+    if (!updated.count) return;
+    await addActivity(transaction, {
+      clinicId,
+      actorUserId,
+      claimId,
+      type: InsuranceActivityType.DOCUMENT_EXTRACTION_FAILED,
+      summary: "Document extraction failed and can be retried",
+      details: { documentId, issueCode },
     });
   });
 }

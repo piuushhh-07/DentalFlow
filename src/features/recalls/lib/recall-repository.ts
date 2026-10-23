@@ -170,7 +170,10 @@ export async function createClinicRecall(
         select: { id: true },
       });
     },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 5_000,
+    },
   );
 }
 

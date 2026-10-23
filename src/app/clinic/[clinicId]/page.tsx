@@ -20,6 +20,7 @@ import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { prisma } from "@/lib/db/prisma";
 import { RecallControls } from "@/features/recalls/components/recall-controls";
 import { TreatmentVisitControls } from "@/features/treatments/components/treatment-visit-controls";
+import { countClinicAppointments } from "@/features/appointments/lib/appointment-repository";
 import { WhatsAppReminder } from "@/features/messages/components/whatsapp-reminder";
 import { DEFAULT_WHATSAPP_TEMPLATE } from "@/features/messages/lib/template-validation";
 import { getClinicWhatsAppTemplate } from "@/features/messages/lib/template-repository";
@@ -101,13 +102,19 @@ export default async function ClinicDashboardPage({
   const query = parsed.success ? parsed.data.query : "";
   const page = parsed.success ? parsed.data.page : 1;
   const clinicToday = getClinicToday();
-  const [queue, summary, reminderTemplate, financialSummary] =
-    await Promise.all([
-      listFollowUpQueue(membership.clinicId, tab, query, page, clinicToday),
-      getFollowUpSummary(membership.clinicId, clinicToday),
-      getClinicWhatsAppTemplate(membership.clinicId),
-      getClinicTreatmentFinanceSummary(membership.clinicId),
-    ]);
+  const [
+    queue,
+    summary,
+    reminderTemplate,
+    financialSummary,
+    appointmentsToday,
+  ] = await Promise.all([
+    listFollowUpQueue(membership.clinicId, tab, query, page, clinicToday),
+    getFollowUpSummary(membership.clinicId, clinicToday),
+    getClinicWhatsAppTemplate(membership.clinicId),
+    getClinicTreatmentFinanceSummary(membership.clinicId),
+    countClinicAppointments(membership.clinicId, clinicToday),
+  ]);
   const { items, pagination } = queue;
   const basePath = `/clinic/${membership.clinicId}`;
 
@@ -178,6 +185,23 @@ export default async function ClinicDashboardPage({
             );
           })}
         </section>
+
+        <Link
+          className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-teal-200"
+          href={`/clinic/${membership.clinicId}/appointments`}
+        >
+          <span>
+            <span className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+              Appointments today
+            </span>
+            <span className="mt-1 block text-2xl font-semibold text-slate-900">
+              {appointmentsToday}
+            </span>
+          </span>
+          <span className="text-sm font-medium text-teal-800">
+            Open schedule →
+          </span>
+        </Link>
 
         <section
           aria-label="Treatment finance summary"

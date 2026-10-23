@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleAlert,
+  CalendarDays,
   MessageCircle,
   UsersRound,
 } from "lucide-react";
@@ -57,6 +58,14 @@ export default async function ClinicReportsPage({
       description: "Patient records currently in this clinic.",
       icon: UsersRound,
       tone: "teal",
+    },
+    {
+      label: "Appointments",
+      value: metrics.appointments,
+      description:
+        "Scheduled, confirmed or completed appointments in this date range.",
+      icon: CalendarDays,
+      tone: "blue",
     },
     {
       label: "Pending treatment visits",

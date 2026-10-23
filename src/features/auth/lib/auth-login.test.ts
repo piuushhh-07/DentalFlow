@@ -6,6 +6,7 @@ import { AuthApiError, type User } from "@supabase/supabase-js";
 import {
   classifySignInResult,
   getSafeAuthErrorMetadata,
+  persistSignInProfile,
 } from "@/features/auth/lib/auth-login";
 
 const authenticatedUser: User = {
@@ -70,4 +71,56 @@ test("exposes only safe auth error metadata for server diagnostics", () => {
     code: "none",
     status: "none",
   });
+});
+
+test("clears a newly authenticated session when profile persistence fails", async () => {
+  const persistenceError = new Error("synthetic database outage");
+  let cleanupCalls = 0;
+  const result = await persistSignInProfile(
+    async () => {
+      throw persistenceError;
+    },
+    async () => {
+      cleanupCalls += 1;
+      return null;
+    },
+  );
+
+  assert.deepEqual(result, {
+    status: "failed",
+    persistenceError,
+    cleanupError: null,
+  });
+  assert.equal(cleanupCalls, 1);
+});
+
+test("preserves a failed session cleanup result for explicit handling", async () => {
+  const persistenceError = new Error("synthetic database outage");
+  const cleanupError = new Error("synthetic sign-out outage");
+  const result = await persistSignInProfile(
+    async () => {
+      throw persistenceError;
+    },
+    async () => cleanupError,
+  );
+
+  assert.deepEqual(result, {
+    status: "failed",
+    persistenceError,
+    cleanupError,
+  });
+});
+
+test("does not clear a session when profile persistence succeeds", async () => {
+  let cleanupCalls = 0;
+  const result = await persistSignInProfile(
+    async () => undefined,
+    async () => {
+      cleanupCalls += 1;
+      return null;
+    },
+  );
+
+  assert.deepEqual(result, { status: "saved" });
+  assert.equal(cleanupCalls, 0);
 });

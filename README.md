@@ -22,10 +22,19 @@ marked placeholders in `.env.local` with your own development credentials
 before connecting external services. Never commit `.env.local` or real
 credentials.
 
-For the local no-database demo, set `NEXT_PUBLIC_DENTALFLOW_DEMO_MODE=true`
-in `.env.local` and visit [http://localhost:3000/demo](http://localhost:3000/demo).
+For the local no-database demo, keep `NEXT_PUBLIC_DENTALFLOW_DEMO_MODE=true`
+in `.env.local` (or leave it unset in development to use the default local demo
+mode) and visit [http://localhost:3000/demo](http://localhost:3000/demo).
 The demo uses a fictional clinic dataset stored in browser local storage only,
 so it never touches Supabase or the production database.
+
+The demo is interactive: add fictional patients and appointments, detect
+clinician/chair scheduling conflicts, advance appointment statuses, connect
+visits to treatment-plan stages, record plan decisions, manage recalls and
+follow-ups, and prepare consent-gated WhatsApp message snapshots. Changes stay
+in the current browser and can be removed with **Reset demo**. WhatsApp chats
+open only after an explicit click; opening a chat does not mean the message was
+sent or delivered.
 
 ## Scripts
 
@@ -273,6 +282,20 @@ running `test:integration:prepare`; never point these variables at staging or
 production. No integration test command is run automatically by build or
 application startup.
 
+To test Prisma Schema Engine connectivity to the validated disposable migration
+datasource without applying migrations, run:
+
+```powershell
+npm run test:integration:diagnose:migrate
+```
+
+This command repeats the disposable-target and TLS checks, performs the
+read-only runtime and migration-target identity checks, then runs Prisma 6's
+`migrate diff` from the schema datasource to an empty schema. It verifies that
+the Schema Engine can read the datasource and inspect the current schema. It does not run
+`migrate deploy`, write database data, or prove that migration locking,
+migration-history access, or applying migrations will succeed.
+
 ## WhatsApp click-to-chat
 
 The follow-up queue can open a `wa.me` chat with the patient's validated Indian
@@ -388,10 +411,19 @@ environment before production use.
 Before deployment, configure and verify Vercel environment variables
 separately for each environment. Confirm the Supabase Auth site URL and
 redirect allowlist, public client configuration, and server-only database
-URLs. Run `npm run db:validate` and inspect `npx prisma migrate status` against
-the intended database; apply reviewed migrations as a separate, explicitly
+URLs. Set `DATABASE_URL` to the runtime transaction pooler, and reserve
+`DIRECT_URL` for migration operations. Do not add database credentials,
+service-role keys, AI provider keys, or integration-test credentials to
+`NEXT_PUBLIC_*` variables. The local demo flag is development-only. Keep
+`DENTALFLOW_TEST_*` values out of Vercel and use them only in a separately
+verified disposable test project.
+
+Run `npm run db:validate` and inspect `npx prisma migrate status` against the
+intended database; apply reviewed migrations as a separate, explicitly
 approved operation. Do not run migration commands against production until
-the target and rollback plan are confirmed.
+the target and rollback plan are confirmed. The integration-test runner
+requires TLS (`sslmode=require`) on both test URLs and rejects application
+project references before connecting.
 
 Select a Supabase backup/PITR plan and retention period that meet the clinic's
 recovery needs. Before a production migration, ensure a recent recoverable
@@ -399,6 +431,32 @@ backup exists. Test restoration only into an isolated project, then verify
 schema, constraints and application access there; never test restore
 procedures against the live clinic database. Document the clinic's recovery
 point/time objectives and who is authorized to perform recovery.
+
+Configure monitoring and alerts before onboarding real clinics. At minimum,
+monitor application availability and server errors, Supabase Auth and
+database availability, database connection saturation, Storage usage and
+upload failures, scheduled backup status, and migration outcomes. Review
+Vercel and Supabase audit/operational logs without copying patient data or
+credentials into third-party logs. This repository does not configure an
+external error-monitoring or alerting service.
+
+The application currently has no configurable patient-record retention
+schedule, automatic deletion workflow, or verified clinic data-export and
+erasure process. Define these with the clinic before launch; do not assume
+database cascades or the insurance audit immutability triggers implement a
+complete retention policy. Review access to clinic memberships periodically
+and define an incident-response process, including escalation and breach
+notification responsibilities.
+
+The insurance document AI provider configuration is server-only. However,
+the current extraction and policy-answer helpers are not connected to a
+user-facing processing workflow, and source quotes are not independently
+verified against extracted document text. Do not represent AI output as
+verified or use it to make coverage decisions. Before enabling such a
+workflow, document the provider, data location, retention and training
+settings, obtain the required clinic/vendor approvals, and keep a human
+review gate. Never send real insurance or patient documents to an AI provider
+until those privacy and contractual controls have been verified.
 
 Before using real patient information, obtain appropriate Indian privacy and
 legal review, establish the clinic's data-controller responsibilities and

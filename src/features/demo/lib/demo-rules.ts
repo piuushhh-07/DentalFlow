@@ -64,7 +64,10 @@ export function validateAppointmentInput(input: {
 }): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return "Choose a valid date.";
   const date = new Date(`${input.date}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== input.date) {
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== input.date
+  ) {
     return "Choose a valid date.";
   }
   if (!/^\d{2}:\d{2}$/.test(input.time) || toMinutes(input.time) >= 24 * 60) {
@@ -113,7 +116,12 @@ export function updateRecallDueDate(
   intervalMonths: number,
 ): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(lastVisit);
-  if (!match || !Number.isInteger(intervalMonths) || intervalMonths < 1 || intervalMonths > 60) {
+  if (
+    !match ||
+    !Number.isInteger(intervalMonths) ||
+    intervalMonths < 1 ||
+    intervalMonths > 60
+  ) {
     throw new Error("Enter a valid last visit date and recall interval.");
   }
   const date = new Date(
@@ -191,7 +199,9 @@ export function createWhatsAppUrl(
   consent: DemoConsent,
 ): string {
   if (!canPrepareWhatsApp(consent)) {
-    throw new Error("Recorded WhatsApp consent is required for this demo action.");
+    throw new Error(
+      "Recorded WhatsApp consent is required for this demo action.",
+    );
   }
   const digits = phone.replace(/\D/g, "");
   if (!/^91[6-9]\d{9}$/.test(digits)) {

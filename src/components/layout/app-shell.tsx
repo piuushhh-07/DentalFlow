@@ -9,6 +9,7 @@ type AppShellProps = Readonly<{
   clinicId: string;
   activeSection?:
     | "dashboard"
+    | "appointments"
     | "patients"
     | "treatments"
     | "recalls"
