@@ -117,8 +117,81 @@ export type DemoMessage = {
   createdAt: string;
 };
 
+export type DemoClinicalRecord = {
+  id: string;
+  patientId: string;
+  chiefComplaint: string;
+  medicalHistory: string;
+  allergies: string;
+  examination: string;
+  dentistDiagnosis: string;
+  recommendations: string;
+  createdAt: string;
+};
+
+export type DemoToothSurface =
+  "Mesial" | "Distal" | "Occlusal" | "Buccal" | "Lingual";
+
+export type DemoOdontogramEntry = {
+  id: string;
+  patientId: string;
+  toothNumber: number;
+  finding: string;
+  surfaces: DemoToothSurface[];
+  status: "Finding" | "Planned" | "In progress" | "Completed";
+  createdAt: string;
+};
+
+export type DemoPrescriptionMedicine = {
+  name: string;
+  dosage: string;
+  route: string;
+  frequency: string;
+  duration: string;
+  instructions: string;
+};
+
+export type DemoPrescription = {
+  id: string;
+  patientId: string;
+  date: string;
+  dentist: string;
+  clinicalNotes: string;
+  medicines: DemoPrescriptionMedicine[];
+  advice: string;
+};
+
+export type DemoEstimate = {
+  id: string;
+  patientId: string;
+  planId: string;
+  date: string;
+  validUntil: string;
+  items: Array<{ description: string; amount: number }>;
+  discount: number;
+  taxRate: number;
+};
+
+export type DemoInsuranceClaim = {
+  id: string;
+  patientId: string;
+  provider: string;
+  reference: string;
+  status: "Under review" | "Approved" | "Needs documents";
+  amount: number;
+};
+
+export type DemoPayment = {
+  id: string;
+  patientId: string;
+  planId: string;
+  date: string;
+  amount: number;
+  method: "UPI" | "Cash" | "Card" | "Bank transfer";
+};
+
 export type DemoData = {
-  version: 1;
+  version: 2;
   patients: DemoPatient[];
   appointments: DemoAppointment[];
   treatmentPlans: DemoTreatmentPlan[];
@@ -126,4 +199,10 @@ export type DemoData = {
   followUps: DemoFollowUp[];
   templates: DemoMessageTemplate[];
   messages: DemoMessage[];
+  clinicalRecords: DemoClinicalRecord[];
+  odontogramEntries: DemoOdontogramEntry[];
+  prescriptions: DemoPrescription[];
+  estimates: DemoEstimate[];
+  insuranceClaims: DemoInsuranceClaim[];
+  payments: DemoPayment[];
 };

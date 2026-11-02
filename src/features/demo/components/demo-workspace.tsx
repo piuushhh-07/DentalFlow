@@ -18,6 +18,7 @@ import {
   DemoProvider,
   useDemoData,
 } from "@/features/demo/components/demo-provider";
+import { DemoClinicalWorkflow } from "@/features/demo/components/demo-clinical-workflow";
 import {
   appointmentConflict,
   canPrepareWhatsApp,
@@ -71,14 +72,21 @@ function DemoWorkspaceInner() {
   const [appointmentError, setAppointmentError] = useState("");
   const [patientSearch, setPatientSearch] = useState("");
   const [appointmentDate, setAppointmentDate] = useState(todayKey());
+  const [appointmentForPatientId, setAppointmentForPatientId] = useState<
+    string | null
+  >(null);
   const [appointmentFormOpen, setAppointmentFormOpen] = useState(false);
   const [patientFormOpen, setPatientFormOpen] = useState(false);
   const [planFormOpen, setPlanFormOpen] = useState(false);
+  const [createPlanForPatientId, setCreatePlanForPatientId] = useState<
+    string | null
+  >(null);
   const [recallFormOpen, setRecallFormOpen] = useState(false);
   const [followUpFormOpen, setFollowUpFormOpen] = useState(false);
   const [messagePatientId, setMessagePatientId] = useState("");
   const [messageTemplateId, setMessageTemplateId] = useState("");
   const [messageText, setMessageText] = useState("");
+  const [messageRelatedId, setMessageRelatedId] = useState("");
   const [preparedMessageId, setPreparedMessageId] = useState<string | null>(
     null,
   );
@@ -215,17 +223,27 @@ function DemoWorkspaceInner() {
 
         {tab === "Appointments" ? (
           <Appointments
+            key={appointmentForPatientId ?? "all"}
             appointmentDate={appointmentDate}
             appointments={data.appointments}
             data={data}
             error={appointmentError}
             formOpen={appointmentFormOpen}
+            initialPatientId={appointmentForPatientId}
             onAdd={() => {
               setAppointmentError("");
               setAppointmentFormOpen(true);
             }}
             onDateChange={setAppointmentDate}
             onPatient={selectPatient}
+            onPrepareConfirmation={(appointment) => {
+              setMessagePatientId(appointment.patientId);
+              setMessageTemplateId("tpl-appointment");
+              setMessageRelatedId(`appointment:${appointment.id}`);
+              setMessageText("");
+              setPreparedMessageId(null);
+              setTab("Messages");
+            }}
             onSave={(formData) => {
               const error = validateAppointmentInput(formData);
               if (error) {
@@ -293,6 +311,7 @@ function DemoWorkspaceInner() {
                 ),
               }));
               setAppointmentFormOpen(false);
+              setAppointmentForPatientId(null);
               setAppointmentError("");
               showNotice("Appointment added to the local demo schedule.");
             }}
@@ -378,13 +397,27 @@ function DemoWorkspaceInner() {
             }}
             selectedPatient={selectedPatient}
             onCloseForm={() => setPatientFormOpen(false)}
+            onOpenTreatmentPlans={() => {
+              if (!selectedPatient) return;
+              setCreatePlanForPatientId(selectedPatient.id);
+              setPlanFormOpen(true);
+              setTab("Treatment plans");
+            }}
+            onBookAppointment={() => {
+              if (!selectedPatient) return;
+              setAppointmentForPatientId(selectedPatient.id);
+              setAppointmentFormOpen(true);
+              setTab("Appointments");
+            }}
           />
         ) : null}
 
         {tab === "Treatment plans" ? (
           <TreatmentPlans
+            key={createPlanForPatientId ?? "all"}
             data={data}
             formOpen={planFormOpen}
+            initialPatientId={createPlanForPatientId}
             onAdd={() => setPlanFormOpen(true)}
             onCreate={(plan) => {
               updateData((current) => ({
@@ -392,6 +425,7 @@ function DemoWorkspaceInner() {
                 treatmentPlans: [plan, ...current.treatmentPlans],
               }));
               setPlanFormOpen(false);
+              setCreatePlanForPatientId(null);
               showNotice("Treatment plan added to the demo.");
             }}
             onPatient={selectPatient}
@@ -524,8 +558,22 @@ function DemoWorkspaceInner() {
             messageTemplateId={messageTemplateId}
             messageText={messageText}
             preparedMessageId={preparedMessageId}
+            messageRelatedId={messageRelatedId}
             onPatientChange={(patientId) => {
               setMessagePatientId(patientId);
+              setMessageRelatedId("");
+              setPreparedMessageId(null);
+              setMessageText("");
+            }}
+            onRelatedChange={(relatedId) => {
+              setMessageRelatedId(relatedId);
+              const patientId = relatedId.startsWith("appointment:")
+                ? data.appointments.find(
+                    (item) => `appointment:${item.id}` === relatedId,
+                  )?.patientId
+                : data.recalls.find((item) => `recall:${item.id}` === relatedId)
+                    ?.patientId;
+              if (patientId) setMessagePatientId(patientId);
               setPreparedMessageId(null);
               setMessageText("");
             }}
@@ -758,9 +806,11 @@ function Appointments({
   data,
   error,
   formOpen,
+  initialPatientId,
   onAdd,
   onDateChange,
   onPatient,
+  onPrepareConfirmation,
   onSave,
   onStatus,
   onCancelForm,
@@ -770,9 +820,11 @@ function Appointments({
   data: DemoData;
   error: string;
   formOpen: boolean;
+  initialPatientId: string | null;
   onAdd: () => void;
   onDateChange: (date: string) => void;
   onPatient: (id: string) => void;
+  onPrepareConfirmation: (appointment: DemoAppointment) => void;
   onSave: (appointment: Omit<DemoAppointment, "id" | "status">) => void;
   onStatus: (
     appointment: DemoAppointment,
@@ -780,7 +832,9 @@ function Appointments({
   ) => void;
   onCancelForm: () => void;
 }) {
-  const [patientId, setPatientId] = useState(data.patients[0]?.id ?? "");
+  const [patientId, setPatientId] = useState(
+    initialPatientId ?? data.patients[0]?.id ?? "",
+  );
   const [planId, setPlanId] = useState("");
   const [stageId, setStageId] = useState("");
   const [time, setTime] = useState("09:00");
@@ -1021,6 +1075,18 @@ function Appointments({
                   </button>
                   <StatusPill value={appointment.status} />
                 </div>
+                {appointment.status !== "CANCELLED" &&
+                appointment.status !== "NO_SHOW" ? (
+                  <div className="mt-3 border-t border-slate-100 pt-3">
+                    <button
+                      className="button-secondary text-xs"
+                      onClick={() => onPrepareConfirmation(appointment)}
+                      type="button"
+                    >
+                      Prepare WhatsApp confirmation
+                    </button>
+                  </div>
+                ) : null}
                 {appointment.status !== "COMPLETED" &&
                 appointment.status !== "CANCELLED" &&
                 appointment.status !== "NO_SHOW" ? (
@@ -1057,6 +1123,8 @@ function Patients({
   onConsent,
   selectedPatient,
   onCloseForm,
+  onOpenTreatmentPlans,
+  onBookAppointment,
 }: {
   data: DemoData;
   filteredPatients: DemoPatient[];
@@ -1068,6 +1136,8 @@ function Patients({
   onConsent: (id: string, consent: DemoPatient["consent"]) => void;
   selectedPatient?: DemoPatient;
   onCloseForm: () => void;
+  onOpenTreatmentPlans: () => void;
+  onBookAppointment: () => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -1362,6 +1432,15 @@ function Patients({
           )}
         </Panel>
       </div>
+      {selectedPatient ? (
+        <DemoClinicalWorkflow
+          key={selectedPatient.id}
+          onBookAppointment={onBookAppointment}
+          onCreatePlan={onOpenTreatmentPlans}
+          patient={selectedPatient}
+          plans={plans}
+        />
+      ) : null}
     </main>
   );
 }
@@ -1369,6 +1448,7 @@ function Patients({
 function TreatmentPlans({
   data,
   formOpen,
+  initialPatientId,
   onAdd,
   onCreate,
   onPatient,
@@ -1378,6 +1458,7 @@ function TreatmentPlans({
 }: {
   data: DemoData;
   formOpen: boolean;
+  initialPatientId: string | null;
   onAdd: () => void;
   onCreate: (plan: DemoData["treatmentPlans"][number]) => void;
   onPatient: (id: string) => void;
@@ -1385,7 +1466,9 @@ function TreatmentPlans({
   onStage: (planId: string, stageId: string, status: DemoStageStatus) => void;
   onCloseForm: () => void;
 }) {
-  const [patientId, setPatientId] = useState(data.patients[0]?.id ?? "");
+  const [patientId, setPatientId] = useState(
+    initialPatientId ?? data.patients[0]?.id ?? "",
+  );
   const [name, setName] = useState("");
   const [procedure, setProcedure] = useState("");
   const [amount, setAmount] = useState("");
@@ -2069,7 +2152,9 @@ function Messages({
   messageTemplateId,
   messageText,
   preparedMessageId,
+  messageRelatedId,
   onPatientChange,
+  onRelatedChange,
   onTemplateChange,
   onMessageChange,
   onPrepare,
@@ -2080,7 +2165,9 @@ function Messages({
   messageTemplateId: string;
   messageText: string;
   preparedMessageId: string | null;
+  messageRelatedId: string;
   onPatientChange: (id: string) => void;
+  onRelatedChange: (id: string) => void;
   onTemplateChange: (id: string) => void;
   onMessageChange: (message: string) => void;
   onPrepare: (message: DemoData["messages"][number]) => void;
@@ -2089,6 +2176,22 @@ function Messages({
   const patient = data.patients.find((item) => item.id === messagePatientId);
   const template = data.templates.find((item) => item.id === messageTemplateId);
   const prepared = data.messages.find((item) => item.id === preparedMessageId);
+  const appointment = messageRelatedId.startsWith("appointment:")
+    ? data.appointments.find(
+        (item) => `appointment:${item.id}` === messageRelatedId,
+      )
+    : undefined;
+  const recall = messageRelatedId.startsWith("recall:")
+    ? data.recalls.find((item) => `recall:${item.id}` === messageRelatedId)
+    : undefined;
+  const patientAppointments = data.appointments.filter(
+    (item) =>
+      item.patientId === messagePatientId &&
+      !["CANCELLED", "NO_SHOW"].includes(item.status),
+  );
+  const patientRecalls = data.recalls.filter(
+    (item) => item.patientId === messagePatientId && item.status === "ACTIVE",
+  );
   const values = useMemo(
     () => ({
       patient_name: patient?.name ?? "",
@@ -2096,18 +2199,22 @@ function Messages({
       treatment_name: "your care plan",
       visit_number: "1",
       total_visits: "2",
-      due_date: formatDate(todayKey()),
+      due_date: formatDate(recall?.dueDate ?? appointment?.date ?? todayKey()),
       clinic_phone: clinicPhone,
-      appointment_date: formatDate(todayKey()),
-      appointment_time: "10:00",
-      clinician_name: "your clinician",
+      appointment_date: formatDate(appointment?.date ?? todayKey()),
+      appointment_time: appointment?.time ?? "to be arranged",
+      clinician_name: appointment?.dentist ?? "your clinician",
     }),
-    [patient],
+    [appointment, patient, recall],
   );
   const preview = template ? renderDemoMessage(template, values) : "";
   const consent = patient ? canPrepareWhatsApp(patient.consent) : false;
+  const completePreview =
+    preview.trim().length > 0 &&
+    !/\{\{[^{}]*\}\}/.test(preview) &&
+    !/\b(undefined|null)\b/i.test(preview);
   const whatsappUrl =
-    prepared && patient && consent
+    prepared && patient && consent && prepared.snapshot.trim()
       ? createWhatsAppUrl(patient.phone, prepared.snapshot, patient.consent)
       : "";
 
@@ -2151,6 +2258,31 @@ function Messages({
             </select>
           </label>
         </div>
+        <label className="field-label mt-3">
+          Appointment or recall
+          <select
+            className="field-input"
+            disabled={!patient}
+            onChange={(event) => onRelatedChange(event.target.value)}
+            value={messageRelatedId}
+          >
+            <option value="">General reminder (no scheduled time)</option>
+            <optgroup label="Appointments">
+              {patientAppointments.map((item) => (
+                <option key={item.id} value={`appointment:${item.id}`}>
+                  {formatDate(item.date)} · {item.time} · {item.type}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Recalls">
+              {patientRecalls.map((item) => (
+                <option key={item.id} value={`recall:${item.id}`}>
+                  {item.type} · due {formatDate(item.dueDate)}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </label>
         {patient ? (
           <div
             className={`mt-3 rounded-xl border p-3 text-sm ${consent ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}
@@ -2182,7 +2314,8 @@ function Messages({
               !patient ||
               !template ||
               !consent ||
-              !(messageText || preview).trim()
+              !(messageText || preview).trim() ||
+              (!messageText.trim() && !completePreview)
             }
             onClick={() => {
               if (!patient || !template || !consent) return;
@@ -2199,7 +2332,7 @@ function Messages({
           >
             <Check className="size-4" /> Save prepared snapshot
           </button>
-          {prepared && consent ? (
+          {prepared && consent && whatsappUrl ? (
             <a
               className="button-secondary"
               href={whatsappUrl}
@@ -2211,6 +2344,12 @@ function Messages({
             </a>
           ) : null}
         </div>
+        {template && !completePreview && !messageText.trim() ? (
+          <p className="mt-2 text-sm text-rose-700" role="alert">
+            This message is incomplete. Choose a valid appointment or recall,
+            then review the preview before preparing it.
+          </p>
+        ) : null}
         <p className="mt-3 text-xs text-slate-500">
           Opening the chat does not confirm that the message was sent or
           delivered.

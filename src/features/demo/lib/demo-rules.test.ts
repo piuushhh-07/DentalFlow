@@ -245,6 +245,35 @@ test("WhatsApp prep only allows consented patients and renders templates safely"
 
   assert.equal(text, "Hello Anu, please call +91 98765 43210.");
 
+  const booking = renderDemoMessage(
+    {
+      id: "tpl-booking",
+      name: "Appointment",
+      content:
+        "Hello {{patient_name}}, your appointment is {{appointment_date}} at {{appointment_time}} with {{clinician_name}}.",
+    },
+    {
+      patient_name: "Anu",
+      appointment_date: "2 Nov 2026",
+      appointment_time: "10:30",
+      clinician_name: "Dr. Kavya Shah",
+    },
+  );
+  assert.equal(
+    booking,
+    "Hello Anu, your appointment is 2 Nov 2026 at 10:30 with Dr. Kavya Shah.",
+  );
+
+  const incomplete = renderDemoMessage(
+    {
+      id: "tpl-incomplete",
+      name: "Incomplete",
+      content: "Hello {{patient_name}}, {{unknown_value}}",
+    },
+    { patient_name: "Anu" },
+  );
+  assert.match(incomplete, /\{\{unknown_value\}\}/);
+
   assert.equal(
     createWhatsAppUrl("+91 98765 43210", "Hi there", "GRANTED"),
     "https://wa.me/919876543210?text=Hi%20there",

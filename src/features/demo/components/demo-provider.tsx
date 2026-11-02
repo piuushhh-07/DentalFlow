@@ -36,6 +36,8 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         const parsed: unknown = JSON.parse(stored);
         if (isDemoData(parsed)) {
           setData(parsed);
+        } else if (isPreviousDemoData(parsed)) {
+          setData(migratePreviousDemoData(parsed));
         } else {
           setStorageWarning(
             "Saved demo data is invalid. Reset the demo to restore its fictional sample data.",
@@ -93,6 +95,40 @@ function isDemoData(value: unknown): value is DemoData {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<DemoData>;
   return (
+    candidate.version === 2 &&
+    Array.isArray(candidate.patients) &&
+    Array.isArray(candidate.appointments) &&
+    Array.isArray(candidate.treatmentPlans) &&
+    Array.isArray(candidate.recalls) &&
+    Array.isArray(candidate.followUps) &&
+    Array.isArray(candidate.templates) &&
+    Array.isArray(candidate.messages) &&
+    Array.isArray(candidate.clinicalRecords) &&
+    Array.isArray(candidate.odontogramEntries) &&
+    Array.isArray(candidate.prescriptions) &&
+    Array.isArray(candidate.estimates) &&
+    Array.isArray(candidate.insuranceClaims) &&
+    Array.isArray(candidate.payments)
+  );
+}
+
+type PreviousDemoData = Omit<
+  DemoData,
+  | "version"
+  | "clinicalRecords"
+  | "odontogramEntries"
+  | "prescriptions"
+  | "estimates"
+  | "insuranceClaims"
+  | "payments"
+> & {
+  version: 1;
+};
+
+function isPreviousDemoData(value: unknown): value is PreviousDemoData {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
     candidate.version === 1 &&
     Array.isArray(candidate.patients) &&
     Array.isArray(candidate.appointments) &&
@@ -102,4 +138,27 @@ function isDemoData(value: unknown): value is DemoData {
     Array.isArray(candidate.templates) &&
     Array.isArray(candidate.messages)
   );
+}
+
+function migratePreviousDemoData(saved: PreviousDemoData): DemoData {
+  const initial = createInitialDemoData();
+  return {
+    ...initial,
+    ...saved,
+    version: 2,
+    patients: mergeById(initial.patients, saved.patients),
+    appointments: mergeById(initial.appointments, saved.appointments),
+    treatmentPlans: mergeById(initial.treatmentPlans, saved.treatmentPlans),
+    recalls: mergeById(initial.recalls, saved.recalls),
+    followUps: mergeById(initial.followUps, saved.followUps),
+    templates: mergeById(initial.templates, saved.templates),
+    messages: mergeById(initial.messages, saved.messages),
+    estimates: initial.estimates,
+  };
+}
+
+function mergeById<T extends { id: string }>(initial: T[], saved: T[]): T[] {
+  const records = new Map(initial.map((record) => [record.id, record]));
+  saved.forEach((record) => records.set(record.id, record));
+  return Array.from(records.values());
 }

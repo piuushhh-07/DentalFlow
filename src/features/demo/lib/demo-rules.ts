@@ -184,12 +184,10 @@ export function renderDemoMessage(
   values: Readonly<Record<string, string | null | undefined>>,
 ): string {
   return template.content
-    .replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_match, key: string) => {
+    .replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (match, key: string) => {
       const value = values[key.toLowerCase()];
-      return value && value !== "null" && value !== "undefined" ? value : "";
+      return value && value !== "null" && value !== "undefined" ? value : match;
     })
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/ +([,.!?])/g, "$1")
     .trim();
 }
 

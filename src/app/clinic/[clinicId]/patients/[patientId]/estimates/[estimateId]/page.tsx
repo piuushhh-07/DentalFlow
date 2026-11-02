@@ -41,6 +41,18 @@ function formatDate(date: Date) {
   }).format(date);
 }
 
+function clinicInitials(name: string) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase() || "DF"
+  );
+}
+
 function getStatusOptions(
   status: TreatmentEstimateStatus,
   validityDate: Date,
@@ -137,16 +149,25 @@ export default async function TreatmentEstimatePage({
           className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8 print:border-0 print:p-0 print:shadow-none"
           id="treatment-estimate-document"
         >
-          <div className="mb-6 border-b border-slate-200 pb-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
-              Treatment quotation · Version {estimate.version}
-            </p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              {estimate.clinicNameSnapshot}
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Quotation #{estimate.id.slice(0, 8).toUpperCase()}
-            </p>
+          <div className="mb-6 flex items-center gap-4 border-b border-slate-200 pb-5">
+            <span
+              aria-label={`${estimate.clinicNameSnapshot} monogram`}
+              className="grid size-12 shrink-0 place-items-center rounded-xl bg-teal-800 text-sm font-bold tracking-wide text-white print:border print:border-teal-800 print:bg-white print:text-teal-800"
+              role="img"
+            >
+              {clinicInitials(estimate.clinicNameSnapshot)}
+            </span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
+                Treatment quotation · Version {estimate.version}
+              </p>
+              <h2 className="mt-2 text-2xl font-bold text-slate-900">
+                {estimate.clinicNameSnapshot}
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Quotation #{estimate.id.slice(0, 8).toUpperCase()}
+              </p>
+            </div>
           </div>
           <div className="grid gap-5 border-b border-slate-200 pb-5 sm:grid-cols-2">
             <div>

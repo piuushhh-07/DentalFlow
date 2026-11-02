@@ -27,6 +27,18 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata",
 });
 
+function clinicInitials(name: string) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase() || "DF"
+  );
+}
+
 export default async function PrescriptionPage({
   params,
 }: PrescriptionPageProps) {
@@ -73,26 +85,35 @@ export default async function PrescriptionPage({
         >
           <header className="border-b-2 border-teal-700 pb-5">
             <div className="flex flex-col justify-between gap-4 sm:flex-row">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-800">
-                  DentalFlow · Digital prescription
-                </p>
-                <h1 className="mt-2 text-2xl font-bold text-slate-900">
-                  {prescription.clinicNameSnapshot}
-                </h1>
-                {prescription.clinicAddressSnapshot ? (
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
-                    {prescription.clinicAddressSnapshot}
+              <div className="flex items-center gap-4">
+                <span
+                  aria-label={`${prescription.clinicNameSnapshot} monogram`}
+                  className="grid size-12 shrink-0 place-items-center rounded-xl bg-teal-800 text-sm font-bold tracking-wide text-white print:border print:border-teal-800 print:bg-white print:text-teal-800"
+                  role="img"
+                >
+                  {clinicInitials(prescription.clinicNameSnapshot)}
+                </span>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-800">
+                    DentalFlow · Digital prescription
                   </p>
-                ) : null}
-                <p className="mt-1 text-sm text-slate-600">
-                  {[
-                    prescription.clinicPhoneSnapshot,
-                    prescription.clinicEmailSnapshot,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
+                  <h1 className="mt-2 text-2xl font-bold text-slate-900">
+                    {prescription.clinicNameSnapshot}
+                  </h1>
+                  {prescription.clinicAddressSnapshot ? (
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
+                      {prescription.clinicAddressSnapshot}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-sm text-slate-600">
+                    {[
+                      prescription.clinicPhoneSnapshot,
+                      prescription.clinicEmailSnapshot,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
               </div>
               <div className="text-sm sm:text-right">
                 <p className="font-semibold text-slate-900">
