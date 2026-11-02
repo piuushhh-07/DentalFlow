@@ -47,6 +47,15 @@ enum FinancialEntryType {
   REFUND
 }
 
+enum TreatmentEstimateStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
 enum TreatmentVisitStatus {
   PENDING
   REMINDER_SENT
@@ -55,6 +64,53 @@ enum TreatmentVisitStatus {
   COMPLETED
   CANCELLED
   NO_RESPONSE
+}
+
+enum OdontogramDentition {
+  PERMANENT
+  PRIMARY
+}
+
+enum OdontogramEntryType {
+  FINDING
+  TREATMENT
+}
+
+enum OdontogramFinding {
+  HEALTHY
+  DECAYED
+  MISSING
+  EXTRACTED
+  RESTORED
+  FRACTURED
+  WORN
+  IMPACTED
+  SENSITIVE
+  OTHER
+}
+
+enum OdontogramTreatmentStatus {
+  EXISTING
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum OdontogramSurface {
+  MESIAL
+  DISTAL
+  OCCLUSAL
+  BUCCAL
+  LINGUAL
+  PALATAL
+  INCISAL
+}
+
+enum ClinicalRecordAuditAction {
+  CREATED
+  UPDATED
+  REVIEWED
+  RECOMMENDATION
 }
 
 enum AppointmentStatus {
@@ -174,6 +230,37 @@ enum InsuranceActivityType {
   NOTE_ADDED
 }
 
+enum BillingInterval {
+  MONTH
+  YEAR
+}
+
+enum BillingSubscriptionStatus {
+  CHECKOUT_PENDING
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  GRACE_PERIOD
+  CANCEL_AT_PERIOD_END
+  PAUSED
+  CANCELLED
+  EXPIRED
+  FAILED
+}
+
+enum BillingPaymentStatus {
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum BillingWebhookStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
 model UserProfile {
   id              String             @id @db.Uuid
   displayName     String?            @db.VarChar(120)
@@ -201,6 +288,7 @@ model Clinic {
   treatmentPlans             TreatmentPlan[]
   treatmentCatalogueItems    TreatmentCatalogueItem[]
   treatmentFinancialEntries  TreatmentFinancialEntry[]
+  treatmentEstimates         TreatmentEstimate[]
   treatmentVisits            TreatmentVisit[]
   appointments               Appointment[]
   preventiveRecalls          PreventiveRecall[]
@@ -213,25 +301,131 @@ model Clinic {
   insuranceDocuments         InsuranceDocument[]
   insurancePayments          InsurancePayment[]
   insuranceActivities        InsuranceActivity[]
+  billingSubscriptions       ClinicSubscription[]
+  billingPayments            BillingPayment[]
+  odontogramEntries          OdontogramEntry[]
+  dentalClinicalRecords      DentalClinicalRecord[]
+  digitalPrescriptions       DigitalPrescription[]
+  prescriptionMedicineCatalogueItems PrescriptionMedicineCatalogueItem[]
 
   @@index([name])
   @@map("clinics")
 }
 
+model BillingPlanVersion {
+  id                 String               @id @default(uuid()) @db.Uuid
+  code               String               @db.VarChar(64)
+  version            Int
+  displayName        String               @db.VarChar(120)
+  description        String?              @db.VarChar(500)
+  currency           String               @default("INR") @db.VarChar(3)
+  amountMinor        Int
+  interval           BillingInterval
+  intervalCount      Int                  @default(1)
+  totalBillingCycles Int
+  trialDays          Int                  @default(14)
+  graceDays          Int                  @default(7)
+  entitlements       Json                 @db.JsonB
+  providerPlanId     String?              @unique @db.VarChar(64)
+  availableForSale   Boolean              @default(false)
+  createdAt          DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime             @updatedAt @db.Timestamptz(6)
+  subscriptions      ClinicSubscription[]
+
+  @@unique([code, version])
+  @@index([availableForSale, code])
+  @@map("billing_plan_versions")
+}
+
+model ClinicSubscription {
+  id                         String                    @id @default(uuid()) @db.Uuid
+  clinicId                   String                    @db.Uuid
+  planVersionId              String                    @db.Uuid
+  status                     BillingSubscriptionStatus @default(CHECKOUT_PENDING)
+  providerSubscriptionId     String?                   @unique @db.VarChar(64)
+  providerCustomerId         String?                   @db.VarChar(64)
+  checkoutUrl                String?                   @db.VarChar(500)
+  checkoutExpiresAt          DateTime?                 @db.Timestamptz(6)
+  trialStartedAt             DateTime?                 @db.Timestamptz(6)
+  trialEndsAt                DateTime?                 @db.Timestamptz(6)
+  currentPeriodStart         DateTime?                 @db.Timestamptz(6)
+  currentPeriodEnd           DateTime?                 @db.Timestamptz(6)
+  graceUntil                 DateTime?                 @db.Timestamptz(6)
+  cancelAtPeriodEnd          Boolean                   @default(false)
+  cancelledAt                DateTime?                 @db.Timestamptz(6)
+  lastProviderEventCreatedAt DateTime?                 @db.Timestamptz(6)
+  createdAt                  DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime                  @updatedAt @db.Timestamptz(6)
+  clinic                     Clinic                    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  planVersion                BillingPlanVersion        @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  payments                   BillingPayment[]
+
+  @@unique([id, clinicId])
+  @@index([clinicId, status, createdAt])
+  @@map("clinic_subscriptions")
+}
+
+model BillingPayment {
+  id                String               @id @default(uuid()) @db.Uuid
+  clinicId          String               @db.Uuid
+  subscriptionId    String               @db.Uuid
+  providerPaymentId String               @unique @db.VarChar(64)
+  providerInvoiceId String?              @db.VarChar(64)
+  amountMinor       Int
+  currency          String               @db.VarChar(3)
+  status            BillingPaymentStatus
+  failureCode       String?              @db.VarChar(120)
+  paidAt            DateTime?            @db.Timestamptz(6)
+  createdAt         DateTime             @default(now()) @db.Timestamptz(6)
+  clinic            Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  subscription      ClinicSubscription   @relation(fields: [subscriptionId, clinicId], references: [id, clinicId], onDelete: Cascade)
+
+  @@unique([providerPaymentId, clinicId])
+  @@index([clinicId, createdAt])
+  @@index([subscriptionId, createdAt])
+  @@map("billing_payments")
+}
+
+model BillingWebhookEvent {
+  id                  String               @id @default(uuid()) @db.Uuid
+  providerEventId     String               @unique @db.VarChar(120)
+  eventType           String               @db.VarChar(120)
+  eventCreatedAt      DateTime             @db.Timestamptz(6)
+  payload             Json                 @db.JsonB
+  status              BillingWebhookStatus @default(PENDING)
+  attemptCount        Int                  @default(0)
+  processingStartedAt DateTime?            @db.Timestamptz(6)
+  processedAt         DateTime?            @db.Timestamptz(6)
+  lastError           String?              @db.VarChar(500)
+  receivedAt          DateTime             @default(now()) @db.Timestamptz(6)
+
+  @@index([status, receivedAt])
+  @@index([eventType, eventCreatedAt])
+  @@map("billing_webhook_events")
+}
+
 model ClinicMembership {
-  id                  String                    @id @default(uuid()) @db.Uuid
-  clinicId            String                    @db.Uuid
-  userId              String                    @db.Uuid
-  role                ClinicRole
-  createdAt           DateTime                  @default(now()) @db.Timestamptz(6)
-  updatedAt           DateTime                  @updatedAt @db.Timestamptz(6)
-  clinic              Clinic                    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  user                UserProfile               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messageLogs         MessageLog[]              @relation("MessageSender")
-  financialEntries    TreatmentFinancialEntry[] @relation("TreatmentFinancialEntryActor")
-  insurancePayments   InsurancePayment[]
-  insuranceActivities InsuranceActivity[]
-  reviewedInsuranceClaimSummaries InsuranceClaim[] @relation("InsuranceClaimSummaryReviewer")
+  id                              String                    @id @default(uuid()) @db.Uuid
+  clinicId                        String                    @db.Uuid
+  userId                          String                    @db.Uuid
+  role                            ClinicRole
+  createdAt                       DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt                       DateTime                  @updatedAt @db.Timestamptz(6)
+  clinic                          Clinic                    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  user                            UserProfile               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messageLogs                     MessageLog[]              @relation("MessageSender")
+  financialEntries                TreatmentFinancialEntry[] @relation("TreatmentFinancialEntryActor")
+  insurancePayments               InsurancePayment[]
+  insuranceActivities             InsuranceActivity[]
+  reviewedInsuranceClaimSummaries InsuranceClaim[]          @relation("InsuranceClaimSummaryReviewer")
+  recordedOdontogramEntries       OdontogramEntry[]
+  dentalClinicalRecords            DentalClinicalRecord[]
+  dentalClinicalRecordAudits       DentalClinicalRecordAudit[]
+  authoredPrescriptions            DigitalPrescription[]             @relation("PrescriptionAuthor")
+  createdPrescriptionCatalogueItems PrescriptionMedicineCatalogueItem[]
+  prescriptionAudits               DigitalPrescriptionAudit[]
+  authoredTreatmentEstimates        TreatmentEstimate[]                @relation("TreatmentEstimateAuthor")
+  treatmentEstimateAudits           TreatmentEstimateAudit[]
 
   @@unique([userId, clinicId])
   @@index([clinicId, role])
@@ -252,12 +446,16 @@ model Patient {
   clinic                     Clinic                      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   treatmentPlans             TreatmentPlan[]
   treatmentFinancialEntries  TreatmentFinancialEntry[]
+  treatmentEstimates         TreatmentEstimate[]
   appointments               Appointment[]
   preventiveRecalls          PreventiveRecall[]
   messageLogs                MessageLog[]
   insurancePolicies          InsurancePolicy[]
   insuranceClaims            InsuranceClaim[]
   insurancePreAuthorizations InsurancePreAuthorization[]
+  odontogramEntries          OdontogramEntry[]
+  dentalClinicalRecords      DentalClinicalRecord[]
+  digitalPrescriptions       DigitalPrescription[]
 
   @@unique([id, clinicId])
   @@unique([clinicId, normalizedPhone])
@@ -287,8 +485,10 @@ model TreatmentPlan {
   catalogItem                TreatmentCatalogueItem?     @relation(fields: [catalogItemId, clinicId], references: [id, clinicId], onDelete: Restrict)
   visits                     TreatmentVisit[]
   financialEntries           TreatmentFinancialEntry[]
+  estimates                  TreatmentEstimate[]
   insuranceClaims            InsuranceClaim[]
   insurancePreAuthorizations InsurancePreAuthorization[]
+  odontogramEntries          OdontogramEntry[]
 
   @@unique([id, clinicId])
   @@unique([id, clinicId, patientId])
@@ -308,6 +508,7 @@ model TreatmentCatalogueItem {
   updatedAt      DateTime               @updatedAt @db.Timestamptz(6)
   clinic         Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   treatmentPlans TreatmentPlan[]
+  estimateLines  TreatmentEstimateLine[]
 
   @@unique([id, clinicId])
   @@unique([clinicId, name])
@@ -345,6 +546,92 @@ model TreatmentFinancialEntry {
   @@map("treatment_financial_entries")
 }
 
+model TreatmentEstimate {
+  id                         String                   @id @default(uuid()) @db.Uuid
+  clinicId                   String                   @db.Uuid
+  patientId                  String                   @db.Uuid
+  treatmentPlanId            String                   @db.Uuid
+  createdByUserId            String                   @db.Uuid
+  revisionOfEstimateId       String?                  @db.Uuid
+  revisionReason             String?                  @db.VarChar(1000)
+  version                    Int                      @default(1)
+  status                     TreatmentEstimateStatus  @default(DRAFT)
+  estimateDate               DateTime                 @db.Date
+  validityDate               DateTime                 @db.Date
+  currency                   String                   @default("INR") @db.VarChar(3)
+  subtotal                   Decimal                  @db.Decimal(12, 2)
+  discountAmount             Decimal                  @db.Decimal(12, 2)
+  taxRate                    Decimal                  @db.Decimal(5, 2)
+  taxAmount                  Decimal                  @db.Decimal(12, 2)
+  totalAmount                Decimal                  @db.Decimal(12, 2)
+  notes                      String?                  @db.VarChar(4000)
+  terms                      String?                  @db.VarChar(4000)
+  clinicNameSnapshot         String                   @db.VarChar(160)
+  clinicPhoneSnapshot        String?                  @db.VarChar(20)
+  clinicEmailSnapshot        String?                  @db.VarChar(254)
+  clinicAddressSnapshot      String?                  @db.VarChar(400)
+  patientNameSnapshot        String                   @db.VarChar(160)
+  patientPhoneSnapshot       String                   @db.VarChar(20)
+  dentistNameSnapshot        String                   @db.VarChar(120)
+  dentistRegistrationSnapshot String?                 @db.VarChar(100)
+  finalizedAt                DateTime?                @db.Timestamptz(6)
+  createdAt                  DateTime                 @default(now()) @db.Timestamptz(6)
+  clinic                     Clinic                   @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  patient                    Patient                  @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  treatmentPlan              TreatmentPlan            @relation(fields: [treatmentPlanId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  createdBy                  ClinicMembership         @relation("TreatmentEstimateAuthor", fields: [createdByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  revisionOf                 TreatmentEstimate?        @relation("TreatmentEstimateRevisions", fields: [revisionOfEstimateId, clinicId, patientId, treatmentPlanId], references: [id, clinicId, patientId, treatmentPlanId], onDelete: Restrict)
+  revisions                  TreatmentEstimate[]       @relation("TreatmentEstimateRevisions")
+  lines                      TreatmentEstimateLine[]
+  audits                     TreatmentEstimateAudit[]
+
+  @@unique([id, clinicId, patientId])
+  @@unique([id, clinicId, patientId, treatmentPlanId])
+  @@unique([treatmentPlanId, version])
+  @@unique([revisionOfEstimateId, clinicId, patientId])
+  @@index([clinicId, patientId, createdAt])
+  @@index([clinicId, treatmentPlanId, status])
+  @@map("treatment_estimates")
+}
+
+model TreatmentEstimateLine {
+  id                String           @id @default(uuid()) @db.Uuid
+  clinicId          String           @db.Uuid
+  patientId         String           @db.Uuid
+  estimateId        String           @db.Uuid
+  catalogueItemId   String?          @db.Uuid
+  position          Int
+  description       String           @db.VarChar(300)
+  quantity          Int
+  unitPrice         Decimal          @db.Decimal(12, 2)
+  lineTotal         Decimal          @db.Decimal(12, 2)
+  estimate          TreatmentEstimate @relation(fields: [estimateId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  catalogueItem     TreatmentCatalogueItem? @relation(fields: [catalogueItemId, clinicId], references: [id, clinicId], onDelete: Restrict)
+
+  @@unique([estimateId, position])
+  @@index([clinicId, patientId, estimateId])
+  @@map("treatment_estimate_lines")
+}
+
+model TreatmentEstimateAudit {
+  id             String                   @id @default(uuid()) @db.Uuid
+  clinicId       String                   @db.Uuid
+  patientId      String                   @db.Uuid
+  estimateId     String                   @db.Uuid
+  actorUserId    String                   @db.Uuid
+  actorNameSnapshot String?               @db.VarChar(120)
+  action         String                   @db.VarChar(40)
+  fromStatus     TreatmentEstimateStatus?
+  toStatus       TreatmentEstimateStatus?
+  note           String?                  @db.VarChar(1000)
+  createdAt      DateTime                 @default(now()) @db.Timestamptz(6)
+  estimate       TreatmentEstimate        @relation(fields: [estimateId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  actor          ClinicMembership         @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@index([clinicId, patientId, estimateId, createdAt])
+  @@map("treatment_estimate_audits")
+}
+
 model TreatmentVisit {
   id              String               @id @default(uuid()) @db.Uuid
   clinicId        String               @db.Uuid
@@ -361,6 +648,8 @@ model TreatmentVisit {
   treatmentPlan   TreatmentPlan        @relation(fields: [treatmentPlanId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Cascade)
   messageLogs     MessageLog[]
   appointments    Appointment[]
+  dentalClinicalRecords DentalClinicalRecord[]
+  digitalPrescriptions DigitalPrescription[]
 
   @@unique([id, clinicId])
   @@unique([id, clinicId, patientId])
@@ -368,6 +657,198 @@ model TreatmentVisit {
   @@index([clinicId, status, dueDate])
   @@index([clinicId, dueDate])
   @@map("treatment_visits")
+}
+
+model OdontogramEntry {
+  id                     String                        @id @default(uuid()) @db.Uuid
+  clinicId               String                        @db.Uuid
+  patientId              String                        @db.Uuid
+  createdByUserId        String                        @db.Uuid
+  toothNumber            Int
+  dentition              OdontogramDentition
+  entryType              OdontogramEntryType
+  finding                OdontogramFinding?
+  treatmentName          String?                       @db.VarChar(160)
+  treatmentStatus        OdontogramTreatmentStatus?
+  surfaces               OdontogramSurface[]           @default([])
+  notes                  String?                       @db.VarChar(2000)
+  treatmentPlanId        String?                       @db.Uuid
+  supersedesEntryId      String?                       @db.Uuid
+  createdAt              DateTime                      @default(now()) @db.Timestamptz(6)
+  clinic                 Clinic                        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient                Patient                       @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  recordedBy             ClinicMembership              @relation(fields: [createdByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  treatmentPlan          TreatmentPlan?                @relation(fields: [treatmentPlanId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  supersedes             OdontogramEntry?              @relation("OdontogramEntryCorrections", fields: [supersedesEntryId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  supersededBy           OdontogramEntry?              @relation("OdontogramEntryCorrections")
+  clinicalRecordFindings DentalClinicalRecordFinding[]
+
+  @@unique([id, clinicId, patientId])
+  @@unique([supersedesEntryId, clinicId, patientId])
+  @@index([clinicId, patientId, createdAt])
+  @@index([clinicId, patientId, toothNumber, createdAt])
+  @@index([clinicId, treatmentPlanId])
+  @@map("odontogram_entries")
+}
+
+model DentalClinicalRecord {
+  id                       String                          @id @default(uuid()) @db.Uuid
+  clinicId                 String                          @db.Uuid
+  patientId                String                          @db.Uuid
+  visitId                  String?                         @db.Uuid
+  createdByUserId         String                          @db.Uuid
+  medicalHistory           String?                         @db.Text
+  dentalHistory            String?                         @db.Text
+  allergies                String?                         @db.Text
+  chiefComplaints          String?                         @db.Text
+  clinicalExamination      String?                         @db.Text
+  diagnosis                String?                         @db.Text
+  treatmentRecommendations String?                         @db.Text
+  clinicalNotes            String?                         @db.Text
+  createdAt                DateTime                        @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime                        @updatedAt @db.Timestamptz(6)
+  clinic                   Clinic                          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient                  Patient                         @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  visit                    TreatmentVisit?                 @relation(fields: [visitId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  createdBy                ClinicMembership                @relation(fields: [createdByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  findings                 DentalClinicalRecordFinding[]
+  audits                   DentalClinicalRecordAudit[]
+
+  @@unique([id, clinicId, patientId])
+  @@index([clinicId, patientId, createdAt])
+  @@index([clinicId, visitId])
+  @@map("dental_clinical_records")
+}
+
+model DentalClinicalRecordFinding {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  clinicId            String                 @db.Uuid
+  patientId           String                 @db.Uuid
+  recordId            String                 @db.Uuid
+  toothNumber         Int?
+  dentition           OdontogramDentition?
+  toothFindingLabel   String?                @db.VarChar(160)
+  summary             String?                @db.Text
+  surfaces            OdontogramSurface[]    @default([])
+  notes               String?                @db.Text
+  relatedOdontogramEntryId String?             @db.Uuid
+  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  record              DentalClinicalRecord   @relation(fields: [recordId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Cascade)
+  relatedOdontogramEntry OdontogramEntry?     @relation(fields: [relatedOdontogramEntryId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+
+  @@unique([id, clinicId, patientId])
+  @@index([clinicId, patientId, toothNumber])
+  @@map("dental_clinical_record_findings")
+}
+
+model DentalClinicalRecordAudit {
+  id              String                     @id @default(uuid()) @db.Uuid
+  clinicId        String                     @db.Uuid
+  patientId       String                     @db.Uuid
+  recordId        String                     @db.Uuid
+  action          ClinicalRecordAuditAction
+  changedByUserId String                     @db.Uuid
+  note            String?                    @db.Text
+  createdAt       DateTime                   @default(now()) @db.Timestamptz(6)
+  record          DentalClinicalRecord       @relation(fields: [recordId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Cascade)
+  changedBy       ClinicMembership           @relation(fields: [changedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@index([clinicId, patientId, createdAt])
+  @@map("dental_clinical_record_audits")
+}
+
+model PrescriptionMedicineCatalogueItem {
+  id              String               @id @default(uuid()) @db.Uuid
+  clinicId        String               @db.Uuid
+  createdByUserId String               @db.Uuid
+  name            String               @db.VarChar(200)
+  normalizedName  String               @db.VarChar(200)
+  strength        String?              @db.VarChar(120)
+  form            String?              @db.VarChar(80)
+  createdAt       DateTime             @default(now()) @db.Timestamptz(6)
+  clinic          Clinic               @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  createdBy       ClinicMembership     @relation(fields: [createdByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  prescriptionLines DigitalPrescriptionMedicine[]
+
+  @@unique([id, clinicId])
+  @@unique([clinicId, normalizedName])
+  @@index([clinicId, name])
+  @@map("prescription_medicine_catalogue_items")
+}
+
+model DigitalPrescription {
+  id                       String                        @id @default(uuid()) @db.Uuid
+  clinicId                 String                        @db.Uuid
+  patientId                String                        @db.Uuid
+  visitId                  String?                       @db.Uuid
+  authorUserId             String                        @db.Uuid
+  amendsPrescriptionId     String?                       @db.Uuid
+  amendmentReason          String?                       @db.VarChar(1000)
+  prescriptionDate         DateTime                      @db.Date
+  diagnosisNotes           String?                       @db.VarChar(4000)
+  additionalAdvice         String?                       @db.VarChar(4000)
+  followUpDate             DateTime?                     @db.Date
+  clinicNameSnapshot       String                        @db.VarChar(160)
+  clinicPhoneSnapshot      String?                       @db.VarChar(20)
+  clinicEmailSnapshot      String?                       @db.VarChar(254)
+  clinicAddressSnapshot    String?                       @db.VarChar(400)
+  authorNameSnapshot       String                        @db.VarChar(120)
+  authorRegistrationSnapshot String?                     @db.VarChar(100)
+  authorConfirmedAt        DateTime                      @db.Timestamptz(6)
+  finalizedAt              DateTime?                     @db.Timestamptz(6)
+  createdAt                DateTime                      @default(now()) @db.Timestamptz(6)
+  clinic                   Clinic                        @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  patient                  Patient                       @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  visit                    TreatmentVisit?               @relation(fields: [visitId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  author                   ClinicMembership              @relation("PrescriptionAuthor", fields: [authorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  amendsPrescription       DigitalPrescription?          @relation("PrescriptionAmendments", fields: [amendsPrescriptionId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  amendments               DigitalPrescription[]         @relation("PrescriptionAmendments")
+  medicines                DigitalPrescriptionMedicine[]
+  audits                   DigitalPrescriptionAudit[]
+
+  @@unique([id, clinicId, patientId])
+  @@unique([amendsPrescriptionId, clinicId, patientId])
+  @@index([clinicId, patientId, createdAt])
+  @@index([clinicId, visitId])
+  @@map("digital_prescriptions")
+}
+
+model DigitalPrescriptionMedicine {
+  id                  String                          @id @default(uuid()) @db.Uuid
+  clinicId            String                          @db.Uuid
+  patientId           String                          @db.Uuid
+  prescriptionId      String                          @db.Uuid
+  catalogueItemId     String?                         @db.Uuid
+  position            Int
+  medicineName        String                          @db.VarChar(200)
+  dosage              String                          @db.VarChar(160)
+  route               String                          @db.VarChar(100)
+  frequency           String                          @db.VarChar(160)
+  duration            String                          @db.VarChar(120)
+  quantity            String                          @db.VarChar(100)
+  instructions        String?                         @db.VarChar(1000)
+  prescription        DigitalPrescription             @relation(fields: [prescriptionId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  catalogueItem       PrescriptionMedicineCatalogueItem? @relation(fields: [catalogueItemId, clinicId], references: [id, clinicId], onDelete: Restrict)
+
+  @@unique([prescriptionId, position])
+  @@index([clinicId, patientId, prescriptionId])
+  @@map("digital_prescription_medicines")
+}
+
+model DigitalPrescriptionAudit {
+  id              String                    @id @default(uuid()) @db.Uuid
+  clinicId        String                    @db.Uuid
+  patientId       String                    @db.Uuid
+  prescriptionId  String                    @db.Uuid
+  actorUserId     String                    @db.Uuid
+  action          String                    @db.VarChar(40)
+  note            String?                   @db.VarChar(1000)
+  createdAt       DateTime                  @default(now()) @db.Timestamptz(6)
+  prescription    DigitalPrescription       @relation(fields: [prescriptionId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  actor           ClinicMembership          @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@index([clinicId, patientId, createdAt])
+  @@map("digital_prescription_audits")
 }
 
 model Appointment {
@@ -523,42 +1004,42 @@ model InsurancePolicy {
 }
 
 model InsuranceClaim {
-  id                 String                     @id @default(uuid()) @db.Uuid
-  clinicId           String                     @db.Uuid
-  patientId          String                     @db.Uuid
-  policyId           String                     @db.Uuid
-  treatmentPlanId    String?                    @db.Uuid
-  preAuthorizationId String?                    @unique @db.Uuid
-  type               InsuranceClaimType
-  status             InsuranceClaimStatus       @default(DRAFT)
-  treatmentDetails   String                     @db.VarChar(2000)
-  treatmentDate      DateTime                   @db.Date
-  estimatedCost      Decimal                    @db.Decimal(12, 2)
-  amountClaimed      Decimal                    @db.Decimal(12, 2)
-  amountApproved     Decimal?                   @db.Decimal(12, 2)
-  claimReference     String?                    @db.VarChar(120)
-  submittedAt        DateTime?                  @db.Timestamptz(6)
-  insurerRespondedAt DateTime?                  @db.Timestamptz(6)
-  followUpAt         DateTime?                  @db.Timestamptz(6)
-  rejectionReason    String?                    @db.Text
-  notes              String?                    @db.Text
-  claimSummary       String?                    @db.Text
-  claimSummaryFields Json?                       @db.JsonB
+  id                  String                     @id @default(uuid()) @db.Uuid
+  clinicId            String                     @db.Uuid
+  patientId           String                     @db.Uuid
+  policyId            String                     @db.Uuid
+  treatmentPlanId     String?                    @db.Uuid
+  preAuthorizationId  String?                    @unique @db.Uuid
+  type                InsuranceClaimType
+  status              InsuranceClaimStatus       @default(DRAFT)
+  treatmentDetails    String                     @db.VarChar(2000)
+  treatmentDate       DateTime                   @db.Date
+  estimatedCost       Decimal                    @db.Decimal(12, 2)
+  amountClaimed       Decimal                    @db.Decimal(12, 2)
+  amountApproved      Decimal?                   @db.Decimal(12, 2)
+  claimReference      String?                    @db.VarChar(120)
+  submittedAt         DateTime?                  @db.Timestamptz(6)
+  insurerRespondedAt  DateTime?                  @db.Timestamptz(6)
+  followUpAt          DateTime?                  @db.Timestamptz(6)
+  rejectionReason     String?                    @db.Text
+  notes               String?                    @db.Text
+  claimSummary        String?                    @db.Text
+  claimSummaryFields  Json?                      @db.JsonB
   claimSummarySources Json?                      @db.JsonB
-  summaryReviewedAt  DateTime?                  @db.Timestamptz(6)
-  summaryReviewedById String?                   @db.Uuid
-  resubmissionCount  Int                        @default(0)
-  createdAt          DateTime                   @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime                   @updatedAt @db.Timestamptz(6)
-  clinic             Clinic                     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  patient            Patient                    @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
-  policy             InsurancePolicy            @relation(fields: [policyId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
-  treatmentPlan      TreatmentPlan?             @relation(fields: [treatmentPlanId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
-  preAuthorization   InsurancePreAuthorization? @relation(fields: [preAuthorizationId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
-  summaryReviewer    ClinicMembership?          @relation("InsuranceClaimSummaryReviewer", fields: [summaryReviewedById, clinicId], references: [userId, clinicId], onDelete: Restrict)
-  payments           InsurancePayment[]
-  documents          InsuranceDocument[]
-  activities         InsuranceActivity[]
+  summaryReviewedAt   DateTime?                  @db.Timestamptz(6)
+  summaryReviewedById String?                    @db.Uuid
+  resubmissionCount   Int                        @default(0)
+  createdAt           DateTime                   @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime                   @updatedAt @db.Timestamptz(6)
+  clinic              Clinic                     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient             Patient                    @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  policy              InsurancePolicy            @relation(fields: [policyId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  treatmentPlan       TreatmentPlan?             @relation(fields: [treatmentPlanId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  preAuthorization    InsurancePreAuthorization? @relation(fields: [preAuthorizationId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  summaryReviewer     ClinicMembership?          @relation("InsuranceClaimSummaryReviewer", fields: [summaryReviewedById, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  payments            InsurancePayment[]
+  documents           InsuranceDocument[]
+  activities          InsuranceActivity[]
 
   @@unique([id, clinicId])
   @@unique([id, clinicId, patientId])
@@ -622,25 +1103,25 @@ model InsurancePayment {
 }
 
 model InsuranceDocument {
-  id              String                  @id @default(uuid()) @db.Uuid
-  clinicId        String                  @db.Uuid
-  claimId         String                  @db.Uuid
-  type            InsuranceDocumentType
-  name            String                  @db.VarChar(160)
-  status          InsuranceDocumentStatus @default(REQUIRED)
-  storagePath     String?                 @unique @db.VarChar(500)
-  receivedAt      DateTime?               @db.Timestamptz(6)
-  verifiedAt      DateTime?               @db.Timestamptz(6)
-  rejectionReason String?                 @db.Text
-  extractionStatus InsuranceDocumentExtractionStatus @default(NOT_STARTED)
-  extractionData  Json?                   @db.JsonB
-  extractionIssues Json?                  @db.JsonB
-  extractionCompletedAt DateTime?         @db.Timestamptz(6)
-  extractionModel String?                 @db.VarChar(120)
-  createdAt       DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime                @updatedAt @db.Timestamptz(6)
-  clinic          Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  claim           InsuranceClaim          @relation(fields: [claimId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  id                    String                            @id @default(uuid()) @db.Uuid
+  clinicId              String                            @db.Uuid
+  claimId               String                            @db.Uuid
+  type                  InsuranceDocumentType
+  name                  String                            @db.VarChar(160)
+  status                InsuranceDocumentStatus           @default(REQUIRED)
+  storagePath           String?                           @unique @db.VarChar(500)
+  receivedAt            DateTime?                         @db.Timestamptz(6)
+  verifiedAt            DateTime?                         @db.Timestamptz(6)
+  rejectionReason       String?                           @db.Text
+  extractionStatus      InsuranceDocumentExtractionStatus @default(NOT_STARTED)
+  extractionData        Json?                             @db.JsonB
+  extractionIssues      Json?                             @db.JsonB
+  extractionCompletedAt DateTime?                         @db.Timestamptz(6)
+  extractionModel       String?                           @db.VarChar(120)
+  createdAt             DateTime                          @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime                          @updatedAt @db.Timestamptz(6)
+  clinic                Clinic                            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  claim                 InsuranceClaim                    @relation(fields: [claimId, clinicId], references: [id, clinicId], onDelete: Restrict)
 
   @@unique([id, clinicId, claimId])
   @@index([clinicId, claimId, status])
@@ -663,8 +1144,8 @@ model InsuranceActivity {
   clinic             Clinic                     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   claim              InsuranceClaim?            @relation(fields: [claimId, clinicId], references: [id, clinicId], onDelete: Restrict)
   preAuthorization   InsurancePreAuthorization? @relation(fields: [preAuthorizationId, clinicId], references: [id, clinicId], onDelete: Restrict)
-  policy             InsurancePolicy?            @relation(fields: [policyId, clinicId], references: [id, clinicId], onDelete: Restrict)
-  provider           InsuranceProvider?          @relation(fields: [providerId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  policy             InsurancePolicy?           @relation(fields: [policyId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  provider           InsuranceProvider?         @relation(fields: [providerId, clinicId], references: [id, clinicId], onDelete: Restrict)
   actor              ClinicMembership           @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
 
   @@index([clinicId, claimId, createdAt])

@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CircleAlert,
   ClipboardCheck,
+  CreditCard,
   MessageCircle,
   Search,
 } from "lucide-react";
@@ -149,12 +150,23 @@ export default async function ClinicDashboardPage({
               {dateFormatter.format(new Date(`${clinicToday}T00:00:00.000Z`))}
             </p>
           </div>
-          <Link
-            className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            href={`/clinic/${membership.clinicId}/patients`}
-          >
-            Patient directory
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              href={`/clinic/${membership.clinicId}/patients`}
+            >
+              Patient directory
+            </Link>
+            {membership.role === "OWNER" && (
+              <Link
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+                href={`/clinic/${membership.clinicId}/billing`}
+              >
+                <CreditCard aria-hidden="true" className="size-4" />
+                Billing
+              </Link>
+            )}
+          </div>
         </header>
 
         <section

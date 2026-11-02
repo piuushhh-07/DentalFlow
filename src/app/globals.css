@@ -58,3 +58,31 @@
     @apply min-h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100;
   }
 }
+
+@media print {
+  @page {
+    margin: 16mm;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #prescription-document,
+  #prescription-document *,
+  #treatment-estimate-document,
+  #treatment-estimate-document * {
+    visibility: visible !important;
+  }
+
+  #prescription-document,
+  #treatment-estimate-document {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    border: 0;
+    padding: 0;
+    color: #0f172a;
+    box-shadow: none;
+  }
+}

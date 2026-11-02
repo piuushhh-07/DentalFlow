@@ -7,6 +7,7 @@ import {
   updateAppointmentAction,
   type AppointmentActionState,
 } from "@/features/appointments/actions";
+import { AppointmentSubmitButton } from "@/features/appointments/components/appointment-submit-button";
 
 type PatientOption = Readonly<{ id: string; fullName: string }>;
 type VisitOption = Readonly<{
@@ -20,6 +21,13 @@ type AppointmentFormProps = Readonly<{
   clinicId: string;
   patients: readonly PatientOption[];
   visits: readonly VisitOption[];
+  prefill?: Readonly<{
+    patientId: string;
+    patientName: string;
+    treatmentVisitId: string;
+    visitLabel: string;
+    dueDate: string;
+  }>;
   initial?: {
     appointmentId: string;
     patientId: string;
@@ -42,6 +50,7 @@ export function AppointmentForm({
   clinicId,
   patients,
   visits,
+  prefill,
   initial,
 }: AppointmentFormProps) {
   const action = initial ? updateAppointmentAction : createAppointmentAction;
@@ -60,45 +69,74 @@ export function AppointmentForm({
           value={initial.appointmentId}
         />
       )}
-      <label className="text-sm font-medium text-slate-700">
-        Patient
-        <select
-          className={`${inputClass} mt-1`}
-          defaultValue={initial?.patientId ?? ""}
-          name="patientId"
-          required
-        >
-          <option disabled value="">
-            Select patient
-          </option>
-          {patients.map((patient) => (
-            <option key={patient.id} value={patient.id}>
-              {patient.fullName}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="text-sm font-medium text-slate-700">
-        Linked treatment visit (optional)
-        <select
-          className={`${inputClass} mt-1`}
-          defaultValue={initial?.treatmentVisitId ?? ""}
-          name="treatmentVisitId"
-        >
-          <option value="">No linked visit</option>
-          {visits.map((visit) => (
-            <option key={visit.id} value={visit.id}>
-              {patientNames.get(visit.patientId) ?? "Patient"} ·{" "}
-              {visit.treatmentPlan.name} · Visit {visit.visitNumber}
-            </option>
-          ))}
-        </select>
-      </label>
+      {prefill ? (
+        <>
+          <input name="patientId" type="hidden" value={prefill.patientId} />
+          <input
+            name="treatmentVisitId"
+            type="hidden"
+            value={prefill.treatmentVisitId}
+          />
+          <div className="text-sm font-medium text-slate-700">
+            <span>Patient</span>
+            <p className="mt-1 flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 font-normal">
+              {prefill.patientName}
+            </p>
+          </div>
+          <div className="text-sm font-medium text-slate-700">
+            <span>Treatment visit</span>
+            <p className="mt-1 flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 font-normal">
+              {prefill.visitLabel}
+            </p>
+          </div>
+          <p className="text-sm text-slate-600 sm:col-span-2">
+            The visit&apos;s date and status are managed separately from this
+            appointment.
+          </p>
+        </>
+      ) : (
+        <>
+          <label className="text-sm font-medium text-slate-700">
+            Patient
+            <select
+              className={`${inputClass} mt-1`}
+              defaultValue={initial?.patientId ?? ""}
+              name="patientId"
+              required
+            >
+              <option disabled value="">
+                Select patient
+              </option>
+              {patients.map((patient) => (
+                <option key={patient.id} value={patient.id}>
+                  {patient.fullName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-slate-700">
+            Linked treatment visit (optional)
+            <select
+              className={`${inputClass} mt-1`}
+              defaultValue={initial?.treatmentVisitId ?? ""}
+              name="treatmentVisitId"
+            >
+              <option value="">No linked visit</option>
+              {visits.map((visit) => (
+                <option key={visit.id} value={visit.id}>
+                  {patientNames.get(visit.patientId) ?? "Patient"} ·{" "}
+                  {visit.treatmentPlan.name} · Visit {visit.visitNumber}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
       <label className="text-sm font-medium text-slate-700">
         Date
         <input
           className={`${inputClass} mt-1`}
-          defaultValue={initial?.date}
+          defaultValue={prefill?.dueDate ?? initial?.date}
           name="date"
           required
           type="date"
@@ -176,12 +214,9 @@ export function AppointmentForm({
             {state.success}
           </p>
         )}
-        <button
-          className="inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
-          type="submit"
-        >
-          {initial ? "Save appointment" : "Create appointment"}
-        </button>
+        <AppointmentSubmitButton
+          label={initial ? "Save appointment" : "Create appointment"}
+        />
       </div>
     </form>
   );

@@ -27,7 +27,7 @@ export function DeletePatientButton({
       onSubmit={(event) => {
         if (
           !window.confirm(
-            "Delete this patient? Their treatment plans and recalls will also be removed. Patients with message history cannot be deleted.",
+            "Delete this patient? Their treatment plans and recalls will also be removed. Patients with message or clinical chart history cannot be deleted.",
           )
         ) {
           event.preventDefault();

@@ -6,6 +6,10 @@ import { z } from "zod";
 
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import {
+  BillingAccessRestrictedError,
+  BillingLimitReachedError,
+} from "@/features/billing/lib/billing-entitlements";
+import {
   createClinicPatient,
   deleteClinicPatient,
   updateClinicPatient,
@@ -69,6 +73,18 @@ export async function createPatient(
     const patient = await createClinicPatient(membership.clinicId, parsed.data);
     patientId = patient.id;
   } catch (error) {
+    if (error instanceof BillingLimitReachedError) {
+      return {
+        error:
+          "This clinic has reached its patient limit. Review the subscription in Billing to continue adding patients.",
+      };
+    }
+    if (error instanceof BillingAccessRestrictedError) {
+      return {
+        error:
+          "New patient records are paused for this subscription. Existing clinical records remain available.",
+      };
+    }
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002" &&
@@ -167,7 +183,7 @@ export async function deletePatient(
     if (!deleted) {
       return {
         error:
-          "This patient cannot be deleted while message history exists, or the record is no longer available.",
+          "This patient cannot be deleted while message or clinical chart history exists, or the record is no longer available.",
       };
     }
   } catch (error) {

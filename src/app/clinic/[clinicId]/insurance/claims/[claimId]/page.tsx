@@ -559,6 +559,7 @@ export default async function InsuranceClaimDetailPage({
                         clinicId={membership.clinicId}
                         documentId={document.id}
                         name={document.name}
+                        pendingCleanupPaths={document.pendingCleanupPaths}
                         storagePath={document.storagePath}
                       />
                     </div>

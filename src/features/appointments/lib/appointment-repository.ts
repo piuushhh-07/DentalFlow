@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { assertMonthlyAppointmentCapacity } from "@/features/billing/lib/billing-entitlements";
 import {
   measureTransactionQuery,
   recordTransactionPhase,
@@ -23,6 +24,12 @@ import {
 
 export class AppointmentPatientNotFoundError extends Error {}
 export class AppointmentVisitNotFoundError extends Error {}
+export class AppointmentVisitAlreadyScheduledError extends Error {
+  constructor() {
+    super("This treatment visit already has an active appointment.");
+    this.name = "AppointmentVisitAlreadyScheduledError";
+  }
+}
 export class AppointmentNotFoundError extends Error {}
 export class AppointmentConflictError extends Error {}
 export class AppointmentTransitionError extends Error {}
@@ -30,6 +37,12 @@ export class AppointmentTransitionError extends Error {}
 const INACTIVE_STATUSES = [
   AppointmentStatus.CANCELLED,
   AppointmentStatus.NO_SHOW,
+] as const;
+const ACTIVE_BOOKING_STATUSES = [
+  AppointmentStatus.SCHEDULED,
+  AppointmentStatus.CONFIRMED,
+  AppointmentStatus.CHECKED_IN,
+  AppointmentStatus.IN_PROGRESS,
 ] as const;
 
 function runDiagnosticQuery<T>(
@@ -175,6 +188,80 @@ async function validatePatientAndVisit(
   }
 }
 
+async function validateVisitBookingAvailability(
+  transaction: Prisma.TransactionClient,
+  clinicId: string,
+  treatmentVisitId: string | null,
+  excludeAppointmentId?: string,
+): Promise<void> {
+  if (!treatmentVisitId) return;
+
+  const activeAppointment = await transaction.appointment.findFirst({
+    where: {
+      clinicId,
+      treatmentVisitId,
+      status: { in: [...ACTIVE_BOOKING_STATUSES] },
+      ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+    },
+    select: { id: true },
+  });
+
+  if (activeAppointment) {
+    throw new AppointmentVisitAlreadyScheduledError();
+  }
+}
+
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
+
+function isSerializationFailure(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2034"
+  );
+}
+
+function isTransactionLifecycleFailure(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2028"
+  );
+}
+
+async function rethrowVisitBookingConflict(
+  error: unknown,
+  clinicId: string,
+  treatmentVisitId: string | null,
+  excludeAppointmentId?: string,
+): Promise<void> {
+  if (
+    !treatmentVisitId ||
+    (!isUniqueConstraintViolation(error) &&
+      !isSerializationFailure(error) &&
+      !isTransactionLifecycleFailure(error))
+  ) {
+    return;
+  }
+
+  const conflictingAppointment = await prisma.appointment.findFirst({
+    where: {
+      clinicId,
+      treatmentVisitId,
+      status: { in: [...ACTIVE_BOOKING_STATUSES] },
+      ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+    },
+    select: { id: true },
+  });
+
+  if (conflictingAppointment) {
+    throw new AppointmentVisitAlreadyScheduledError();
+  }
+}
+
 export async function listClinicAppointments(clinicId: string, date: string) {
   return prisma.appointment.findMany({
     where: {
@@ -188,6 +275,7 @@ export async function listClinicAppointments(clinicId: string, date: string) {
         select: {
           id: true,
           visitNumber: true,
+          status: true,
           treatmentPlan: { select: { id: true, name: true } },
         },
       },
@@ -223,13 +311,19 @@ export async function listAppointmentVisits(clinicId: string) {
   });
 }
 
-export async function createClinicAppointment(
+async function createClinicAppointmentTransaction(
   clinicId: string,
   input: AppointmentInput,
 ) {
   return prisma.$transaction(
     async (transaction) => {
+      await assertMonthlyAppointmentCapacity(transaction, clinicId);
       await validatePatientAndVisit(transaction, clinicId, input);
+      await validateVisitBookingAvailability(
+        transaction,
+        clinicId,
+        input.treatmentVisitId,
+      );
       const scheduledAt = await assertNoSchedulingConflict(
         transaction,
         clinicId,
@@ -250,8 +344,32 @@ export async function createClinicAppointment(
         select: { id: true },
       });
     },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      timeout: 10_000,
+    },
   );
+}
+
+export async function createClinicAppointment(
+  clinicId: string,
+  input: AppointmentInput,
+) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await createClinicAppointmentTransaction(clinicId, input);
+    } catch (error) {
+      if (attempt === 0 && isSerializationFailure(error)) continue;
+      await rethrowVisitBookingConflict(
+        error,
+        clinicId,
+        input.treatmentVisitId,
+      );
+      throw error;
+    }
+  }
+
+  throw new Error("Appointment creation retry limit exceeded.");
 }
 
 export async function updateClinicAppointment(
@@ -288,6 +406,12 @@ export async function updateClinicAppointment(
             clinicId,
             input,
             diagnostic,
+          );
+          await validateVisitBookingAvailability(
+            transaction,
+            clinicId,
+            input.treatmentVisitId,
+            appointmentId,
           );
           const scheduledAt = await assertNoSchedulingConflict(
             transaction,
@@ -327,6 +451,12 @@ export async function updateClinicAppointment(
     return result;
   } catch (error) {
     recordTransactionPhase(diagnostic, "outer_rejected", error);
+    await rethrowVisitBookingConflict(
+      error,
+      clinicId,
+      input.treatmentVisitId,
+      appointmentId,
+    );
     throw error;
   }
 }
@@ -357,12 +487,62 @@ export async function updateClinicAppointmentStatus(
   );
 }
 
+export async function listClinicAppointmentsInRange(
+  clinicId: string,
+  startDate: string,
+  endDate: string,
+) {
+  return prisma.appointment.findMany({
+    where: {
+      clinicId,
+      scheduledAt: {
+        gte: clinicDateStart(startDate),
+        lt: clinicDateEnd(endDate),
+      },
+    },
+    orderBy: [{ scheduledAt: "asc" }, { createdAt: "asc" }],
+    include: {
+      patient: { select: { id: true, fullName: true, phoneNumber: true } },
+      treatmentVisit: {
+        select: {
+          id: true,
+          visitNumber: true,
+          status: true,
+          treatmentPlan: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+}
+
 export async function countClinicAppointments(clinicId: string, date: string) {
   return prisma.appointment.count({
     where: {
       clinicId,
       scheduledAt: { gte: clinicDateStart(date), lt: clinicDateEnd(date) },
       status: { notIn: [...INACTIVE_STATUSES] },
+    },
+  });
+}
+
+export async function countClinicAppointmentsByStatus(
+  clinicId: string,
+  statuses: readonly AppointmentStatus[],
+  startDate?: string,
+  endDate?: string,
+) {
+  return prisma.appointment.count({
+    where: {
+      clinicId,
+      ...(startDate && endDate
+        ? {
+            scheduledAt: {
+              gte: clinicDateStart(startDate),
+              lt: clinicDateEnd(endDate),
+            },
+          }
+        : {}),
+      status: { in: [...statuses] },
     },
   });
 }

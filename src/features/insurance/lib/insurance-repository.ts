@@ -1487,7 +1487,7 @@ export async function listInsuranceClaims(
 }
 
 export async function getInsuranceClaim(clinicId: string, claimId: string) {
-  return prisma.insuranceClaim.findFirst({
+  const claim = await prisma.insuranceClaim.findFirst({
     where: { id: claimId, clinicId },
     include: {
       patient: { select: { id: true, fullName: true, phoneNumber: true } },
@@ -1531,6 +1531,28 @@ export async function getInsuranceClaim(clinicId: string, claimId: string) {
       },
     },
   });
+  if (!claim) return null;
+  const pendingCleanup = await prisma.$queryRaw<
+    { documentId: string; storagePath: string }[]
+  >`
+    SELECT document_id AS "documentId", storage_path AS "storagePath"
+    FROM public.insurance_document_storage_cleanup
+    WHERE clinic_id = ${clinicId}::uuid
+      AND claim_id = ${claimId}::uuid
+  `;
+  const cleanupPathsByDocument = new Map<string, string[]>();
+  for (const cleanup of pendingCleanup) {
+    const paths = cleanupPathsByDocument.get(cleanup.documentId) ?? [];
+    paths.push(cleanup.storagePath);
+    cleanupPathsByDocument.set(cleanup.documentId, paths);
+  }
+  return {
+    ...claim,
+    documents: claim.documents.map((document) => ({
+      ...document,
+      pendingCleanupPaths: cleanupPathsByDocument.get(document.id) ?? [],
+    })),
+  };
 }
 
 export async function createInsuranceDocumentRequirement(
@@ -1572,19 +1594,39 @@ export async function createInsuranceDocumentRequirement(
   });
 }
 
-export async function registerInsuranceDocumentUpload(
+function validateInsuranceDocumentStoragePath(
   clinicId: string,
-  actorUserId: string,
+  claimId: string,
+  documentId: string,
+  storagePath: string,
+): void {
+  const expectedPrefix = `${clinicId}/${claimId}/${documentId}/`;
+  const filename = storagePath.startsWith(expectedPrefix)
+    ? storagePath.slice(expectedPrefix.length)
+    : "";
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(pdf|jpg|png)$/i.test(
+      filename,
+    )
+  ) {
+    throw new InsuranceRecordNotFoundError();
+  }
+}
+
+export async function authorizeInsuranceDocumentUpload(
+  clinicId: string,
   claimId: string,
   documentId: string,
   storagePath: string,
 ) {
-  const expectedPrefix = `${clinicId}/${claimId}/${documentId}/`;
-  if (!storagePath.startsWith(expectedPrefix)) {
-    throw new InsuranceRecordNotFoundError();
-  }
+  validateInsuranceDocumentStoragePath(
+    clinicId,
+    claimId,
+    documentId,
+    storagePath,
+  );
   return prisma.$transaction(async (transaction) => {
-    const result = await transaction.insuranceDocument.updateMany({
+    const document = await transaction.insuranceDocument.findFirst({
       where: {
         id: documentId,
         claimId,
@@ -1596,29 +1638,157 @@ export async function registerInsuranceDocumentUpload(
           ],
         },
       },
-      data: {
-        storagePath,
-        status: InsuranceDocumentStatus.RECEIVED,
-        receivedAt: new Date(),
-        verifiedAt: null,
-        rejectionReason: null,
-        extractionStatus: InsuranceDocumentExtractionStatus.NOT_STARTED,
-        extractionData: Prisma.DbNull,
-        extractionIssues: Prisma.DbNull,
-        extractionCompletedAt: null,
-        extractionModel: null,
-      },
+      select: { id: true, storagePath: true },
     });
-    if (!result.count) throw new InsuranceRecordNotFoundError();
-    await addActivity(transaction, {
-      clinicId,
-      actorUserId,
-      claimId,
-      type: InsuranceActivityType.DOCUMENT_RECEIVED,
-      summary: "A required document was received",
-      details: { documentId },
-    });
+    if (!document || document.storagePath === storagePath) {
+      throw new InsuranceRecordNotFoundError();
+    }
+    await transaction.$executeRaw`
+      INSERT INTO public.insurance_document_storage_cleanup
+        (storage_path, clinic_id, claim_id, document_id)
+      VALUES
+        (${storagePath}, ${clinicId}::uuid, ${claimId}::uuid, ${documentId}::uuid)
+      ON CONFLICT (storage_path) DO NOTHING
+    `;
   });
+}
+
+export async function registerInsuranceDocumentUpload(
+  clinicId: string,
+  actorUserId: string,
+  claimId: string,
+  documentId: string,
+  storagePath: string,
+) {
+  validateInsuranceDocumentStoragePath(
+    clinicId,
+    claimId,
+    documentId,
+    storagePath,
+  );
+  return prisma.$transaction(
+    async (transaction) => {
+      const document = await transaction.insuranceDocument.findFirst({
+        where: { id: documentId, claimId, clinicId },
+        select: { storagePath: true, status: true },
+      });
+      if (!document) throw new InsuranceRecordNotFoundError();
+      const canReceiveUpload =
+        document.status === InsuranceDocumentStatus.REQUIRED ||
+        document.status === InsuranceDocumentStatus.REJECTED;
+      if (!canReceiveUpload) {
+        if (document.storagePath === storagePath) {
+          throw new InsuranceRecordNotFoundError();
+        }
+        await transaction.$executeRaw`
+          INSERT INTO public.insurance_document_storage_cleanup
+            (storage_path, clinic_id, claim_id, document_id)
+          VALUES
+            (${storagePath}, ${clinicId}::uuid, ${claimId}::uuid, ${documentId}::uuid)
+          ON CONFLICT (storage_path) DO NOTHING
+        `;
+        return { registered: false as const, cleanupAuthorized: true as const };
+      }
+      const result = await transaction.insuranceDocument.updateMany({
+        where: {
+          id: documentId,
+          claimId,
+          clinicId,
+          status: {
+            in: [
+              InsuranceDocumentStatus.REQUIRED,
+              InsuranceDocumentStatus.REJECTED,
+            ],
+          },
+        },
+        data: {
+          storagePath,
+          status: InsuranceDocumentStatus.RECEIVED,
+          receivedAt: new Date(),
+          verifiedAt: null,
+          rejectionReason: null,
+          extractionStatus: InsuranceDocumentExtractionStatus.NOT_STARTED,
+          extractionData: Prisma.DbNull,
+          extractionIssues: Prisma.DbNull,
+          extractionCompletedAt: null,
+          extractionModel: null,
+        },
+      });
+      if (!result.count) {
+        const currentDocument = await transaction.insuranceDocument.findFirst({
+          where: { id: documentId, claimId, clinicId },
+          select: { storagePath: true },
+        });
+        if (!currentDocument || currentDocument.storagePath === storagePath) {
+          throw new InsuranceRecordNotFoundError();
+        }
+        await transaction.$executeRaw`
+          INSERT INTO public.insurance_document_storage_cleanup
+            (storage_path, clinic_id, claim_id, document_id)
+          VALUES
+            (${storagePath}, ${clinicId}::uuid, ${claimId}::uuid, ${documentId}::uuid)
+          ON CONFLICT (storage_path) DO NOTHING
+        `;
+        return { registered: false as const, cleanupAuthorized: true as const };
+      }
+      if (document.storagePath && document.storagePath !== storagePath) {
+        await transaction.$executeRaw`
+          INSERT INTO public.insurance_document_storage_cleanup
+            (storage_path, clinic_id, claim_id, document_id)
+          VALUES
+            (${document.storagePath}, ${clinicId}::uuid, ${claimId}::uuid, ${documentId}::uuid)
+          ON CONFLICT (storage_path) DO NOTHING
+        `;
+      }
+      await transaction.$executeRaw`
+        DELETE FROM public.insurance_document_storage_cleanup
+        WHERE storage_path = ${storagePath}
+          AND clinic_id = ${clinicId}::uuid
+          AND claim_id = ${claimId}::uuid
+          AND document_id = ${documentId}::uuid
+      `;
+      await addActivity(transaction, {
+        clinicId,
+        actorUserId,
+        claimId,
+        type: InsuranceActivityType.DOCUMENT_RECEIVED,
+        summary: "A required document was received",
+        details: { documentId },
+      });
+      return { registered: true as const };
+    },
+    { timeout: 10_000 },
+  );
+}
+
+export async function completeInsuranceDocumentStorageCleanup(
+  clinicId: string,
+  claimId: string,
+  documentId: string,
+  storagePath: string,
+) {
+  validateInsuranceDocumentStoragePath(
+    clinicId,
+    claimId,
+    documentId,
+    storagePath,
+  );
+  const deleted = await prisma.$executeRaw`
+    DELETE FROM public.insurance_document_storage_cleanup
+    WHERE storage_path = ${storagePath}
+      AND clinic_id = ${clinicId}::uuid
+      AND claim_id = ${claimId}::uuid
+      AND document_id = ${documentId}::uuid
+      AND EXISTS (
+        SELECT 1
+        FROM public.insurance_documents document
+        WHERE document."id" = ${documentId}::uuid
+          AND document."clinicId" = ${clinicId}::uuid
+          AND document."claimId" = ${claimId}::uuid
+          AND document."storagePath" IS DISTINCT FROM ${storagePath}
+      )
+  `;
+  return deleted > 0;
 }
 
 export async function resetUnverifiedInsuranceDocumentUpload(

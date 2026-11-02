@@ -11,6 +11,8 @@ import { z } from "zod";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import {
   archiveInsuranceProvider,
+  authorizeInsuranceDocumentUpload,
+  completeInsuranceDocumentStorageCleanup,
   createInsuranceClaim,
   createInsuranceDocumentRequirement,
   createInsurancePayment,
@@ -40,6 +42,9 @@ import {
   preAuthorizationInputSchema,
   providerInputSchema,
 } from "@/features/insurance/lib/insurance-validation";
+import { createSupabaseServerActionClient } from "@/lib/supabase/server";
+
+const INSURANCE_DOCUMENT_BUCKET = "dentalflow-insurance-private";
 
 const uuid = z.string().uuid();
 
@@ -487,17 +492,91 @@ export async function registerInsuranceDocumentUploadAction(
   }
   const membership = await requireClinicMembership(clinicId.data);
   try {
-    await registerInsuranceDocumentUpload(
+    const registration = await registerInsuranceDocumentUpload(
       membership.clinicId,
       membership.userId,
       claimId.data,
       documentId.data,
       storagePath,
     );
+    if (!registration.registered) {
+      return {
+        error:
+          "Another upload was saved before this document could be registered.",
+        cleanupAuthorized: registration.cleanupAuthorized,
+      };
+    }
     return { success: true as const };
   } catch (error) {
     logInsuranceError("Insurance document registration failed", error);
     return { error: "The uploaded document could not be registered." };
+  }
+}
+
+export async function authorizeInsuranceDocumentUploadAction(
+  clinicIdValue: string,
+  claimIdValue: string,
+  documentIdValue: string,
+  storagePath: string,
+) {
+  const clinicId = uuid.safeParse(clinicIdValue);
+  const claimId = uuid.safeParse(claimIdValue);
+  const documentId = uuid.safeParse(documentIdValue);
+  if (!clinicId.success || !claimId.success || !documentId.success) {
+    return { error: "The document upload could not be prepared." };
+  }
+  const membership = await requireClinicMembership(clinicId.data);
+  try {
+    await authorizeInsuranceDocumentUpload(
+      membership.clinicId,
+      claimId.data,
+      documentId.data,
+      storagePath,
+    );
+    return { success: true as const };
+  } catch (error) {
+    logInsuranceError("Insurance document upload preparation failed", error);
+    return { error: "The document upload could not be prepared." };
+  }
+}
+
+export async function completeInsuranceDocumentStorageCleanupAction(
+  clinicIdValue: string,
+  claimIdValue: string,
+  documentIdValue: string,
+  storagePath: string,
+) {
+  const clinicId = uuid.safeParse(clinicIdValue);
+  const claimId = uuid.safeParse(claimIdValue);
+  const documentId = uuid.safeParse(documentIdValue);
+  if (!clinicId.success || !claimId.success || !documentId.success) {
+    return { error: "The replaced document could not be cleaned up." };
+  }
+  const membership = await requireClinicMembership(clinicId.data);
+  try {
+    const supabase = await createSupabaseServerActionClient();
+    const { error: storageError } = await supabase.storage
+      .from(INSURANCE_DOCUMENT_BUCKET)
+      .remove([storagePath]);
+    if (storageError) {
+      logInsuranceError(
+        "Insurance document Storage cleanup failed",
+        storageError,
+      );
+      return { error: "The replaced document could not be removed." };
+    }
+    const completed = await completeInsuranceDocumentStorageCleanup(
+      membership.clinicId,
+      claimId.data,
+      documentId.data,
+      storagePath,
+    );
+    return completed
+      ? { success: true as const }
+      : { error: "The replaced document cleanup authorization was not found." };
+  } catch (error) {
+    logInsuranceError("Insurance document cleanup finalization failed", error);
+    return { error: "The replaced document cleanup could not be finalized." };
   }
 }
 

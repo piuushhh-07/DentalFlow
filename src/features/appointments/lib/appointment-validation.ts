@@ -72,6 +72,14 @@ export function canTransitionAppointment(
   return current === next || transitions[current].includes(next);
 }
 
+export function isActiveAppointmentStatus(status: AppointmentStatus): boolean {
+  return (
+    status !== AppointmentStatus.COMPLETED &&
+    status !== AppointmentStatus.CANCELLED &&
+    status !== AppointmentStatus.NO_SHOW
+  );
+}
+
 export function appointmentsConflict(
   requested: Readonly<{
     id?: string;

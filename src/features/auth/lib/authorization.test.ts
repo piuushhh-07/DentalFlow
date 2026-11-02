@@ -84,6 +84,27 @@ test("uses the database membership role for role authorization", () => {
   );
 });
 
+test("appointment scheduling permits only verified OWNER and STAFF memberships", () => {
+  for (const role of [ClinicRole.OWNER, ClinicRole.STAFF]) {
+    const membership = authorizeClinicMembership(userId, clinicId, {
+      userId,
+      clinicId,
+      role,
+    });
+
+    assert.equal(
+      authorizeClinicRole(membership, [ClinicRole.OWNER, ClinicRole.STAFF])
+        .role,
+      role,
+    );
+  }
+
+  assert.throws(
+    () => authorizeClinicMembership(userId, clinicId, null),
+    ClinicAccessDeniedError,
+  );
+});
+
 test("allows template editing only for an owner membership", () => {
   const owner = authorizeClinicMembership(userId, clinicId, {
     userId,

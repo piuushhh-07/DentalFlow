@@ -228,7 +228,10 @@ export async function updateTreatmentPlanFinance(
           throw error;
         }
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        timeout: 10_000,
+      },
     );
     recordTransactionPhase(diagnostic, "outer_resolved");
     return result;

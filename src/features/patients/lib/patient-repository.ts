@@ -3,6 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { assertPatientCapacity } from "@/features/billing/lib/billing-entitlements";
 import {
   getPatientPagination,
   patientBelongsToClinic,
@@ -79,18 +80,39 @@ export async function createClinicPatient(
   clinicId: string,
   input: PatientInput,
 ) {
-  return prisma.patient.create({
-    data: {
-      clinicId,
-      fullName: input.fullName,
-      phoneNumber: input.phoneNumber,
-      normalizedPhone: input.phoneNumber,
-      whatsappOptIn: input.whatsappOptIn,
-      whatsappOptedInAt: input.whatsappOptedInAt,
-      notes: input.notes,
-    },
-    select: { id: true },
-  });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (transaction) => {
+          await assertPatientCapacity(transaction, clinicId);
+          return transaction.patient.create({
+            data: {
+              clinicId,
+              fullName: input.fullName,
+              phoneNumber: input.phoneNumber,
+              normalizedPhone: input.phoneNumber,
+              whatsappOptIn: input.whatsappOptIn,
+              whatsappOptedInAt: input.whatsappOptedInAt,
+              notes: input.notes,
+            },
+            select: { id: true },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        attempt === 0 &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2034"
+      ) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error("Patient creation retry limit exceeded.");
 }
 
 export async function updateClinicPatient(
@@ -119,6 +141,7 @@ export async function deleteClinicPatient(clinicId: string, patientId: string) {
       id: patientId,
       clinicId,
       messageLogs: { none: {} },
+      odontogramEntries: { none: {} },
     },
   });
 

@@ -13,6 +13,7 @@ import {
   listClinicAppointments,
 } from "@/features/appointments/lib/appointment-repository";
 import { getClinicToday } from "@/features/follow-ups/lib/follow-up-validation";
+import { toClinicDateInput } from "@/features/treatments/lib/treatment-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,11 @@ export default async function ClinicAppointmentsPage({
   searchParams,
 }: {
   params: { clinicId: string };
-  searchParams: { date?: string };
+  searchParams: {
+    date?: string;
+    patientId?: string;
+    treatmentVisitId?: string;
+  };
 }) {
   const clinicId = z.string().uuid().safeParse(params.clinicId);
   if (!clinicId.success) notFound();
@@ -58,6 +63,44 @@ export default async function ClinicAppointmentsPage({
     listAppointmentPatients(membership.clinicId),
     listAppointmentVisits(membership.clinicId),
   ]);
+  let prefill:
+    | {
+        patientId: string;
+        patientName: string;
+        treatmentVisitId: string;
+        visitLabel: string;
+        dueDate: string;
+      }
+    | undefined;
+  const hasVisitPrefill =
+    searchParams.patientId !== undefined ||
+    searchParams.treatmentVisitId !== undefined;
+  if (hasVisitPrefill) {
+    const requestedPatientId = z
+      .string()
+      .uuid()
+      .safeParse(searchParams.patientId);
+    const requestedVisitId = z
+      .string()
+      .uuid()
+      .safeParse(searchParams.treatmentVisitId);
+    if (!requestedPatientId.success || !requestedVisitId.success) notFound();
+
+    const patient = patients.find(({ id }) => id === requestedPatientId.data);
+    const visit = visits.find(
+      ({ id, patientId }) =>
+        id === requestedVisitId.data && patientId === requestedPatientId.data,
+    );
+    if (!patient || !visit) notFound();
+
+    prefill = {
+      patientId: patient.id,
+      patientName: patient.fullName,
+      treatmentVisitId: visit.id,
+      visitLabel: `${visit.treatmentPlan.name} · Visit ${visit.visitNumber}`,
+      dueDate: toClinicDateInput(visit.dueDate),
+    };
+  }
   const basePath = `/clinic/${membership.clinicId}/appointments`;
 
   return (
@@ -117,6 +160,7 @@ export default async function ClinicAppointmentsPage({
             <AppointmentForm
               clinicId={membership.clinicId}
               patients={patients}
+              prefill={prefill}
               visits={visits}
             />
           )}
@@ -183,6 +227,16 @@ export default async function ClinicAppointmentsPage({
                             Linked to{" "}
                             {appointment.treatmentVisit.treatmentPlan.name},
                             visit {appointment.treatmentVisit.visitNumber}
+                          </p>
+                        )}
+                        {appointment.treatmentVisit && (
+                          <p className="mt-1 text-xs text-slate-500">
+                            Treatment visit status:{" "}
+                            {appointment.treatmentVisit.status.replaceAll(
+                              "_",
+                              " ",
+                            )}{" "}
+                            · managed separately
                           </p>
                         )}
                         {appointment.notes && (

@@ -6,6 +6,7 @@ import {
   appointmentsConflict,
   canTransitionAppointment,
   createAppointmentSchema,
+  isActiveAppointmentStatus,
 } from "@/features/appointments/lib/appointment-validation";
 
 test("validates appointment details and linked database IDs", () => {
@@ -112,4 +113,13 @@ test("appointment state transitions cannot reopen completed bookings", () => {
     ),
     false,
   );
+});
+
+test("only non-terminal appointments count as active treatment bookings", () => {
+  assert.equal(isActiveAppointmentStatus(AppointmentStatus.SCHEDULED), true);
+  assert.equal(isActiveAppointmentStatus(AppointmentStatus.CONFIRMED), true);
+  assert.equal(isActiveAppointmentStatus(AppointmentStatus.IN_PROGRESS), true);
+  assert.equal(isActiveAppointmentStatus(AppointmentStatus.COMPLETED), false);
+  assert.equal(isActiveAppointmentStatus(AppointmentStatus.CANCELLED), false);
+  assert.equal(isActiveAppointmentStatus(AppointmentStatus.NO_SHOW), false);
 });

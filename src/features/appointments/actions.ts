@@ -5,10 +5,15 @@ import { revalidatePath } from "next/cache";
 
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import {
+  BillingAccessRestrictedError,
+  BillingLimitReachedError,
+} from "@/features/billing/lib/billing-entitlements";
+import {
   AppointmentConflictError,
   AppointmentNotFoundError,
   AppointmentPatientNotFoundError,
   AppointmentTransitionError,
+  AppointmentVisitAlreadyScheduledError,
   AppointmentVisitNotFoundError,
   createClinicAppointment,
   updateClinicAppointment,
@@ -50,11 +55,20 @@ function parseInput(formData: FormData) {
 }
 
 function userFacingAppointmentError(error: unknown): string {
+  if (error instanceof BillingLimitReachedError) {
+    return "This clinic has reached its monthly appointment limit. Review the subscription in Billing to continue scheduling.";
+  }
+  if (error instanceof BillingAccessRestrictedError) {
+    return "New appointments are paused for this subscription. Existing clinical records remain available.";
+  }
   if (error instanceof AppointmentPatientNotFoundError) {
     return "The selected patient is not available in this clinic.";
   }
   if (error instanceof AppointmentVisitNotFoundError) {
     return "The selected treatment visit does not belong to this patient and clinic.";
+  }
+  if (error instanceof AppointmentVisitAlreadyScheduledError) {
+    return "This treatment visit already has an active appointment. Update or cancel the existing appointment before booking another.";
   }
   if (error instanceof AppointmentConflictError) {
     return error.message;

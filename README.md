@@ -66,6 +66,8 @@ src/
     onboarding/        Verified first-run clinic setup
     patients/          Clinic-scoped patient records
     treatments/        Treatment plans and multi-visit schedules
+    estimates/         Versioned treatment estimates and printable quotations
+    prescriptions/     Clinic-scoped, append-only digital prescriptions
     recalls/            Preventive recall cycles
     insurance/         Clinic-scoped insurers, policies, claims and private documents
   lib/                 Shared utilities
@@ -74,6 +76,20 @@ prisma/
   schema.prisma        Clinic-scoped data model
 middleware.ts          Supabase session refresh and route protection
 ```
+
+Digital prescriptions are finalized as historical records. A correction creates
+a linked amendment and does not overwrite the original. The prescription page
+uses the browser print dialog for printing or saving a PDF; medicine details
+and clinical text are entered and confirmed by the clinic author, not generated
+by DentalFlow.
+
+Treatment quotations are immutable price snapshots linked to the existing
+clinic, patient, treatment plan, and optional procedure catalogue entries.
+Sending, acceptance, rejection, expiry, and conversion are recorded with their
+actor. A correction creates a new estimate version. Conversion records the
+accepted quotation against its existing treatment plan without creating a
+charge, payment, or ledger entry; actual treatment finance remains in the
+existing financial workflow.
 
 The project uses Next.js 14 App Router, strict TypeScript, Tailwind CSS, and
 shadcn/ui conventions. `components.json` configures shadcn/ui component

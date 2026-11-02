@@ -11,9 +11,28 @@ import { getClinicPatient } from "@/features/patients/lib/patient-repository";
 import { formatIndianPhoneNumber } from "@/features/patients/lib/patient-validation";
 import { listInsurancePolicies } from "@/features/insurance/lib/insurance-repository";
 import { maskPolicyIdentifier } from "@/features/insurance/lib/insurance-validation";
+import { ClinicalRecordsPanel } from "@/features/clinical-records/components/clinical-records-panel";
+import { listPatientDentalClinicalRecords } from "@/features/clinical-records/lib/clinical-record-repository";
+import { OdontogramBoard } from "@/features/odontogram/components/odontogram-board";
+import {
+  listPatientOdontogramEntries,
+  listPatientOdontogramTreatmentPlans,
+} from "@/features/odontogram/lib/odontogram-repository";
+import { listPatientTreatmentPlans } from "@/features/treatments/lib/treatment-repository";
+import { PrescriptionsPanel } from "@/features/prescriptions/components/prescriptions-panel";
+import {
+  listClinicPrescriptionMedicineCatalogue,
+  listPatientPrescriptions,
+} from "@/features/prescriptions/lib/prescription-repository";
+import { PatientEstimatesPanel } from "@/features/estimates/components/patient-estimates-panel";
+import { listPatientTreatmentEstimates } from "@/features/estimates/lib/estimate-repository";
 
 type PatientDetailPageProps = Readonly<{
   params: { clinicId: string; patientId: string };
+  searchParams?: {
+    prescriptionVisitId?: string;
+    amendsPrescriptionId?: string;
+  };
 }>;
 
 const dateFormatter = new Intl.DateTimeFormat("en-IN", {
@@ -24,6 +43,7 @@ const dateFormatter = new Intl.DateTimeFormat("en-IN", {
 
 export default async function PatientDetailPage({
   params,
+  searchParams,
 }: PatientDetailPageProps) {
   const clinicId = z.string().uuid().safeParse(params.clinicId);
   const patientId = z.string().uuid().safeParse(params.patientId);
@@ -50,15 +70,45 @@ export default async function PatientDetailPage({
     notFound();
   }
 
-  const insurancePolicies = await listInsurancePolicies(
-    membership.clinicId,
-    "",
-    patient.id,
+  const [
+    insurancePolicies,
+    odontogramEntries,
+    odontogramTreatmentPlans,
+    treatmentPlans,
+    clinicalRecords,
+    prescriptions,
+    medicineCatalogue,
+    treatmentEstimates,
+  ] = await Promise.all([
+    listInsurancePolicies(membership.clinicId, "", patient.id),
+    listPatientOdontogramEntries(membership.clinicId, patient.id),
+    listPatientOdontogramTreatmentPlans(membership.clinicId, patient.id),
+    listPatientTreatmentPlans(membership.clinicId, patient.id),
+    listPatientDentalClinicalRecords(membership.clinicId, patient.id),
+    listPatientPrescriptions(membership.clinicId, patient.id),
+    listClinicPrescriptionMedicineCatalogue(membership.clinicId),
+    listPatientTreatmentEstimates(membership.clinicId, patient.id),
+  ]);
+  const correctionSource = prescriptions.find(
+    (prescription) => prescription.id === searchParams?.amendsPrescriptionId,
   );
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
   }).format(new Date());
   const patientPath = `/clinic/${membership.clinicId}/patients/${patient.id}`;
+  const chartEntries = odontogramEntries.map((entry) => ({
+    ...entry,
+    createdAt: entry.createdAt.toISOString(),
+  }));
+  const treatmentVisitOptions = treatmentPlans.flatMap((plan) =>
+    plan.visits.map((visit) => ({
+      id: visit.id,
+      visitNumber: visit.visitNumber,
+      dueDate: visit.dueDate,
+      status: visit.status,
+      treatmentPlan: { id: plan.id, name: plan.name },
+    })),
+  );
 
   return (
     <AppShell activeSection="patients" clinicId={membership.clinicId}>
@@ -114,6 +164,45 @@ export default async function PatientDetailPage({
             Create preventive recall
           </Link>
         </nav>
+
+        <OdontogramBoard
+          clinicId={membership.clinicId}
+          entries={chartEntries}
+          patientId={patient.id}
+          treatmentPlans={odontogramTreatmentPlans}
+        />
+
+        <ClinicalRecordsPanel
+          clinicId={membership.clinicId}
+          patientId={patient.id}
+          records={clinicalRecords}
+          visits={treatmentVisitOptions}
+          odontogramEntries={chartEntries.map((entry) => ({
+            id: entry.id,
+            toothNumber: entry.toothNumber,
+            dentition: entry.dentition,
+            entryType: entry.entryType,
+            finding: entry.finding,
+          }))}
+        />
+
+        <PrescriptionsPanel
+          catalogue={medicineCatalogue}
+          clinicId={membership.clinicId}
+          correctionSource={correctionSource}
+          initialVisitId={searchParams?.prescriptionVisitId}
+          patientId={patient.id}
+          patientName={patient.fullName}
+          prescriptions={prescriptions}
+          today={today}
+          visits={treatmentVisitOptions}
+        />
+
+        <PatientEstimatesPanel
+          clinicId={membership.clinicId}
+          estimates={treatmentEstimates}
+          patientId={patient.id}
+        />
 
         <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -277,7 +366,8 @@ export default async function PatientDetailPage({
           </h2>
           <p className="mb-4 mt-1 text-sm leading-5 text-slate-600">
             This also removes treatment plans and recalls. A patient with
-            message history cannot be deleted so the audit trail is preserved.
+            message or clinical chart history cannot be deleted so the audit
+            trail is preserved.
           </p>
           <DeletePatientButton
             clinicId={membership.clinicId}

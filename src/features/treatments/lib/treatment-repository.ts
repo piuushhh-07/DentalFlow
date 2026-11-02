@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  AppointmentStatus,
   Prisma,
   TreatmentPlanStatus,
   TreatmentVisitStatus,
@@ -90,6 +91,25 @@ export async function getClinicTreatmentPlan(
       patient: { select: { id: true, fullName: true } },
       visits: {
         orderBy: { visitNumber: "asc" },
+        include: {
+          appointments: {
+            where: {
+              status: {
+                notIn: [
+                  AppointmentStatus.COMPLETED,
+                  AppointmentStatus.CANCELLED,
+                  AppointmentStatus.NO_SHOW,
+                ],
+              },
+            },
+            orderBy: { scheduledAt: "asc" },
+            select: {
+              id: true,
+              scheduledAt: true,
+              status: true,
+            },
+          },
+        },
       },
     },
   });
@@ -318,7 +338,8 @@ export async function updateClinicTreatmentVisitStatus(
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        maxWait: 5_000,
+        maxWait: 10_000,
+        timeout: 10_000,
       },
     );
     recordTransactionPhase(diagnostic, "outer_resolved");
