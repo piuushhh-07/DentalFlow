@@ -120,6 +120,7 @@ export async function recordManualWhatsAppReminder(
           )?.patientId;
     if (
       !patientId ||
+      existing.senderUserId === null ||
       !isSameManualReminderSubmission(existing, input, patientId) ||
       !existing.manuallyConfirmedSentAt
     ) {

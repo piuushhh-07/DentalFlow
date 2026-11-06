@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil, UserRound } from "lucide-react";
 import { z } from "zod";
+import { ClinicRole } from "@prisma/client";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
@@ -136,15 +137,33 @@ export default async function PatientDetailPage({
               <p className="mt-1 text-sm text-slate-600">
                 {formatIndianPhoneNumber(patient.phoneNumber)}
               </p>
+              {patient.email && (
+                <p className="mt-1 text-sm text-slate-600">{patient.email}</p>
+              )}
+              {patient.portalAccessEnabled && (
+                <p className="mt-1 text-xs font-medium text-teal-800">
+                  Patient portal enabled
+                </p>
+              )}
             </div>
           </div>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            href={`${patientPath}/edit`}
-          >
-            <Pencil aria-hidden="true" className="size-4" />
-            Edit patient
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {membership.role === ClinicRole.OWNER && (
+              <a
+                className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                href={`${patientPath}/export`}
+              >
+                Export patient data
+              </a>
+            )}
+            <Link
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              href={`${patientPath}/edit`}
+            >
+              <Pencil aria-hidden="true" className="size-4" />
+              Edit patient
+            </Link>
+          </div>
         </header>
 
         <nav

@@ -22,6 +22,11 @@ marked placeholders in `.env.local` with your own development credentials
 before connecting external services. Never commit `.env.local` or real
 credentials.
 
+`NEXT_PUBLIC_SITE_URL` must be the exact public origin used for Supabase Auth
+redirect allow-list entries. Keep `SUPABASE_SERVICE_ROLE_KEY` server-only; it is
+used only to send owner-authorized staff invitations. Meta WhatsApp credentials
+are optional until automatic reminders are explicitly configured.
+
 For the local no-database demo, keep `NEXT_PUBLIC_DENTALFLOW_DEMO_MODE=true`
 in `.env.local` (or leave it unset in development to use the default local demo
 mode) and visit [http://localhost:3000/demo](http://localhost:3000/demo).
@@ -121,8 +126,9 @@ datasource API.
 Authentication uses Supabase Auth with server-side `getUser()` verification.
 Middleware refreshes the cookie session and protects application routes;
 passwords and auth tokens are never read from client-submitted claims. A
-successful sign-in creates or updates only the user's local profile, not a
-clinic membership.
+successful sign-in creates or updates the user's local profile. A verified,
+unexpired owner invitation may activate a `STAFF` membership after the invited
+email address is confirmed.
 
 A user may belong to multiple clinics. Each clinic-scoped server operation must
 receive a clinic selection, resolve it together with the authenticated
@@ -135,8 +141,11 @@ are the shared server-side guards for clinic data operations.
 The profile UUID mirrors the verified Supabase Auth user UUID. Membership is
 unique per `(userId, clinicId)`, allowing one user to have distinct roles in
 different clinics while preventing duplicate memberships in the same clinic.
-The sign-in screen does not create accounts; provision users through Supabase
-Auth and assign memberships through the approved onboarding/admin workflow.
+Owners can invite staff from **Team**. Invitations expire after seven days;
+memberships are created only after the invitee verifies the invited email.
+Owners may remove staff memberships; client-supplied roles are never trusted.
+`OWNER` manages clinic administration, team access and billing, while `STAFF`
+uses the allowed clinic workflows.
 All application tables have row-level security enabled without client-facing
 policies. Browser code uses Supabase Auth only; clinic data access goes through
 the server-only Prisma client and the verified membership guards.
@@ -156,6 +165,27 @@ Users who already have a membership are redirected to that clinic. Users with
 multiple clinic memberships see `/clinics` and choose one; each clinic page
 rechecks the selected membership before reading clinic details. Contact email
 and address are optional; timezone defaults to `Asia/Kolkata`.
+
+## Booking, portal, team and privacy exports
+
+Clinic owners manage dentists and chairs from the Appointments page. Existing
+appointment labels are migrated into clinic-scoped resources, while each
+appointment keeps its original label snapshot. Owners can enable a public
+booking URL; patients submit a preferred slot as a request, and clinic staff
+must approve it before an appointment is created.
+
+Patient portal access is opt-in per patient record and requires a clinic-
+verified email address. Supabase sends a magic link; the portal exposes only
+upcoming appointment details and estimates marked SENT or ACCEPTED, not
+clinical notes, prescriptions, or insurance documents. Configure
+`NEXT_PUBLIC_SITE_URL` in the deployment and Supabase redirect allow list.
+
+Only owners can invite or remove staff. Configure the server-only
+`SUPABASE_SERVICE_ROLE_KEY` to send invitations; memberships are activated
+after the invitee verifies the invited address. The owner-only **Export patient
+data** action downloads a clinic-scoped JSON export and records an audit event.
+It exports structured database records, not the contents of private storage
+objects.
 
 Message logs retain the sender membership, patient and clinic-scoped visit or
 recall, recipient phone, template name, rendered message snapshot and manual
@@ -312,14 +342,23 @@ the Schema Engine can read the datasource and inspect the current schema. It doe
 `migrate deploy`, write database data, or prove that migration locking,
 migration-history access, or applying migrations will succeed.
 
-## WhatsApp click-to-chat
+## WhatsApp reminders
 
 The follow-up queue can open a `wa.me` chat with the patient's validated Indian
-mobile number and an editable, URL-encoded reminder. DentalFlow does not send
-messages automatically and does not integrate with the WhatsApp Business API.
-Reminders are disabled unless the patient has WhatsApp opt-in and its recorded
-timestamp. Consent is checked again by the server when a user records a
-reminder.
+mobile number and an editable, URL-encoded reminder. Manual click-to-chat
+remains available. Clinic owners can separately enable automated appointment
+reminders after configuring Meta WhatsApp Business Cloud API credentials and
+an approved template. Automatic messages are attempted about 24 hours before
+an appointment, only when clinic automation and the patient's recorded
+WhatsApp consent are both enabled.
+
+An external scheduler must POST to `/api/cron/whatsapp-reminders` at least
+hourly with `Authorization: Bearer <WHATSAPP_CRON_SECRET>`. The approved Meta
+template must have three body parameters in order: patient name, clinic name,
+appointment time. Delivery attempts are deduplicated and logged. A
+`SENT_AUTOMATICALLY` log means Meta accepted the API request; it does not prove
+delivery, reading, or patient response. Provider credentials and the scheduler
+are deployment configuration and are not included in this repository.
 
 Opening a chat does not create a message log or change a treatment visit's
 status. After opening WhatsApp, a clinic member can explicitly confirm that

@@ -21,8 +21,8 @@ const appointmentDetailsSchema = z.object({
     .string()
     .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, "Choose a valid appointment time."),
   durationMinutes: z.coerce.number().int().min(5).max(480),
-  dentistName: z.string().trim().min(2).max(120),
-  chairLabel: z.string().trim().min(1).max(80),
+  dentistId: z.string().uuid(),
+  chairId: z.string().uuid(),
   type: z.string().trim().min(2).max(160),
   notes: z
     .string()

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import { ClinicRole, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
@@ -84,6 +85,11 @@ async function ensureOwnerClinic(
       const clinic = await transaction.clinic.create({
         data: {
           name: input.name,
+          publicBookingSlug: `${input.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "")
+            .slice(0, 130) || "clinic"}-${randomUUID().slice(0, 8)}`,
           phoneNumber: input.phoneNumber,
           contactEmail: input.contactEmail,
           address: input.address,

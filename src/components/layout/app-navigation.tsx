@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Stethoscope,
   UsersRound,
+  UserRoundPlus,
 } from "lucide-react";
 
 const navigationGroups = [
@@ -22,6 +23,7 @@ const navigationGroups = [
       { label: "Templates", icon: MessageCircle, href: "messages/templates" },
       { label: "Reports", icon: ClipboardList, href: "reports" },
       { label: "Insurance", icon: ShieldCheck, href: "insurance" },
+      { label: "Team", icon: UserRoundPlus, href: "settings/staff" },
     ],
   },
 ];
@@ -37,7 +39,8 @@ type AppNavigationProps = Readonly<{
     | "recalls"
     | "templates"
     | "reports"
-    | "insurance";
+    | "insurance"
+    | "team";
 }>;
 
 export function AppNavigation({
@@ -76,7 +79,8 @@ export function AppNavigation({
                 (label === "Recalls" && activeSection === "recalls") ||
                 (label === "Templates" && activeSection === "templates") ||
                 (label === "Reports" && activeSection === "reports") ||
-                (label === "Insurance" && activeSection === "insurance");
+                (label === "Insurance" && activeSection === "insurance") ||
+                (label === "Team" && activeSection === "team");
 
               const destination =
                 label === "Recalls"
@@ -91,7 +95,9 @@ export function AppNavigation({
                           ? "/appointments"
                           : label === "Treatments"
                             ? "/treatments/catalogue"
-                            : "";
+                              : label === "Team"
+                                ? "/settings/staff"
+                              : "";
 
               return (
                 <li key={label}>

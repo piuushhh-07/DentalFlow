@@ -65,6 +65,8 @@ export default async function EditPatientPage({
             initialValues={{
               fullName: patient.fullName,
               phoneNumber: patient.phoneNumber,
+              email: patient.email ?? "",
+              portalAccessEnabled: patient.portalAccessEnabled,
               whatsappOptIn: patient.whatsappOptIn,
               notes: patient.notes ?? "",
             }}

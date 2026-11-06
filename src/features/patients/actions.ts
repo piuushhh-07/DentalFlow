@@ -19,9 +19,17 @@ import {
   patientIdSchema,
   patientInputSchema,
 } from "@/features/patients/lib/patient-validation";
+import { createSupabaseServerActionClient } from "@/lib/supabase/server";
+
+export type PatientPortalActionState = Readonly<{
+  error?: string;
+  success?: string;
+}>;
 
 export type PatientActionState = Readonly<{
-  errors?: Partial<Record<"fullName" | "phoneNumber" | "notes", string[]>>;
+  errors?: Partial<
+    Record<"fullName" | "phoneNumber" | "email" | "notes", string[]>
+  >;
   error?: string;
 }>;
 
@@ -31,6 +39,8 @@ function readPatientInput(formData: FormData) {
   return patientInputSchema.safeParse({
     fullName: formData.get("fullName"),
     phoneNumber: formData.get("phoneNumber"),
+    email: formData.get("email") ?? "",
+    portalAccessEnabled: formData.get("portalAccessEnabled") === "on",
     whatsappOptIn: formData.get("whatsappOptIn") === "on",
     notes: formData.get("notes"),
   });
@@ -192,4 +202,69 @@ export async function deletePatient(
   }
 
   redirect(`/clinic/${membership.clinicId}/patients`);
+}
+
+export async function requestPatientPortalMagicLink(
+  _previousState: PatientPortalActionState,
+  formData: FormData,
+): Promise<PatientPortalActionState> {
+  const parsedEmail = z
+    .string()
+    .trim()
+    .email()
+    .max(254)
+    .safeParse(formData.get("email"));
+  if (!parsedEmail.success) {
+    return { error: "Enter a valid email address." };
+  }
+
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const siteUrl =
+    configuredSiteUrl ??
+    (process.env.NODE_ENV === "development"
+      ? "http://localhost:3000"
+      : undefined);
+  if (!siteUrl) {
+    console.error("Patient portal magic link requires NEXT_PUBLIC_SITE_URL.");
+    return { error: "Patient portal sign-in is not configured. Contact the clinic." };
+  }
+
+  let redirectTo: string;
+  try {
+    redirectTo = new URL("/portal/auth/callback", siteUrl).toString();
+  } catch (error) {
+    console.error("Patient portal site URL is invalid.", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    return { error: "Patient portal sign-in is not configured. Contact the clinic." };
+  }
+
+  const supabase = await createSupabaseServerActionClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email: parsedEmail.data.toLowerCase(),
+    options: { emailRedirectTo: redirectTo },
+  });
+  if (error) {
+    console.error("Patient portal magic link request failed.", {
+      status: error.status,
+      code: error.code,
+    });
+    return { error: "We couldn't send a sign-in link. Please try again later." };
+  }
+
+  return {
+    success:
+      "If portal access is enabled for this email, a secure sign-in link will arrive shortly.",
+  };
+}
+
+export async function signOutPatientPortal() {
+  const supabase = await createSupabaseServerActionClient();
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    throw new Error("Unable to end the patient portal session.", {
+      cause: error,
+    });
+  }
+  redirect("/portal");
 }

@@ -16,11 +16,15 @@ type VisitOption = Readonly<{
   visitNumber: number;
   treatmentPlan: { name: string };
 }>;
+type DentistOption = Readonly<{ id: string; name: string }>;
+type ChairOption = Readonly<{ id: string; label: string }>;
 
 type AppointmentFormProps = Readonly<{
   clinicId: string;
   patients: readonly PatientOption[];
   visits: readonly VisitOption[];
+  dentists: readonly DentistOption[];
+  chairs: readonly ChairOption[];
   prefill?: Readonly<{
     patientId: string;
     patientName: string;
@@ -35,8 +39,8 @@ type AppointmentFormProps = Readonly<{
     date: string;
     time: string;
     durationMinutes: number;
-    dentistName: string;
-    chairLabel: string;
+    dentistId: string | null;
+    chairId: string | null;
     type: string;
     notes: string | null;
   };
@@ -50,6 +54,8 @@ export function AppointmentForm({
   clinicId,
   patients,
   visits,
+  dentists,
+  chairs,
   prefill,
   initial,
 }: AppointmentFormProps) {
@@ -166,23 +172,39 @@ export function AppointmentForm({
       </label>
       <label className="text-sm font-medium text-slate-700">
         Dentist
-        <input
+        <select
           className={`${inputClass} mt-1`}
-          defaultValue={initial?.dentistName}
-          maxLength={120}
-          name="dentistName"
+          defaultValue={initial?.dentistId ?? ""}
+          name="dentistId"
           required
-        />
+        >
+          <option disabled value="">
+            Select dentist
+          </option>
+          {dentists.map((dentist) => (
+            <option key={dentist.id} value={dentist.id}>
+              {dentist.name}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="text-sm font-medium text-slate-700">
         Chair
-        <input
+        <select
           className={`${inputClass} mt-1`}
-          defaultValue={initial?.chairLabel}
-          maxLength={80}
-          name="chairLabel"
+          defaultValue={initial?.chairId ?? ""}
+          name="chairId"
           required
-        />
+        >
+          <option disabled value="">
+            Select chair
+          </option>
+          {chairs.map((chair) => (
+            <option key={chair.id} value={chair.id}>
+              {chair.label}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="text-sm font-medium text-slate-700">
         Appointment type

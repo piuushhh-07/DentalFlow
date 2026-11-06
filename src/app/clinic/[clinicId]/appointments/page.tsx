@@ -1,14 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { ClinicRole } from "@prisma/client";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { AppointmentForm } from "@/features/appointments/components/appointment-form";
 import { AppointmentStatusForm } from "@/features/appointments/components/appointment-status-form";
+import { ScheduleResourceForm } from "@/features/appointments/components/schedule-resource-form";
+import { AppointmentRequestQueue } from "@/features/appointments/components/appointment-request-queue";
+import { PublicBookingSettings } from "@/features/appointments/components/public-booking-settings";
 import {
+  getPublicBookingSettings,
+  listAppointmentRequests,
   listAppointmentPatients,
+  listAppointmentResources,
   listAppointmentVisits,
   listClinicAppointments,
 } from "@/features/appointments/lib/appointment-repository";
@@ -58,10 +65,20 @@ export default async function ClinicAppointmentsPage({
   const today = getClinicToday();
   const date = daySchema.safeParse(searchParams.date ?? today);
   const selectedDate = date.success ? date.data : today;
-  const [appointments, patients, visits] = await Promise.all([
+  const [
+    appointments,
+    patients,
+    visits,
+    resources,
+    requests,
+    bookingSettings,
+  ] = await Promise.all([
     listClinicAppointments(membership.clinicId, selectedDate),
     listAppointmentPatients(membership.clinicId),
     listAppointmentVisits(membership.clinicId),
+    listAppointmentResources(membership.clinicId),
+    listAppointmentRequests(membership.clinicId),
+    getPublicBookingSettings(membership.clinicId),
   ]);
   let prefill:
     | {
@@ -144,6 +161,39 @@ export default async function ClinicAppointmentsPage({
 
         <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="mb-4 text-lg font-semibold text-slate-900">
+            Online booking
+          </h2>
+          {membership.role === ClinicRole.OWNER && bookingSettings && (
+            <PublicBookingSettings
+              clinicId={membership.clinicId}
+              enabled={bookingSettings.publicBookingEnabled}
+              slug={bookingSettings.publicBookingSlug}
+            />
+          )}
+          {membership.role !== ClinicRole.OWNER && (
+            <p className="mb-3 text-sm text-slate-600">
+              Patients can request a time online. Review requests here; they
+              are not confirmed automatically.
+            </p>
+          )}
+          <div className="mt-4">
+            <AppointmentRequestQueue
+              clinicId={membership.clinicId}
+              requests={requests}
+            />
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          {membership.role === ClinicRole.OWNER && (
+            <div className="mb-6 border-b border-slate-100 pb-5">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">
+                Schedule resources
+              </h2>
+              <ScheduleResourceForm clinicId={membership.clinicId} />
+            </div>
+          )}
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">
             Create appointment
           </h2>
           {patients.length === 0 ? (
@@ -156,9 +206,15 @@ export default async function ClinicAppointmentsPage({
                 Create patient
               </Link>
             </p>
+          ) : resources.dentists.length === 0 || resources.chairs.length === 0 ? (
+            <p className="text-sm text-slate-600">
+              Add at least one active dentist and chair before scheduling.
+            </p>
           ) : (
             <AppointmentForm
+              chairs={resources.chairs}
               clinicId={membership.clinicId}
+              dentists={resources.dentists}
               patients={patients}
               prefill={prefill}
               visits={visits}
@@ -195,8 +251,8 @@ export default async function ClinicAppointmentsPage({
                   date: dateFormatter.format(appointment.scheduledAt),
                   time: timeFormatter.format(appointment.scheduledAt),
                   durationMinutes: appointment.durationMinutes,
-                  dentistName: appointment.dentistName,
-                  chairLabel: appointment.chairLabel,
+                  dentistId: appointment.dentistId,
+                  chairId: appointment.chairId,
                   type: appointment.type,
                   notes: appointment.notes,
                 };
@@ -260,7 +316,9 @@ export default async function ClinicAppointmentsPage({
                         </summary>
                         <div className="mt-4">
                           <AppointmentForm
+                            chairs={resources.chairs}
                             clinicId={membership.clinicId}
+                            dentists={resources.dentists}
                             initial={editForm}
                             patients={patients}
                             visits={visits}

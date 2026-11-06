@@ -9,6 +9,15 @@ export async function middleware(request: NextRequest) {
   const isDemoRoute =
     request.nextUrl.pathname === "/demo" ||
     request.nextUrl.pathname.startsWith("/demo/");
+  const isPublicBookingRoute =
+    request.nextUrl.pathname === "/book" ||
+    request.nextUrl.pathname.startsWith("/book/");
+  const isPatientPortalRoute =
+    request.nextUrl.pathname === "/portal" ||
+    request.nextUrl.pathname.startsWith("/portal/");
+  const isAuthCallbackRoute = request.nextUrl.pathname === "/auth/callback";
+  const isWhatsAppReminderJob =
+    request.nextUrl.pathname === "/api/cron/whatsapp-reminders";
   if (isDemoRoute) {
     if (
       isLocalDemoEnabled(
@@ -61,6 +70,15 @@ export async function middleware(request: NextRequest) {
   if (isExpectedUnauthenticatedAuthError(error)) {
     user = null;
     error = null;
+  }
+
+  if (
+    isPublicBookingRoute ||
+    isPatientPortalRoute ||
+    isAuthCallbackRoute ||
+    isWhatsAppReminderJob
+  ) {
+    return response;
   }
 
   const isLoginPage = request.nextUrl.pathname === "/login";

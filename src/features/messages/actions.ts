@@ -3,6 +3,7 @@
 import { ClinicRole, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { prisma } from "@/lib/db/prisma";
 
 import {
   requireClinicMembership,
@@ -27,6 +28,10 @@ import {
   DEFAULT_WHATSAPP_TEMPLATE,
   templateContentSchema,
 } from "@/features/messages/lib/template-validation";
+import {
+  getWhatsAppCloudApiConfig,
+  WhatsAppConfigurationError,
+} from "@/features/messages/lib/whatsapp-cloud-api";
 
 export type ManualReminderActionState = Readonly<{
   error?: string;
@@ -94,6 +99,38 @@ export async function saveWhatsAppReminderTemplate(
     logTemplateError(error);
     return { error: "We couldn't save the template. Please try again." };
   }
+}
+
+export async function updateAutomatedWhatsAppAction(formData: FormData) {
+  const clinicId = uuidSchema.safeParse(formData.get("clinicId"));
+  const enabled = z.enum(["true", "false"]).safeParse(formData.get("enabled"));
+  if (!clinicId.success || !enabled.success) {
+    throw new Error("Provide valid automated WhatsApp settings.");
+  }
+  const membership = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
+  if (enabled.data === "true") {
+    try {
+      getWhatsAppCloudApiConfig();
+    } catch (error) {
+      if (error instanceof WhatsAppConfigurationError) {
+        console.error(
+          "Automated WhatsApp activation requires provider configuration.",
+          { invalidSettings: error.missingOrInvalid },
+        );
+        throw new Error(
+          "Automated WhatsApp is not configured. Contact support before enabling delivery.",
+          { cause: error },
+        );
+      }
+      throw error;
+    }
+  }
+  await prisma.clinic.update({
+    where: { id: membership.clinicId },
+    data: { automatedWhatsAppEnabled: enabled.data === "true" },
+    select: { id: true },
+  });
+  revalidatePath(`/clinic/${membership.clinicId}/messages/templates`);
 }
 
 function logMessageError(error: unknown): void {

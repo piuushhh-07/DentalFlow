@@ -16,6 +16,7 @@ import {
   formatTemplateDate,
 } from "@/features/messages/lib/template-validation";
 import { prisma } from "@/lib/db/prisma";
+import { WhatsAppAutomationSettings } from "@/features/messages/components/whatsapp-automation-settings";
 
 type MessageTemplatesPageProps = Readonly<{
   params: { clinicId: string };
@@ -61,7 +62,11 @@ export default async function MessageTemplatesPage({
   const [clinic, template, examplePatient] = await Promise.all([
     prisma.clinic.findUnique({
       where: { id: membership.clinicId },
-      select: { name: true, phoneNumber: true },
+      select: {
+        name: true,
+        phoneNumber: true,
+        automatedWhatsAppEnabled: true,
+      },
     }),
     getClinicWhatsAppTemplate(membership.clinicId),
     getClinicTemplatePreviewPatient(membership.clinicId),
@@ -102,6 +107,11 @@ export default async function MessageTemplatesPage({
             snapshot.
           </p>
         </header>
+
+        <WhatsAppAutomationSettings
+          clinicId={membership.clinicId}
+          enabled={clinic.automatedWhatsAppEnabled}
+        />
 
         <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           {examplePatient ? (

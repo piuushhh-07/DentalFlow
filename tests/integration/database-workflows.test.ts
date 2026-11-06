@@ -264,6 +264,7 @@ async function createClinicFixture(userId: string, name: string) {
   const clinic = await prisma.clinic.create({
     data: {
       name,
+      publicBookingSlug: `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${randomUUID().slice(0, 8)}`,
       timeZone: "Asia/Kolkata",
       memberships: {
         create: { userId, role: "OWNER" },
@@ -1421,14 +1422,22 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
     "appointments persist, link only same-clinic visits, enforce conflicts and update reports",
     async () => {
       const appointmentDate = getClinicToday();
+      const dentist = await prisma.clinicDentist.create({
+        data: { clinicId: clinicAId, name: `${marker} Dentist` },
+        select: { id: true },
+      });
+      const chair = await prisma.treatmentChair.create({
+        data: { clinicId: clinicAId, label: `${marker} Chair` },
+        select: { id: true },
+      });
       const appointmentInput = createAppointmentSchema.parse({
         patientId: patientA.id,
         treatmentVisitId: persistedPlan.visits[0].id,
         date: appointmentDate,
         time: "23:00",
         durationMinutes: 30,
-        dentistName: `${marker} Dentist`,
-        chairLabel: `${marker} Chair`,
+        dentistId: dentist.id,
+        chairId: chair.id,
         type: "Synthetic appointment",
         notes: "Synthetic appointment record.",
       });
@@ -1472,8 +1481,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         createClinicAppointment(clinicAId, {
           ...appointmentInput,
           time: "21:00",
-          dentistName: `${marker} Other dentist`,
-          chairLabel: `${marker} Other chair`,
         }),
         AppointmentVisitAlreadyScheduledError,
       );

@@ -13,6 +13,8 @@ import { PatientSubmitButton } from "@/features/patients/components/patient-subm
 type PatientFormValues = Readonly<{
   fullName: string;
   phoneNumber: string;
+  email: string;
+  portalAccessEnabled: boolean;
   whatsappOptIn: boolean;
   notes: string;
 }>;
@@ -110,6 +112,50 @@ export function PatientForm({
           </p>
         )}
       </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-slate-700" htmlFor="email">
+          Email address (optional)
+        </label>
+        <input
+          aria-describedby={state.errors?.email ? "email-error" : "email-hint"}
+          aria-invalid={Boolean(state.errors?.email)}
+          autoComplete="email"
+          className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-red-400"
+          defaultValue={initialValues?.email}
+          id="email"
+          maxLength={254}
+          name="email"
+          type="email"
+        />
+        <p className="text-xs leading-5 text-slate-500" id="email-hint">
+          Required if you enable patient portal access.
+        </p>
+        {state.errors?.email?.[0] && (
+          <p className="text-xs font-medium text-red-700" id="email-error">
+            {state.errors.email[0]}
+          </p>
+        )}
+      </div>
+
+      <fieldset className="rounded-xl border border-slate-200 p-4">
+        <legend className="px-1 text-sm font-medium text-slate-700">
+          Patient portal
+        </legend>
+        <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-slate-700">
+          <input
+            className="mt-0.5 size-4 shrink-0 accent-teal-700"
+            defaultChecked={initialValues?.portalAccessEnabled}
+            name="portalAccessEnabled"
+            type="checkbox"
+            value="on"
+          />
+          <span>
+            Enable access for this patient after confirming they requested it.
+            The patient signs in using a verified email magic link.
+          </span>
+        </label>
+      </fieldset>
 
       <fieldset className="rounded-xl border border-slate-200 p-4">
         <legend className="px-1 text-sm font-medium text-slate-700">

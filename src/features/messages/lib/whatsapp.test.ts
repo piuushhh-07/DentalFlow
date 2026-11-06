@@ -15,6 +15,7 @@ import {
   WhatsAppConsentRequiredError,
   toWhatsAppNumber,
 } from "@/features/messages/lib/whatsapp";
+import { buildWhatsAppTemplateParameters } from "@/features/messages/lib/whatsapp-cloud-api";
 
 describe("WhatsApp reminder safeguards", () => {
   it("formats validated Indian mobile numbers as wa.me digits", () => {
@@ -39,6 +40,17 @@ describe("WhatsApp reminder safeguards", () => {
       clinicName: "DentalFlow Clinic",
       dueDate: "16 Oct 2026",
       clinicPhone: "+91 98765 43210",
+    });
+
+    it("uses the Meta template parameter order without adding clinical details", () => {
+      assert.deepEqual(
+        buildWhatsAppTemplateParameters({
+          patientName: "Anu",
+          clinicName: "DentalFlow Clinic",
+          appointmentTime: "16 Nov, 10:30 am",
+        }),
+        ["Anu", "DentalFlow Clinic", "16 Nov, 10:30 am"],
+      );
     });
     assert.match(message, /Anu/);
     assert.match(message, /DentalFlow Clinic/);

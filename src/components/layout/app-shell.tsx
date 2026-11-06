@@ -15,7 +15,8 @@ type AppShellProps = Readonly<{
     | "recalls"
     | "templates"
     | "reports"
-    | "insurance";
+    | "insurance"
+    | "team";
 }>;
 
 export function AppShell({

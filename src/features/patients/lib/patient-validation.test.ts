@@ -48,6 +48,30 @@ test("clears the consent timestamp when WhatsApp opt-in is false", () => {
     notes: "",
   });
 
+  test("requires a verified email address value before enabling portal access", () => {
+    const patient = patientInputSchema.parse({
+      fullName: "Asha Patel",
+      phoneNumber: "9876543210",
+      email: "  ASHA@example.com ",
+      portalAccessEnabled: true,
+      whatsappOptIn: false,
+      notes: "",
+    });
+    assert.equal(patient.email, "asha@example.com");
+    assert.equal(patient.portalAccessEnabled, true);
+    assert.equal(patient.portalAccessEnabledAt instanceof Date, true);
+
+    const invalid = patientInputSchema.safeParse({
+      fullName: "Asha Patel",
+      phoneNumber: "9876543210",
+      email: "",
+      portalAccessEnabled: true,
+      whatsappOptIn: false,
+      notes: "",
+    });
+    assert.equal(invalid.success, false);
+  });
+
   assert.equal(patient.whatsappOptedInAt, null);
 });
 

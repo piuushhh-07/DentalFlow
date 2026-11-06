@@ -24,6 +24,11 @@ export const patientInputSchema = z
   .object({
     fullName: z.string().trim().min(2).max(160),
     phoneNumber: normalizedPhoneSchema,
+    email: z
+      .union([z.literal(""), z.string().trim().email().max(254)])
+      .default("")
+      .transform((email) => (email ? email.toLowerCase() : null)),
+    portalAccessEnabled: z.boolean().default(false),
     whatsappOptIn: z.boolean(),
     notes: z
       .string()
@@ -31,9 +36,17 @@ export const patientInputSchema = z
       .max(5000)
       .transform((notes) => notes || null),
   })
+  .refine(
+    (patient) => !patient.portalAccessEnabled || patient.email !== null,
+    {
+      path: ["email"],
+      message: "Add an email address before enabling portal access.",
+    },
+  )
   .transform((patient) => ({
     ...patient,
     whatsappOptedInAt: patient.whatsappOptIn ? new Date() : null,
+    portalAccessEnabledAt: patient.portalAccessEnabled ? new Date() : null,
   }));
 
 export type PatientInput = z.output<typeof patientInputSchema>;

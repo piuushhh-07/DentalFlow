@@ -2,6 +2,27 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum ClinicInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+model PatientDataExportAudit {
+  id            String            @id @default(uuid()) @db.Uuid
+  clinicId      String            @db.Uuid
+  patientId     String            @db.Uuid
+  actorUserId   String            @db.Uuid
+  createdAt     DateTime          @default(now()) @db.Timestamptz(6)
+  clinic        Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient       Patient           @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  actor         ClinicMembership  @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@index([clinicId, patientId, createdAt])
+  @@index([clinicId, actorUserId, createdAt])
+  @@map("patient_data_export_audits")
+}
+
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
@@ -123,6 +144,13 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
+enum AppointmentRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum PreventiveRecallType {
   SIX_MONTH_CHECKUP
   CLEANING
@@ -143,6 +171,9 @@ enum MessageChannel {
 enum MessageLogStatus {
   OPENED_IN_WHATSAPP
   MANUALLY_RECORDED_SENT
+  AUTOMATIC_SEND_PENDING
+  SENT_AUTOMATICALLY
+  AUTOMATIC_SEND_FAILED
 }
 
 enum InsuranceProviderKind {
@@ -264,6 +295,8 @@ enum BillingWebhookStatus {
 model UserProfile {
   id              String             @id @db.Uuid
   displayName     String?            @db.VarChar(120)
+  email           String?            @db.VarChar(254)
+  normalizedEmail String?            @unique @db.VarChar(254)
   createdAt       DateTime           @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime           @updatedAt @db.Timestamptz(6)
   memberships     ClinicMembership[]
@@ -275,6 +308,9 @@ model UserProfile {
 model Clinic {
   id                         String                      @id @default(uuid()) @db.Uuid
   name                       String                      @db.VarChar(160)
+  publicBookingSlug          String                      @unique @db.VarChar(180)
+  publicBookingEnabled       Boolean                     @default(false)
+  automatedWhatsAppEnabled  Boolean                     @default(false)
   phoneNumber                String?                     @db.VarChar(20)
   contactEmail               String?                     @db.VarChar(254)
   address                    String?                     @db.VarChar(400)
@@ -291,6 +327,10 @@ model Clinic {
   treatmentEstimates         TreatmentEstimate[]
   treatmentVisits            TreatmentVisit[]
   appointments               Appointment[]
+  dentists                    ClinicDentist[]
+  treatmentChairs             TreatmentChair[]
+  appointmentRequests         AppointmentRequest[]
+  invitations                 ClinicInvitation[]
   preventiveRecalls          PreventiveRecall[]
   messageTemplates           MessageTemplate[]
   messageLogs                MessageLog[]
@@ -307,6 +347,7 @@ model Clinic {
   dentalClinicalRecords      DentalClinicalRecord[]
   digitalPrescriptions       DigitalPrescription[]
   prescriptionMedicineCatalogueItems PrescriptionMedicineCatalogueItem[]
+  patientDataExportAudits            PatientDataExportAudit[]
 
   @@index([name])
   @@map("clinics")
@@ -426,10 +467,32 @@ model ClinicMembership {
   prescriptionAudits               DigitalPrescriptionAudit[]
   authoredTreatmentEstimates        TreatmentEstimate[]                @relation("TreatmentEstimateAuthor")
   treatmentEstimateAudits           TreatmentEstimateAudit[]
+  patientDataExportAudits           PatientDataExportAudit[]
+  sentClinicInvitations             ClinicInvitation[]               @relation("ClinicInvitationSender")
 
   @@unique([userId, clinicId])
   @@index([clinicId, role])
   @@map("clinic_memberships")
+}
+
+model ClinicInvitation {
+  id              String                 @id @default(uuid()) @db.Uuid
+  clinicId        String                 @db.Uuid
+  email           String                 @db.VarChar(254)
+  normalizedEmail String                 @db.VarChar(254)
+  role            ClinicRole             @default(STAFF)
+  status          ClinicInvitationStatus @default(PENDING)
+  invitedByUserId String                 @db.Uuid
+  expiresAt       DateTime               @db.Timestamptz(6)
+  acceptedAt      DateTime?              @db.Timestamptz(6)
+  createdAt       DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime               @updatedAt @db.Timestamptz(6)
+  clinic          Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  invitedBy       ClinicMembership       @relation("ClinicInvitationSender", fields: [invitedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@index([clinicId, status, expiresAt])
+  @@index([normalizedEmail, status, expiresAt])
+  @@map("clinic_invitations")
 }
 
 model Patient {
@@ -438,6 +501,10 @@ model Patient {
   fullName                   String                      @db.VarChar(160)
   phoneNumber                String                      @db.VarChar(20)
   normalizedPhone            String                      @db.VarChar(16)
+  email                      String?                     @db.VarChar(254)
+  normalizedEmail            String?                     @db.VarChar(254)
+  portalAccessEnabled        Boolean                     @default(false)
+  portalAccessEnabledAt      DateTime?                   @db.Timestamptz(6)
   whatsappOptIn              Boolean                     @default(false)
   whatsappOptedInAt          DateTime?                   @db.Timestamptz(6)
   notes                      String?                     @db.Text
@@ -456,9 +523,11 @@ model Patient {
   odontogramEntries          OdontogramEntry[]
   dentalClinicalRecords      DentalClinicalRecord[]
   digitalPrescriptions       DigitalPrescription[]
+  dataExportAudits           PatientDataExportAudit[]
 
   @@unique([id, clinicId])
   @@unique([clinicId, normalizedPhone])
+  @@unique([clinicId, normalizedEmail])
   @@index([clinicId, fullName])
   @@map("patients")
 }
@@ -856,6 +925,8 @@ model Appointment {
   clinicId         String            @db.Uuid
   patientId        String            @db.Uuid
   treatmentVisitId String?           @db.Uuid
+  dentistId        String?           @db.Uuid
+  chairId          String?           @db.Uuid
   scheduledAt      DateTime          @db.Timestamptz(6)
   durationMinutes  Int
   dentistName      String            @db.VarChar(120)
@@ -868,12 +939,75 @@ model Appointment {
   clinic           Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   patient          Patient           @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Cascade)
   treatmentVisit   TreatmentVisit?   @relation(fields: [treatmentVisitId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  dentist          ClinicDentist?    @relation(fields: [dentistId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  chair            TreatmentChair?   @relation(fields: [chairId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  messageLogs      MessageLog[]
 
   @@unique([id, clinicId])
+  @@unique([id, clinicId, patientId])
   @@index([clinicId, scheduledAt, status])
   @@index([clinicId, patientId, scheduledAt])
   @@index([clinicId, treatmentVisitId])
+  @@index([clinicId, dentistId, scheduledAt])
+  @@index([clinicId, chairId, scheduledAt])
   @@map("appointments")
+}
+
+model ClinicDentist {
+  id          String        @id @default(uuid()) @db.Uuid
+  clinicId    String        @db.Uuid
+  name        String        @db.VarChar(120)
+  active      Boolean       @default(true)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @db.Timestamptz(6)
+  clinic      Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  requests    AppointmentRequest[]
+
+  @@unique([id, clinicId])
+  @@unique([clinicId, name])
+  @@index([clinicId, active, name])
+  @@map("clinic_dentists")
+}
+
+model TreatmentChair {
+  id           String        @id @default(uuid()) @db.Uuid
+  clinicId     String        @db.Uuid
+  label        String        @db.VarChar(80)
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
+  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  requests     AppointmentRequest[]
+
+  @@unique([id, clinicId])
+  @@unique([clinicId, label])
+  @@index([clinicId, active, label])
+  @@map("treatment_chairs")
+}
+
+model AppointmentRequest {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  clinicId            String                  @db.Uuid
+  patientName         String                  @db.VarChar(160)
+  phoneNumber         String                  @db.VarChar(20)
+  requestedAt         DateTime                @db.Timestamptz(6)
+  durationMinutes     Int                     @default(30)
+  type                String                  @db.VarChar(160)
+  dentistId           String?                 @db.Uuid
+  chairId             String?                 @db.Uuid
+  status              AppointmentRequestStatus @default(PENDING)
+  notes               String?                 @db.VarChar(1000)
+  createdAt           DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime                @updatedAt @db.Timestamptz(6)
+  clinic              Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  dentist             ClinicDentist?          @relation(fields: [dentistId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  chair               TreatmentChair?         @relation(fields: [chairId, clinicId], references: [id, clinicId], onDelete: Restrict)
+
+  @@unique([id, clinicId])
+  @@index([clinicId, status, requestedAt])
+  @@map("appointment_requests")
 }
 
 model PreventiveRecall {
@@ -923,8 +1057,9 @@ model MessageLog {
   patientId               String            @db.Uuid
   treatmentVisitId        String?           @db.Uuid
   preventiveRecallId      String?           @db.Uuid
+  appointmentId           String?           @db.Uuid
   messageTemplateId       String?           @db.Uuid
-  senderUserId            String            @db.Uuid
+  senderUserId            String?           @db.Uuid
   channel                 MessageChannel    @default(WHATSAPP)
   status                  MessageLogStatus  @default(OPENED_IN_WHATSAPP)
   recipientPhoneSnapshot  String            @db.VarChar(20)
@@ -933,20 +1068,28 @@ model MessageLog {
   openedAt                DateTime?         @db.Timestamptz(6)
   clientRequestId         String?           @db.Uuid
   manuallyConfirmedSentAt DateTime?         @db.Timestamptz(6)
+  automatedReminderKey    String?           @db.VarChar(180)
+  providerMessageId       String?           @db.VarChar(120)
+  deliveryFailureCode     String?           @db.VarChar(120)
+  deliveryAttemptCount    Int               @default(0)
+  lastDeliveryAttemptAt   DateTime?         @db.Timestamptz(6)
   createdAt               DateTime          @default(now()) @db.Timestamptz(6)
   clinic                  Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   patient                 Patient           @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  appointment             Appointment?      @relation(fields: [appointmentId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
   treatmentVisit          TreatmentVisit?   @relation(fields: [treatmentVisitId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
   preventiveRecall        PreventiveRecall? @relation(fields: [preventiveRecallId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
   messageTemplate         MessageTemplate?  @relation(fields: [messageTemplateId, clinicId], references: [id, clinicId], onDelete: Restrict)
-  sender                  ClinicMembership  @relation("MessageSender", fields: [senderUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  sender                  ClinicMembership? @relation("MessageSender", fields: [senderUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
 
   @@unique([clinicId, clientRequestId])
+  @@unique([clinicId, automatedReminderKey])
   @@index([clinicId, openedAt])
   @@index([clinicId, patientId, openedAt])
   @@index([clinicId, senderUserId, openedAt])
   @@index([clinicId, preventiveRecallId])
   @@index([clinicId, status, manuallyConfirmedSentAt])
+  @@index([clinicId, appointmentId])
   @@map("message_logs")
 }
 

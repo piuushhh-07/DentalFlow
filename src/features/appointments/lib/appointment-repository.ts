@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  AppointmentRequestStatus,
   AppointmentStatus,
   Prisma,
   TreatmentPlanStatus,
@@ -8,7 +9,10 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
-import { assertMonthlyAppointmentCapacity } from "@/features/billing/lib/billing-entitlements";
+import {
+  assertMonthlyAppointmentCapacity,
+  assertPatientCapacity,
+} from "@/features/billing/lib/billing-entitlements";
 import {
   measureTransactionQuery,
   recordTransactionPhase,
@@ -24,6 +28,10 @@ import {
 
 export class AppointmentPatientNotFoundError extends Error {}
 export class AppointmentVisitNotFoundError extends Error {}
+export class AppointmentResourceNotFoundError extends Error {}
+export class AppointmentRequestNotFoundError extends Error {}
+export class AppointmentRequestConflictError extends Error {}
+export class AppointmentRequestRateLimitError extends Error {}
 export class AppointmentVisitAlreadyScheduledError extends Error {
   constructor() {
     super("This treatment visit already has an active appointment.");
@@ -69,6 +77,7 @@ async function assertNoSchedulingConflict(
   transaction: Prisma.TransactionClient,
   clinicId: string,
   input: AppointmentInput,
+  resources: Readonly<{ dentistName: string; chairLabel: string }>,
   excludeId?: string,
   diagnostic?: TransactionDiagnostic,
 ): Promise<Date> {
@@ -102,8 +111,8 @@ async function assertNoSchedulingConflict(
         id: excludeId,
         startAt,
         durationMinutes: input.durationMinutes,
-        dentistName: input.dentistName,
-        chairLabel: input.chairLabel,
+        dentistName: resources.dentistName,
+        chairLabel: resources.chairLabel,
       },
       appointments,
     )
@@ -113,6 +122,25 @@ async function assertNoSchedulingConflict(
     );
   }
   return startAt;
+}
+
+async function getActiveScheduleResources(
+  transaction: Prisma.TransactionClient,
+  clinicId: string,
+  input: Pick<AppointmentInput, "dentistId" | "chairId">,
+): Promise<Readonly<{ dentistName: string; chairLabel: string }>> {
+  const [dentist, chair] = await Promise.all([
+    transaction.clinicDentist.findFirst({
+      where: { id: input.dentistId, clinicId, active: true },
+      select: { id: true, name: true },
+    }),
+    transaction.treatmentChair.findFirst({
+      where: { id: input.chairId, clinicId, active: true },
+      select: { id: true, label: true },
+    }),
+  ]);
+  if (!dentist || !chair) throw new AppointmentResourceNotFoundError();
+  return { dentistName: dentist.name, chairLabel: chair.label };
 }
 
 async function validatePatientAndVisit(
@@ -311,6 +339,332 @@ export async function listAppointmentVisits(clinicId: string) {
   });
 }
 
+export async function listAppointmentResources(clinicId: string) {
+  const [dentists, chairs] = await Promise.all([
+    prisma.clinicDentist.findMany({
+      where: { clinicId, active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.treatmentChair.findMany({
+      where: { clinicId, active: true },
+      orderBy: { label: "asc" },
+      select: { id: true, label: true },
+    }),
+  ]);
+  return { dentists, chairs };
+}
+
+export async function getPublicBookingClinic(slug: string) {
+  return prisma.clinic.findFirst({
+    where: { publicBookingSlug: slug, publicBookingEnabled: true },
+    select: {
+      id: true,
+      name: true,
+      publicBookingSlug: true,
+      phoneNumber: true,
+      address: true,
+      timeZone: true,
+      dentists: {
+        where: { active: true },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      },
+      treatmentChairs: {
+        where: { active: true },
+        orderBy: { label: "asc" },
+        select: { id: true, label: true },
+      },
+    },
+  });
+}
+
+export async function getPublicBookingSettings(clinicId: string) {
+  return prisma.clinic.findFirst({
+    where: { id: clinicId },
+    select: { publicBookingSlug: true, publicBookingEnabled: true },
+  });
+}
+
+export async function setPublicBookingEnabled(
+  clinicId: string,
+  enabled: boolean,
+) {
+  const result = await prisma.clinic.updateMany({
+    where: { id: clinicId },
+    data: { publicBookingEnabled: enabled },
+  });
+  if (result.count !== 1) {
+    throw new Error("The clinic could not be found while updating booking settings.");
+  }
+}
+
+export async function listAppointmentRequests(clinicId: string) {
+  return prisma.appointmentRequest.findMany({
+    where: { clinicId, status: AppointmentRequestStatus.PENDING },
+    orderBy: [{ requestedAt: "asc" }, { createdAt: "asc" }],
+    include: {
+      dentist: { select: { name: true } },
+      chair: { select: { label: true } },
+    },
+  });
+}
+
+export async function createPublicAppointmentRequest(
+  clinicId: string,
+  input: Readonly<{
+    patientName: string;
+    phoneNumber: string;
+    requestedAt: Date;
+    dentistId: string;
+    chairId: string;
+    notes: string | null;
+  }>,
+) {
+  const startAt = input.requestedAt;
+  const endAt = new Date(startAt.getTime() + 30 * 60_000);
+  const overlapStart = new Date(startAt.getTime() - 8 * 60 * 60_000);
+  const [dentist, chair] = await Promise.all([
+    prisma.clinicDentist.findFirst({
+      where: { id: input.dentistId, clinicId, active: true },
+      select: { id: true },
+    }),
+    prisma.treatmentChair.findFirst({
+      where: { id: input.chairId, clinicId, active: true },
+      select: { id: true },
+    }),
+  ]);
+  if (!dentist || !chair) throw new AppointmentResourceNotFoundError();
+
+  return prisma.$transaction(
+    async (transaction) => {
+      const recentRequestCount = await transaction.appointmentRequest.count({
+        where: {
+          clinicId,
+          phoneNumber: input.phoneNumber,
+          createdAt: { gte: new Date(Date.now() - 60 * 60_000) },
+        },
+      });
+      if (recentRequestCount >= 3) {
+        throw new AppointmentRequestRateLimitError();
+      }
+
+      const [appointments, requests] = await Promise.all([
+        transaction.appointment.findMany({
+          where: {
+            clinicId,
+            status: { notIn: [...INACTIVE_STATUSES] },
+            scheduledAt: { gte: overlapStart, lt: endAt },
+            OR: [{ dentistId: dentist.id }, { chairId: chair.id }],
+          },
+          select: {
+            id: true,
+            scheduledAt: true,
+            durationMinutes: true,
+            dentistName: true,
+            chairLabel: true,
+            status: true,
+          },
+        }),
+        transaction.appointmentRequest.findMany({
+          where: {
+            clinicId,
+            status: AppointmentRequestStatus.PENDING,
+            requestedAt: { gte: overlapStart, lt: endAt },
+            OR: [{ dentistId: dentist.id }, { chairId: chair.id }],
+          },
+          select: {
+            requestedAt: true,
+            durationMinutes: true,
+            dentistId: true,
+            chairId: true,
+          },
+        }),
+      ]);
+      const overlaps = (otherStart: Date, otherDuration: number) =>
+        startAt.getTime() < otherStart.getTime() + otherDuration * 60_000 &&
+        otherStart.getTime() < endAt.getTime();
+      if (
+        appointments.some((appointment) =>
+          overlaps(appointment.scheduledAt, appointment.durationMinutes),
+        ) ||
+        requests.some(
+          (request) =>
+            (request.dentistId === dentist.id || request.chairId === chair.id) &&
+            overlaps(request.requestedAt, request.durationMinutes),
+        )
+      ) {
+        throw new AppointmentRequestConflictError();
+      }
+
+      return transaction.appointmentRequest.create({
+        data: {
+          clinicId,
+          patientName: input.patientName,
+          phoneNumber: input.phoneNumber,
+          requestedAt: startAt,
+          durationMinutes: 30,
+          type: "Consultation",
+          dentistId: dentist.id,
+          chairId: chair.id,
+          notes: input.notes,
+        },
+        select: { id: true },
+      });
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
+}
+
+export async function rejectAppointmentRequest(
+  clinicId: string,
+  requestId: string,
+) {
+  const result = await prisma.appointmentRequest.updateMany({
+    where: {
+      id: requestId,
+      clinicId,
+      status: AppointmentRequestStatus.PENDING,
+    },
+    data: { status: AppointmentRequestStatus.REJECTED },
+  });
+  if (result.count === 0) throw new AppointmentRequestNotFoundError();
+}
+
+export async function approveAppointmentRequest(
+  clinicId: string,
+  requestId: string,
+) {
+  return prisma.$transaction(
+    async (transaction) => {
+      const request = await transaction.appointmentRequest.findFirst({
+        where: {
+          id: requestId,
+          clinicId,
+          status: AppointmentRequestStatus.PENDING,
+        },
+      });
+      if (!request) throw new AppointmentRequestNotFoundError();
+      if (!request.dentistId || !request.chairId) {
+        throw new AppointmentResourceNotFoundError();
+      }
+
+      const startAt = request.requestedAt;
+      const resources = await getActiveScheduleResources(
+        transaction,
+        clinicId,
+        { dentistId: request.dentistId, chairId: request.chairId },
+      );
+      const appointmentInput = {
+        date: new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Asia/Kolkata",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(startAt),
+        time: new Intl.DateTimeFormat("en-GB", {
+          timeZone: "Asia/Kolkata",
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        }).format(startAt),
+        durationMinutes: request.durationMinutes,
+        dentistId: request.dentistId,
+        chairId: request.chairId,
+      };
+      const patient = await transaction.patient.findFirst({
+        where: { clinicId, normalizedPhone: request.phoneNumber },
+        select: { id: true },
+      });
+      let patientId = patient?.id;
+      if (!patientId) {
+        await assertPatientCapacity(transaction, clinicId);
+        const createdPatient = await transaction.patient.create({
+          data: {
+            clinicId,
+            fullName: request.patientName,
+            phoneNumber: request.phoneNumber,
+            normalizedPhone: request.phoneNumber,
+          },
+          select: { id: true },
+        });
+        patientId = createdPatient.id;
+      }
+
+      await assertMonthlyAppointmentCapacity(transaction, clinicId);
+      const conflictInput = {
+        date: appointmentInput.date,
+        time: appointmentInput.time,
+        durationMinutes: appointmentInput.durationMinutes,
+        dentistName: resources.dentistName,
+        chairLabel: resources.chairLabel,
+      };
+      const scheduledAt = await assertNoSchedulingConflict(
+        transaction,
+        clinicId,
+        {
+          ...conflictInput,
+          patientId,
+          treatmentVisitId: null,
+          dentistId: request.dentistId,
+          chairId: request.chairId,
+          type: request.type,
+          notes: request.notes,
+        },
+        resources,
+      );
+      const appointment = await transaction.appointment.create({
+        data: {
+          clinicId,
+          patientId,
+          scheduledAt,
+          durationMinutes: request.durationMinutes,
+          dentistId: request.dentistId,
+          chairId: request.chairId,
+          dentistName: resources.dentistName,
+          chairLabel: resources.chairLabel,
+          type: request.type,
+          notes: request.notes,
+        },
+        select: { id: true },
+      });
+      const updatedRequest = await transaction.appointmentRequest.updateMany({
+        where: {
+          id: request.id,
+          clinicId,
+          status: AppointmentRequestStatus.PENDING,
+        },
+        data: { status: AppointmentRequestStatus.APPROVED },
+      });
+      if (updatedRequest.count !== 1) {
+        throw new AppointmentRequestNotFoundError();
+      }
+      return appointment;
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      timeout: 10_000,
+    },
+  );
+}
+
+export async function createScheduleResource(
+  clinicId: string,
+  kind: "dentist" | "chair",
+  name: string,
+) {
+  if (kind === "dentist") {
+    return prisma.clinicDentist.create({
+      data: { clinicId, name },
+      select: { id: true },
+    });
+  }
+  return prisma.treatmentChair.create({
+    data: { clinicId, label: name },
+    select: { id: true },
+  });
+}
+
 async function createClinicAppointmentTransaction(
   clinicId: string,
   input: AppointmentInput,
@@ -324,20 +678,28 @@ async function createClinicAppointmentTransaction(
         clinicId,
         input.treatmentVisitId,
       );
+      const resources = await getActiveScheduleResources(
+        transaction,
+        clinicId,
+        input,
+      );
       const scheduledAt = await assertNoSchedulingConflict(
         transaction,
         clinicId,
         input,
+        resources,
       );
       return transaction.appointment.create({
         data: {
           clinicId,
           patientId: input.patientId,
           treatmentVisitId: input.treatmentVisitId,
+          dentistId: input.dentistId,
+          chairId: input.chairId,
           scheduledAt,
           durationMinutes: input.durationMinutes,
-          dentistName: input.dentistName,
-          chairLabel: input.chairLabel,
+          dentistName: resources.dentistName,
+          chairLabel: resources.chairLabel,
           type: input.type,
           notes: input.notes,
         },
@@ -413,10 +775,16 @@ export async function updateClinicAppointment(
             input.treatmentVisitId,
             appointmentId,
           );
+          const resources = await getActiveScheduleResources(
+            transaction,
+            clinicId,
+            input,
+          );
           const scheduledAt = await assertNoSchedulingConflict(
             transaction,
             clinicId,
             input,
+            resources,
             appointmentId,
             diagnostic,
           );
@@ -426,10 +794,12 @@ export async function updateClinicAppointment(
               data: {
                 patientId: input.patientId,
                 treatmentVisitId: input.treatmentVisitId,
+                dentistId: input.dentistId,
+                chairId: input.chairId,
                 scheduledAt,
                 durationMinutes: input.durationMinutes,
-                dentistName: input.dentistName,
-                chairLabel: input.chairLabel,
+                dentistName: resources.dentistName,
+                chairLabel: resources.chairLabel,
                 type: input.type,
                 notes: input.notes,
               },

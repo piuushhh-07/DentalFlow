@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { HeartHandshake } from "lucide-react";
 
 import { SignInForm } from "@/features/auth/components/sign-in-form";
@@ -32,6 +33,12 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
         <p className="mt-5 text-center text-xs leading-5 text-slate-500">
           Clinic access is granted only after your clinic membership is
           verified.
+        </p>
+        <p className="mt-3 text-center text-sm text-slate-600">
+          Patient?{" "}
+          <Link className="font-medium text-teal-800 underline" href="/portal">
+            Open the patient portal
+          </Link>
         </p>
       </div>
     </main>
