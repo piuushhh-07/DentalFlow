@@ -2,7 +2,7 @@ import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
-import { TreatmentEstimateStatus, TreatmentVisitStatus } from "@prisma/client";
+import { TreatmentVisitStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -12,7 +12,6 @@ import { CancelTreatmentPlanButton } from "@/features/treatments/components/canc
 import { TreatmentVisitControls } from "@/features/treatments/components/treatment-visit-controls";
 import { TreatmentPlanFinanceForm } from "@/features/treatments/components/treatment-plan-finance-form";
 import { TreatmentFinancialEntryForm } from "@/features/treatments/components/treatment-financial-entry-form";
-import { listTreatmentPlanEstimates } from "@/features/estimates/lib/estimate-repository";
 import { getClinicTreatmentPlan } from "@/features/treatments/lib/treatment-repository";
 import {
   getTreatmentPlanFinancialSummary,
@@ -26,15 +25,6 @@ import {
 } from "@/features/treatments/lib/treatment-validation";
 
 export const dynamic = "force-dynamic";
-
-const estimateStatusLabels: Record<TreatmentEstimateStatus, string> = {
-  DRAFT: "Draft",
-  SENT: "Sent",
-  ACCEPTED: "Accepted",
-  REJECTED: "Rejected",
-  EXPIRED: "Expired",
-  CONVERTED: "Converted",
-};
 
 function appointmentClinicDate(date: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -70,7 +60,7 @@ export default async function TreatmentPlanPage({
     throw error;
   }
 
-  const [plan, summary, catalogueItems, estimates] = await Promise.all([
+  const [plan, summary, catalogueItems] = await Promise.all([
     getClinicTreatmentPlan(
       membership.clinicId,
       patientId.data,
@@ -82,11 +72,6 @@ export default async function TreatmentPlanPage({
       treatmentPlanId.data,
     ),
     listClinicTreatmentCatalogue(membership.clinicId),
-    listTreatmentPlanEstimates(
-      membership.clinicId,
-      patientId.data,
-      treatmentPlanId.data,
-    ),
   ]);
 
   if (!plan) {
@@ -128,14 +113,12 @@ export default async function TreatmentPlanPage({
             </p>
           </div>
           <div className="flex gap-2">
-            {plan.status !== "CANCELLED" && (
-              <Link
-                className="inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
-                href={`${plan.id}/estimates/new`}
-              >
-                Create estimate
-              </Link>
-            )}
+            <Link
+              className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              href={`${plan.id}/summary`}
+            >
+              Download summary
+            </Link>
             <Link
               className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
               href={`${plan.id}/edit`}
@@ -310,69 +293,6 @@ export default async function TreatmentPlanPage({
           </div>
         </section>
 
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Treatment estimates
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Quotations remain separate from actual charges and payments.
-              </p>
-            </div>
-            {plan.status !== "CANCELLED" && (
-              <Link
-                className="inline-flex min-h-9 items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-slate-50"
-                href={`${plan.id}/estimates/new`}
-              >
-                Create estimate
-              </Link>
-            )}
-          </div>
-          {estimates.length ? (
-            <ul className="mt-4 divide-y divide-slate-100">
-              {estimates.map((estimate) => (
-                <li
-                  className="flex flex-wrap items-center justify-between gap-3 py-3"
-                  key={estimate.id}
-                >
-                  <div>
-                    <Link
-                      className="text-sm font-medium text-teal-800 hover:underline"
-                      href={`/clinic/${membership.clinicId}/patients/${patientId.data}/estimates/${estimate.id}`}
-                    >
-                      Version {estimate.version} ·{" "}
-                      {estimateStatusLabels[estimate.status]}
-                    </Link>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {new Intl.NumberFormat("en-IN", {
-                        style: "currency",
-                        currency: "INR",
-                        maximumFractionDigits: 2,
-                      }).format(Number(estimate.totalAmount.toString()))}
-                      {" · Valid through "}
-                      {new Intl.DateTimeFormat("en-IN", {
-                        dateStyle: "medium",
-                        timeZone: "Asia/Kolkata",
-                      }).format(estimate.validityDate)}
-                    </p>
-                  </div>
-                  <Link
-                    className="text-sm font-medium text-teal-800 hover:underline"
-                    href={`/clinic/${membership.clinicId}/patients/${patientId.data}/estimates/${estimate.id}`}
-                  >
-                    View
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              No quotations exist for this treatment plan.
-            </p>
-          )}
-        </section>
-
         <section className="mt-7 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <h2 className="text-base font-semibold text-slate-900">
             Plan details
@@ -476,12 +396,6 @@ export default async function TreatmentPlanPage({
                     Schedule appointment
                   </Link>
                 ) : null}
-                <Link
-                  className="mt-3 inline-flex min-h-9 items-center rounded-md border border-teal-700 px-3 text-sm font-medium text-teal-800 hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700"
-                  href={`/clinic/${membership.clinicId}/patients/${patientId.data}?prescriptionVisitId=${visit.id}#prescriptions`}
-                >
-                  Create prescription for this visit
-                </Link>
                 <TreatmentVisitControls
                   clinicId={membership.clinicId}
                   dueDate={visit.dueDate}

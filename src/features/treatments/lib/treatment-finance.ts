@@ -597,6 +597,58 @@ export async function getTreatmentPaymentReceipt(
   });
 }
 
+/**
+ * Everything the downloadable treatment summary needs in one shot: the
+ * plan, its clinic and patient, every visit, and the financial ledger.
+ * Returns null if the plan isn't found (or belongs to another clinic),
+ * matching the clinic-scoped-lookup convention used across this feature.
+ */
+export async function getTreatmentPlanSummary(
+  clinicId: string,
+  patientId: string,
+  treatmentPlanId: string,
+) {
+  const plan = await prisma.treatmentPlan.findFirst({
+    where: { id: treatmentPlanId, clinicId, patientId },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      status: true,
+      totalVisits: true,
+      estimatedAmount: true,
+      finalAmount: true,
+      completedAt: true,
+      createdAt: true,
+      notes: true,
+      clinic: { select: { name: true, phoneNumber: true, address: true } },
+      patient: {
+        select: { fullName: true, phoneNumber: true },
+      },
+      visits: {
+        orderBy: { visitNumber: "asc" },
+        select: {
+          id: true,
+          visitNumber: true,
+          dueDate: true,
+          status: true,
+          completedAt: true,
+          notes: true,
+        },
+      },
+    },
+  });
+  if (!plan) return null;
+
+  const financialSummary = await getTreatmentPlanFinancialSummary(
+    clinicId,
+    patientId,
+    treatmentPlanId,
+  );
+
+  return { plan, financialSummary };
+}
+
 export async function getClinicTreatmentFinanceSummary(clinicId: string) {
   const nowParts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
