@@ -8,7 +8,11 @@ import {
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { ClinicRole } from "@prisma/client";
+import {
+  requireClinicMembership,
+  requireClinicRole,
+} from "@/features/auth/lib/server-auth";
 import {
   archiveInsuranceProvider,
   authorizeInsuranceDocumentUpload,
@@ -102,7 +106,7 @@ export async function createInsuranceProviderAction(formData: FormData) {
     notes: text(formData, "notes"),
   });
   if (!clinicId.success || !parsed.success) errorRedirect("/login", "invalid");
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
   try {
     await createInsuranceProvider(membership.clinicId, parsed.data);
   } catch (error) {
@@ -129,7 +133,7 @@ export async function updateInsuranceProviderAction(formData: FormData) {
   if (!clinicId.success || !providerId.success || !parsed.success) {
     errorRedirect("/login", "invalid");
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
   let updated: boolean;
   try {
     updated = await updateInsuranceProvider(
@@ -157,7 +161,7 @@ export async function archiveInsuranceProviderAction(formData: FormData) {
   const providerId = uuid.safeParse(text(formData, "providerId"));
   if (!clinicId.success || !providerId.success)
     errorRedirect("/login", "invalid");
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
   let archived: boolean;
   try {
     archived = await archiveInsuranceProvider(
