@@ -2362,6 +2362,30 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         InsuranceRecordNotFoundError,
       );
 
+      const clinicADocument = storedClaim.documents[0];
+      assert.ok(clinicADocument);
+      await assert.rejects(
+        updateInsuranceDocumentStatus(
+          clinicBId,
+          userBId,
+          claim.id,
+          clinicADocument.id,
+          { status: "REJECTED", rejectionReason: "Cross-clinic test." },
+        ),
+        InsuranceRecordNotFoundError,
+        "Clinic B cannot change the status of Clinic A's insurance document.",
+      );
+      await assert.rejects(
+        authorizeInsuranceDocumentUpload(
+          clinicBId,
+          claim.id,
+          clinicADocument.id,
+          `${clinicBId}/${claim.id}/${clinicADocument.id}/${randomUUID()}.pdf`,
+        ),
+        InsuranceRecordNotFoundError,
+        "Clinic B cannot authorize uploads against Clinic A's claim or document.",
+      );
+
       for (const document of storedClaim.documents) {
         await uploadAndVerifyInsuranceDocument(claim.id, document.id);
       }
