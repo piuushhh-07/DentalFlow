@@ -72,13 +72,13 @@ export default async function InsuranceProvidersPage({
             </p>
           </div>
           {membership.role === "OWNER" && (
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
-            href={`${basePath}/new`}
-          >
-            <Plus aria-hidden="true" className="size-4" />
-            Add provider
-          </Link>
+            <Link
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+              href={`${basePath}/new`}
+            >
+              <Plus aria-hidden="true" className="size-4" />
+              Add provider
+            </Link>
           )}
         </header>
         <div className="mt-6">

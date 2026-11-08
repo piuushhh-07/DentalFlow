@@ -143,7 +143,10 @@ test("restricts destructive patient operations to clinic owners", () => {
     clinicId,
     role: ClinicRole.OWNER,
   });
-  assert.equal(authorizeClinicRole(owner, [ClinicRole.OWNER]).role, ClinicRole.OWNER);
+  assert.equal(
+    authorizeClinicRole(owner, [ClinicRole.OWNER]).role,
+    ClinicRole.OWNER,
+  );
 
   const staff = authorizeClinicMembership(userId, clinicId, {
     userId,
