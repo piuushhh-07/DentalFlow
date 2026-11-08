@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ClinicRole } from "@prisma/client";
+import { ClinicPermission, ClinicRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -11,8 +11,11 @@ import {
   resolveAuthenticatedUser,
 } from "@/features/auth/lib/auth-session";
 import {
+  authorizeClinicPermission,
+  ClinicAccessDeniedError,
   authorizeClinicMembership,
   authorizeClinicRole,
+  hasLegacyStaffPermission,
   type VerifiedClinicMembership,
 } from "@/features/auth/lib/authorization";
 
@@ -50,12 +53,11 @@ export async function requireClinicMembership(
   }
 
   const user = await getAuthenticatedUser();
-  const membership = await prisma.clinicMembership.findUnique({
+  const membership = await prisma.clinicMembership.findFirst({
     where: {
-      userId_clinicId: {
-        userId: user.id,
-        clinicId: parsedClinicId.data,
-      },
+      userId: user.id,
+      clinicId: parsedClinicId.data,
+      active: true,
     },
     select: {
       userId: true,
@@ -65,6 +67,83 @@ export async function requireClinicMembership(
   });
 
   return authorizeClinicMembership(user.id, parsedClinicId.data, membership);
+}
+
+export async function requireClinicPermission(
+  requestedClinicId: string,
+  permission: ClinicPermission,
+): Promise<VerifiedClinicMembership> {
+  const membership = await requireClinicMembership(requestedClinicId);
+  if (membership.role === ClinicRole.OWNER) {
+    return authorizeClinicPermission(
+      membership,
+      true,
+      [permission],
+      permission,
+    );
+  }
+
+  const settings = await prisma.clinicMembership.findUnique({
+    where: {
+      userId_clinicId: {
+        userId: membership.userId,
+        clinicId: membership.clinicId,
+      },
+    },
+    select: { permissionsConfigured: true },
+  });
+  if (!settings) throw new ClinicAccessDeniedError();
+  if (!settings.permissionsConfigured) {
+    return authorizeClinicPermission(membership, false, [], permission);
+  }
+
+  const grant = await prisma.clinicPermissionGrant.findUnique({
+    where: {
+      userId_clinicId_permission: {
+        userId: membership.userId,
+        clinicId: membership.clinicId,
+        permission,
+      },
+    },
+    select: { permission: true },
+  });
+  return authorizeClinicPermission(
+    membership,
+    true,
+    grant ? [grant.permission] : [],
+    permission,
+  );
+}
+
+export async function isClinicPermissionGranted(
+  membership: VerifiedClinicMembership,
+  permission: ClinicPermission,
+): Promise<boolean> {
+  if (membership.role === ClinicRole.OWNER) return true;
+  const settings = await prisma.clinicMembership.findUnique({
+    where: {
+      userId_clinicId: {
+        userId: membership.userId,
+        clinicId: membership.clinicId,
+      },
+    },
+    select: { permissionsConfigured: true },
+  });
+  if (!settings) throw new ClinicAccessDeniedError();
+  if (!settings.permissionsConfigured) {
+    return hasLegacyStaffPermission(permission);
+  }
+  const grant = await prisma.clinicPermissionGrant.findUnique({
+    where: {
+      userId_clinicId_permission: {
+        userId: membership.userId,
+        clinicId: membership.clinicId,
+        permission,
+      },
+    },
+    select: { permission: true },
+  });
+  return grant !== null;
 }
 
 export async function requireClinicRole(

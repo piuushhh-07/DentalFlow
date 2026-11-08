@@ -1,4 +1,4 @@
-import { ClinicRole } from "@prisma/client";
+import { ClinicPermission, ClinicRole } from "@prisma/client";
 
 export type ClinicMembershipRecord = Readonly<{
   clinicId: string;
@@ -24,6 +24,48 @@ export class ClinicRoleDeniedError extends Error {
     super("The authenticated user's clinic role does not allow this action.");
     this.name = "ClinicRoleDeniedError";
   }
+}
+
+export class ClinicPermissionDeniedError extends ClinicAccessDeniedError {
+  constructor() {
+    super();
+    this.message =
+      "The authenticated user's clinic permissions do not allow this action.";
+    this.name = "ClinicPermissionDeniedError";
+  }
+}
+
+const legacyStaffPermissions = new Set<ClinicPermission>([
+  ClinicPermission.PATIENT_VIEW,
+  ClinicPermission.PATIENT_EDIT,
+  ClinicPermission.APPOINTMENT_MANAGE,
+  ClinicPermission.CLINICAL_RECORDS,
+  ClinicPermission.PRESCRIPTIONS,
+  ClinicPermission.TREATMENT_PLANS,
+  ClinicPermission.FINANCIAL_RECORDS,
+  ClinicPermission.INSURANCE,
+  ClinicPermission.REPORTS,
+]);
+
+export function hasLegacyStaffPermission(permission: ClinicPermission): boolean {
+  return legacyStaffPermissions.has(permission);
+}
+
+export function authorizeClinicPermission(
+  membership: VerifiedClinicMembership | null,
+  permissionsConfigured: boolean,
+  grantedPermissions: readonly ClinicPermission[],
+  requestedPermission: ClinicPermission,
+): VerifiedClinicMembership {
+  if (!membership) throw new ClinicAccessDeniedError();
+  if (
+    membership.role === ClinicRole.OWNER ||
+    (!permissionsConfigured && hasLegacyStaffPermission(requestedPermission)) ||
+    grantedPermissions.includes(requestedPermission)
+  ) {
+    return membership;
+  }
+  throw new ClinicPermissionDeniedError();
 }
 
 function isValidClinicRole(value: unknown): value is ClinicRole {

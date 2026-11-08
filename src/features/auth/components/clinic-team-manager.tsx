@@ -1,7 +1,9 @@
 "use client";
 
+import { ClinicPermission, StaffJobTitle } from "@prisma/client";
 import { useFormState } from "react-dom";
 
+import { ClinicStaffProfileEditor } from "@/features/auth/components/clinic-staff-profile-editor";
 import {
   inviteClinicStaffAction,
   removeClinicStaffAction,
@@ -12,13 +14,22 @@ import {
 type TeamMember = Readonly<{
   userId: string;
   role: "OWNER" | "STAFF";
+  active: boolean;
+  permissionsConfigured: boolean;
   createdAt: Date;
   user: { displayName: string | null; email: string | null };
+  staffProfile: {
+    jobTitle: StaffJobTitle;
+    phoneNumber: string | null;
+    active: boolean;
+  } | null;
+  permissionGrants: readonly { permission: ClinicPermission }[];
 }>;
 type PendingInvitation = Readonly<{
   id: string;
   email: string;
   role: "OWNER" | "STAFF";
+  jobTitle: StaffJobTitle;
   expiresAt: Date;
   createdAt: Date;
 }>;
@@ -46,6 +57,21 @@ function InviteForm({ clinicId }: { clinicId: string }) {
         required
         type="email"
       />
+      <label className="sr-only" htmlFor="staff-job-title">
+        Staff job title
+      </label>
+      <select
+        className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
+        defaultValue={StaffJobTitle.RECEPTIONIST}
+        id="staff-job-title"
+        name="jobTitle"
+      >
+        <option value={StaffJobTitle.DENTIST}>Dentist</option>
+        <option value={StaffJobTitle.RECEPTIONIST}>Receptionist</option>
+        <option value={StaffJobTitle.DENTAL_ASSISTANT}>Dental assistant</option>
+        <option value={StaffJobTitle.CLINIC_MANAGER}>Clinic manager</option>
+        <option value={StaffJobTitle.BILLING_STAFF}>Billing staff</option>
+      </select>
       <button
         className="h-10 rounded-md bg-teal-800 px-4 text-sm font-semibold text-white hover:bg-teal-900"
         type="submit"
@@ -173,18 +199,27 @@ export function ClinicTeamManager({
                     "Clinic member"}
                 </p>
                 {member.user.displayName && member.user.email && (
-                  <p className="text-sm text-slate-600">
-                    {member.user.email}
-                  </p>
+                  <p className="text-sm text-slate-600">{member.user.email}</p>
                 )}
                 <p className="mt-1 text-xs text-slate-500">
                   {member.role === "OWNER"
                     ? "Owner · billing, staff, and clinic administration"
-                    : "Staff · clinic workflows"}
+                    : `${member.staffProfile?.jobTitle.replaceAll("_", " ") ?? "Staff"} · ${member.active ? "Active access" : "Access deactivated"}`}
                 </p>
               </div>
               {member.role === "STAFF" && (
                 <MemberRemoval clinicId={clinicId} userId={member.userId} />
+              )}
+              {member.role === "STAFF" && (
+                <details className="basis-full">
+                  <summary className="cursor-pointer text-sm font-medium text-teal-800">
+                    Edit staff details and permissions
+                  </summary>
+                  <ClinicStaffProfileEditor
+                    clinicId={clinicId}
+                    member={member}
+                  />
+                </details>
               )}
             </li>
           ))}
@@ -207,6 +242,9 @@ export function ClinicTeamManager({
                 <div>
                   <p className="font-medium text-slate-900">
                     {invitation.email}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {invitation.jobTitle.replaceAll("_", " ")}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     Expires{" "}

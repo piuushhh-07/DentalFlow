@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { TreatmentEstimateStatus } from "@prisma/client";
+import { ClinicPermission, TreatmentEstimateStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import { EstimateStatusControl } from "@/features/estimates/components/estimate-status-control";
 import { PrintEstimateButton } from "@/features/estimates/components/print-estimate-button";
 import { getClinicTreatmentEstimate } from "@/features/estimates/lib/estimate-repository";
@@ -100,7 +100,10 @@ export default async function TreatmentEstimatePage({
   }
   let membership;
   try {
-    membership = await requireClinicMembership(clinicId.data);
+    membership = await requireClinicPermission(
+      clinicId.data,
+      ClinicPermission.FINANCIAL_RECORDS,
+    );
   } catch (error) {
     if (error instanceof ClinicAccessDeniedError) notFound();
     throw error;

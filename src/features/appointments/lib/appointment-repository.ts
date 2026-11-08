@@ -23,12 +23,14 @@ import {
   appointmentStartAt,
   appointmentsConflict,
   canTransitionAppointment,
+  isWithinDentistWorkingHours,
   type AppointmentInput,
 } from "@/features/appointments/lib/appointment-validation";
 
 export class AppointmentPatientNotFoundError extends Error {}
 export class AppointmentVisitNotFoundError extends Error {}
 export class AppointmentResourceNotFoundError extends Error {}
+export class AppointmentOutsideDentistHoursError extends Error {}
 export class AppointmentRequestNotFoundError extends Error {}
 export class AppointmentRequestConflictError extends Error {}
 export class AppointmentRequestRateLimitError extends Error {}
@@ -63,6 +65,32 @@ function runDiagnosticQuery<T>(
     : query();
 }
 
+export async function listClinicAppointmentsByDentist(
+  clinicId: string,
+  date: string,
+  dentistId: string,
+) {
+  return prisma.appointment.findMany({
+    where: {
+      clinicId,
+      dentistId,
+      scheduledAt: { gte: clinicDateStart(date), lt: clinicDateEnd(date) },
+    },
+    orderBy: [{ scheduledAt: "asc" }, { createdAt: "asc" }],
+    include: {
+      patient: { select: { id: true, fullName: true, phoneNumber: true } },
+      treatmentVisit: {
+        select: {
+          id: true,
+          visitNumber: true,
+          status: true,
+          treatmentPlan: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+}
+
 function clinicDateStart(date: string): Date {
   return appointmentStartAt(date, "00:00");
 }
@@ -77,7 +105,13 @@ async function assertNoSchedulingConflict(
   transaction: Prisma.TransactionClient,
   clinicId: string,
   input: AppointmentInput,
-  resources: Readonly<{ dentistName: string; chairLabel: string }>,
+  resources: Readonly<{
+    dentistId: string;
+    dentistName: string;
+    weeklyAvailability: unknown;
+    chairId: string;
+    chairLabel: string;
+  }>,
   excludeId?: string,
   diagnostic?: TransactionDiagnostic,
 ): Promise<Date> {
@@ -101,6 +135,8 @@ async function assertNoSchedulingConflict(
           durationMinutes: true,
           dentistName: true,
           chairLabel: true,
+          dentistId: true,
+          chairId: true,
           status: true,
         },
       }),
@@ -113,6 +149,8 @@ async function assertNoSchedulingConflict(
         durationMinutes: input.durationMinutes,
         dentistName: resources.dentistName,
         chairLabel: resources.chairLabel,
+        dentistId: resources.dentistId,
+        chairId: resources.chairId,
       },
       appointments,
     )
@@ -128,11 +166,24 @@ async function getActiveScheduleResources(
   transaction: Prisma.TransactionClient,
   clinicId: string,
   input: Pick<AppointmentInput, "dentistId" | "chairId">,
-): Promise<Readonly<{ dentistName: string; chairLabel: string }>> {
+): Promise<
+  Readonly<{
+    dentistId: string;
+    dentistName: string;
+    weeklyAvailability: unknown;
+    chairId: string;
+    chairLabel: string;
+  }>
+> {
   const [dentist, chair] = await Promise.all([
     transaction.clinicDentist.findFirst({
-      where: { id: input.dentistId, clinicId, active: true },
-      select: { id: true, name: true },
+      where: {
+        id: input.dentistId,
+        clinicId,
+        active: true,
+        workingStatus: "ACTIVE",
+      },
+      select: { id: true, name: true, weeklyAvailability: true },
     }),
     transaction.treatmentChair.findFirst({
       where: { id: input.chairId, clinicId, active: true },
@@ -140,7 +191,29 @@ async function getActiveScheduleResources(
     }),
   ]);
   if (!dentist || !chair) throw new AppointmentResourceNotFoundError();
-  return { dentistName: dentist.name, chairLabel: chair.label };
+  return {
+    dentistId: dentist.id,
+    dentistName: dentist.name,
+    weeklyAvailability: dentist.weeklyAvailability,
+    chairId: chair.id,
+    chairLabel: chair.label,
+  };
+}
+
+function assertDentistAvailability(
+  resources: Awaited<ReturnType<typeof getActiveScheduleResources>>,
+  input: Pick<AppointmentInput, "date" | "time" | "durationMinutes">,
+): void {
+  if (
+    !isWithinDentistWorkingHours(
+      resources.weeklyAvailability,
+      input.date,
+      input.time,
+      input.durationMinutes,
+    )
+  ) {
+    throw new AppointmentOutsideDentistHoursError();
+  }
 }
 
 async function validatePatientAndVisit(
@@ -290,10 +363,15 @@ async function rethrowVisitBookingConflict(
   }
 }
 
-export async function listClinicAppointments(clinicId: string, date: string) {
+export async function listClinicAppointments(
+  clinicId: string,
+  date: string,
+  dentistId?: string,
+) {
   return prisma.appointment.findMany({
     where: {
       clinicId,
+      ...(dentistId ? { dentistId } : {}),
       scheduledAt: { gte: clinicDateStart(date), lt: clinicDateEnd(date) },
     },
     orderBy: [{ scheduledAt: "asc" }, { createdAt: "asc" }],
@@ -342,7 +420,7 @@ export async function listAppointmentVisits(clinicId: string) {
 export async function listAppointmentResources(clinicId: string) {
   const [dentists, chairs] = await Promise.all([
     prisma.clinicDentist.findMany({
-      where: { clinicId, active: true },
+      where: { clinicId, active: true, workingStatus: "ACTIVE" },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
@@ -366,7 +444,7 @@ export async function getPublicBookingClinic(slug: string) {
       address: true,
       timeZone: true,
       dentists: {
-        where: { active: true },
+        where: { active: true, workingStatus: "ACTIVE" },
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       },
@@ -395,7 +473,9 @@ export async function setPublicBookingEnabled(
     data: { publicBookingEnabled: enabled },
   });
   if (result.count !== 1) {
-    throw new Error("The clinic could not be found while updating booking settings.");
+    throw new Error(
+      "The clinic could not be found while updating booking settings.",
+    );
   }
 }
 
@@ -426,15 +506,31 @@ export async function createPublicAppointmentRequest(
   const overlapStart = new Date(startAt.getTime() - 8 * 60 * 60_000);
   const [dentist, chair] = await Promise.all([
     prisma.clinicDentist.findFirst({
-      where: { id: input.dentistId, clinicId, active: true },
-      select: { id: true },
+      where: {
+        id: input.dentistId,
+        clinicId,
+        active: true,
+        workingStatus: "ACTIVE",
+      },
+      select: { id: true, name: true, weeklyAvailability: true },
     }),
     prisma.treatmentChair.findFirst({
       where: { id: input.chairId, clinicId, active: true },
-      select: { id: true },
+      select: { id: true, label: true },
     }),
   ]);
   if (!dentist || !chair) throw new AppointmentResourceNotFoundError();
+  const clinicTimeAt = new Date(startAt.getTime() + 330 * 60_000).toISOString();
+  if (
+    !isWithinDentistWorkingHours(
+      dentist.weeklyAvailability,
+      clinicTimeAt.slice(0, 10),
+      clinicTimeAt.slice(11, 16),
+      30,
+    )
+  ) {
+    throw new AppointmentOutsideDentistHoursError();
+  }
 
   return prisma.$transaction(
     async (transaction) => {
@@ -455,7 +551,12 @@ export async function createPublicAppointmentRequest(
             clinicId,
             status: { notIn: [...INACTIVE_STATUSES] },
             scheduledAt: { gte: overlapStart, lt: endAt },
-            OR: [{ dentistId: dentist.id }, { chairId: chair.id }],
+            OR: [
+              { dentistId: dentist.id },
+              { dentistId: null, dentistName: dentist.name },
+              { chairId: chair.id },
+              { chairId: null, chairLabel: chair.label },
+            ],
           },
           select: {
             id: true,
@@ -463,6 +564,8 @@ export async function createPublicAppointmentRequest(
             durationMinutes: true,
             dentistName: true,
             chairLabel: true,
+            dentistId: true,
+            chairId: true,
             status: true,
           },
         }),
@@ -490,7 +593,8 @@ export async function createPublicAppointmentRequest(
         ) ||
         requests.some(
           (request) =>
-            (request.dentistId === dentist.id || request.chairId === chair.id) &&
+            (request.dentistId === dentist.id ||
+              request.chairId === chair.id) &&
             overlaps(request.requestedAt, request.durationMinutes),
         )
       ) {
@@ -572,6 +676,7 @@ export async function approveAppointmentRequest(
         dentistId: request.dentistId,
         chairId: request.chairId,
       };
+      assertDentistAvailability(resources, appointmentInput);
       const patient = await transaction.patient.findFirst({
         where: { clinicId, normalizedPhone: request.phoneNumber },
         select: { id: true },
@@ -683,6 +788,7 @@ async function createClinicAppointmentTransaction(
         clinicId,
         input,
       );
+      assertDentistAvailability(resources, input);
       const scheduledAt = await assertNoSchedulingConflict(
         transaction,
         clinicId,
@@ -780,6 +886,7 @@ export async function updateClinicAppointment(
             clinicId,
             input,
           );
+          assertDentistAvailability(resources, input);
           const scheduledAt = await assertNoSchedulingConflict(
             transaction,
             clinicId,

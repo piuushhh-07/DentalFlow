@@ -1,10 +1,11 @@
+import { ClinicPermission } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import { PrintSummaryButton } from "@/features/treatments/components/print-summary-button";
 import { getTreatmentPlanSummary } from "@/features/treatments/lib/treatment-finance";
 import {
@@ -44,7 +45,14 @@ export default async function TreatmentSummaryPage({
 
   let membership;
   try {
-    membership = await requireClinicMembership(clinicId.data);
+    membership = await requireClinicPermission(
+      clinicId.data,
+      ClinicPermission.TREATMENT_PLANS,
+    );
+    await requireClinicPermission(
+      clinicId.data,
+      ClinicPermission.FINANCIAL_RECORDS,
+    );
   } catch (error) {
     if (error instanceof ClinicAccessDeniedError) notFound();
     throw error;

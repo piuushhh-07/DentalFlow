@@ -2,12 +2,12 @@ import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
-import { TreatmentVisitStatus } from "@prisma/client";
+import { ClinicPermission, TreatmentVisitStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import { CancelTreatmentPlanButton } from "@/features/treatments/components/cancel-treatment-plan-button";
 import { TreatmentVisitControls } from "@/features/treatments/components/treatment-visit-controls";
 import { TreatmentPlanFinanceForm } from "@/features/treatments/components/treatment-plan-finance-form";
@@ -52,7 +52,14 @@ export default async function TreatmentPlanPage({
 
   let membership;
   try {
-    membership = await requireClinicMembership(clinicId.data);
+    membership = await requireClinicPermission(
+      clinicId.data,
+      ClinicPermission.TREATMENT_PLANS,
+    );
+    await requireClinicPermission(
+      clinicId.data,
+      ClinicPermission.FINANCIAL_RECORDS,
+    );
   } catch (error) {
     if (error instanceof ClinicAccessDeniedError) {
       notFound();

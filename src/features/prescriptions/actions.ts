@@ -1,10 +1,10 @@
 "use server";
 
-import { ClinicRole, Prisma } from "@prisma/client";
+import { ClinicPermission, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireClinicRole } from "@/features/auth/lib/server-auth";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import {
   createDigitalPrescription,
   PrescriptionAuthorProfileIncompleteError,
@@ -50,10 +50,10 @@ export async function createDigitalPrescriptionAction(
     return { error: "The patient record could not be found." };
   }
 
-  const membership = await requireClinicRole(clinicId.data, [
-    ClinicRole.OWNER,
-    ClinicRole.STAFF,
-  ]);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.PRESCRIPTIONS,
+  );
   const fieldNames = [
     "medicineCatalogueItemId",
     "medicineName",

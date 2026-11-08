@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ClinicRole } from "@prisma/client";
+import { ClinicPermission, ClinicRole } from "@prisma/client";
 
 import {
   authorizeClinicMembership,
+  authorizeClinicPermission,
   authorizeClinicRole,
   ClinicAccessDeniedError,
+  ClinicPermissionDeniedError,
   ClinicRoleDeniedError,
 } from "@/features/auth/lib/authorization";
 
@@ -81,6 +83,72 @@ test("uses the database membership role for role authorization", () => {
       ClinicRole.STAFF,
     ]).role,
     ClinicRole.STAFF,
+  );
+});
+
+test("preserves legacy permissions but requires explicit grants for new permissions", () => {
+  const staff = authorizeClinicMembership(userId, clinicId, {
+    userId,
+    clinicId,
+    role: ClinicRole.STAFF,
+  });
+  for (const permission of [
+    ClinicPermission.PATIENT_VIEW,
+    ClinicPermission.PATIENT_EDIT,
+    ClinicPermission.APPOINTMENT_MANAGE,
+    ClinicPermission.CLINICAL_RECORDS,
+    ClinicPermission.PRESCRIPTIONS,
+    ClinicPermission.TREATMENT_PLANS,
+    ClinicPermission.FINANCIAL_RECORDS,
+    ClinicPermission.INSURANCE,
+    ClinicPermission.REPORTS,
+  ]) {
+    assert.equal(
+      authorizeClinicPermission(staff, false, [], permission),
+      staff,
+    );
+  }
+  for (const permission of [
+    ClinicPermission.INVENTORY,
+    ClinicPermission.STAFF_MANAGE,
+    ClinicPermission.CLINIC_SETTINGS,
+  ]) {
+    assert.throws(
+      () => authorizeClinicPermission(staff, false, [], permission),
+      ClinicPermissionDeniedError,
+    );
+    assert.equal(
+      authorizeClinicPermission(staff, true, [permission], permission),
+      staff,
+    );
+  }
+  assert.equal(
+    authorizeClinicPermission(
+      staff,
+      true,
+      [ClinicPermission.PATIENT_VIEW],
+      ClinicPermission.PATIENT_VIEW,
+    ),
+    staff,
+  );
+  assert.throws(
+    () =>
+      authorizeClinicPermission(
+        staff,
+        true,
+        [ClinicPermission.PATIENT_VIEW],
+        ClinicPermission.REPORTS,
+      ),
+    ClinicPermissionDeniedError,
+  );
+  const owner = authorizeClinicMembership(userId, clinicId, {
+    userId,
+    clinicId,
+    role: ClinicRole.OWNER,
+  });
+  assert.equal(
+    authorizeClinicPermission(owner, true, [], ClinicPermission.REPORTS),
+    owner,
   );
 });
 

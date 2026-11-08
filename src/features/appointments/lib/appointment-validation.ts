@@ -40,7 +40,55 @@ export const appointmentStatusSchema = z.object({
   status: z.nativeEnum(AppointmentStatus),
 });
 
+const clockTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+
+export const dentistAvailabilitySchema = z
+  .array(
+    z.object({
+      dayOfWeek: z.number().int().min(0).max(6),
+      isWorking: z.boolean(),
+      startTime: clockTimeSchema,
+      endTime: clockTimeSchema,
+    }),
+  )
+  .max(7)
+  .refine(
+    (days) =>
+      new Set(days.map(({ dayOfWeek }) => dayOfWeek)).size === days.length,
+    "Each weekday can only be configured once.",
+  )
+  .refine(
+    (days) =>
+      days.every(
+        ({ startTime, endTime }) =>
+          Number(startTime.replace(":", "")) < Number(endTime.replace(":", "")),
+      ),
+    "Working hours must end after they start.",
+  );
+
 export type AppointmentInput = z.output<typeof createAppointmentSchema>;
+
+export function isWithinDentistWorkingHours(
+  availability: unknown,
+  date: string,
+  time: string,
+  durationMinutes: number,
+): boolean {
+  if (availability === null || availability === undefined) return true;
+  const parsed = dentistAvailabilitySchema.safeParse(availability);
+  if (!parsed.success) return false;
+  const dayOfWeek = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+  const day = parsed.data.find((entry) => entry.dayOfWeek === dayOfWeek);
+  if (!day?.isWorking) return false;
+  const closingTime =
+    Number(day.endTime.slice(0, 2)) * 60 + Number(day.endTime.slice(3, 5));
+  const startMinutes = Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+  const openingTime =
+    Number(day.startTime.slice(0, 2)) * 60 + Number(day.startTime.slice(3, 5));
+  return (
+    startMinutes + durationMinutes <= closingTime && startMinutes >= openingTime
+  );
+}
 
 export function appointmentStartAt(date: string, time: string): Date {
   return new Date(`${date}T${time}:00+05:30`);
@@ -87,6 +135,8 @@ export function appointmentsConflict(
     durationMinutes: number;
     dentistName: string;
     chairLabel: string;
+    dentistId?: string | null;
+    chairId?: string | null;
   }>,
   existing: readonly Readonly<{
     id: string;
@@ -94,6 +144,8 @@ export function appointmentsConflict(
     durationMinutes: number;
     dentistName: string;
     chairLabel: string;
+    dentistId?: string | null;
+    chairId?: string | null;
     status: AppointmentStatus;
   }>[],
 ): boolean {
@@ -113,10 +165,14 @@ export function appointmentsConflict(
       requested.startAt.getTime() < existingEnd && existingStart < requestedEnd;
     return (
       overlaps &&
-      (appointment.dentistName.toLocaleLowerCase() ===
-        requested.dentistName.toLocaleLowerCase() ||
-        appointment.chairLabel.toLocaleLowerCase() ===
-          requested.chairLabel.toLocaleLowerCase())
+      ((requested.dentistId && appointment.dentistId
+        ? appointment.dentistId === requested.dentistId
+        : appointment.dentistName.toLocaleLowerCase() ===
+          requested.dentistName.toLocaleLowerCase()) ||
+        (requested.chairId && appointment.chairId
+          ? appointment.chairId === requested.chairId
+          : appointment.chairLabel.toLocaleLowerCase() ===
+            requested.chairLabel.toLocaleLowerCase()))
     );
   });
 }

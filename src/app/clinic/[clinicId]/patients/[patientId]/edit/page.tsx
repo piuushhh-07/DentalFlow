@@ -2,10 +2,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { ClinicPermission } from "@prisma/client";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import {
+  ClinicAccessDeniedError,
+  ClinicPermissionDeniedError,
+} from "@/features/auth/lib/authorization";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import { PatientForm } from "@/features/patients/components/patient-form";
 import { getClinicPatient } from "@/features/patients/lib/patient-repository";
 
@@ -26,9 +30,15 @@ export default async function EditPatientPage({
   let membership;
 
   try {
-    membership = await requireClinicMembership(clinicId.data);
+    membership = await requireClinicPermission(
+      clinicId.data,
+      ClinicPermission.PATIENT_EDIT,
+    );
   } catch (error) {
-    if (error instanceof ClinicAccessDeniedError) {
+    if (
+      error instanceof ClinicAccessDeniedError ||
+      error instanceof ClinicPermissionDeniedError
+    ) {
       notFound();
     }
 

@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { PreventiveRecallStatus } from "@prisma/client";
+import { ClinicPermission, PreventiveRecallStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import { RecallForm } from "@/features/recalls/components/recall-form";
 import { getClinicRecall } from "@/features/recalls/lib/recall-repository";
 import { toDateInput } from "@/features/recalls/lib/recall-validation";
@@ -24,7 +24,10 @@ export default async function EditRecallPage({ params }: EditRecallPageProps) {
 
   let membership;
   try {
-    membership = await requireClinicMembership(clinicId.data);
+    membership = await requireClinicPermission(
+      clinicId.data,
+      ClinicPermission.TREATMENT_PLANS,
+    );
   } catch (error) {
     if (error instanceof ClinicAccessDeniedError) notFound();
     throw error;

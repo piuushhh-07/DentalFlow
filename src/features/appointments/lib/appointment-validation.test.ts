@@ -6,6 +6,7 @@ import {
   appointmentsConflict,
   canTransitionAppointment,
   createAppointmentSchema,
+  isWithinDentistWorkingHours,
   isActiveAppointmentStatus,
 } from "@/features/appointments/lib/appointment-validation";
 
@@ -88,6 +89,77 @@ test("detects overlapping appointments for the same dentist or chair", () => {
       existing,
     ),
     false,
+  );
+});
+
+test("dentist IDs distinguish same-named dentists and chairs still conflict", () => {
+  const startAt = new Date("2026-10-21T04:00:00.000Z");
+  const existing = [
+    {
+      id: "appointment-1",
+      scheduledAt: startAt,
+      durationMinutes: 45,
+      dentistName: "Dr. Shah",
+      dentistId: "dentist-1",
+      chairLabel: "Chair 1",
+      chairId: "chair-1",
+      status: AppointmentStatus.CONFIRMED,
+    },
+  ];
+  assert.equal(
+    appointmentsConflict(
+      {
+        startAt: new Date(startAt.getTime() + 10 * 60_000),
+        durationMinutes: 20,
+        dentistName: "Dr. Shah",
+        dentistId: "dentist-2",
+        chairLabel: "Chair 2",
+        chairId: "chair-2",
+      },
+      existing,
+    ),
+    false,
+  );
+  assert.equal(
+    appointmentsConflict(
+      {
+        startAt: new Date(startAt.getTime() + 10 * 60_000),
+        durationMinutes: 20,
+        dentistName: "Another dentist",
+        dentistId: "dentist-2",
+        chairLabel: "Chair 1",
+        chairId: "chair-1",
+      },
+      existing,
+    ),
+    true,
+  );
+});
+
+test("dentist availability checks weekday, opening time, and full appointment duration", () => {
+  const availability = [
+    {
+      dayOfWeek: 3,
+      isWorking: true,
+      startTime: "09:00",
+      endTime: "17:00",
+    },
+  ];
+  assert.equal(
+    isWithinDentistWorkingHours(availability, "2026-10-21", "09:00", 30),
+    true,
+  );
+  assert.equal(
+    isWithinDentistWorkingHours(availability, "2026-10-21", "16:45", 30),
+    false,
+  );
+  assert.equal(
+    isWithinDentistWorkingHours(availability, "2026-10-20", "10:00", 30),
+    false,
+  );
+  assert.equal(
+    isWithinDentistWorkingHours(null, "2026-10-20", "10:00", 30),
+    true,
   );
 });
 

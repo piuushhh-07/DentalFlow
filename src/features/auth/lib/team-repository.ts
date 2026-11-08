@@ -12,8 +12,14 @@ export async function listClinicTeam(clinicId: string) {
       select: {
         userId: true,
         role: true,
+        active: true,
+        permissionsConfigured: true,
         createdAt: true,
         user: { select: { displayName: true, email: true } },
+        staffProfile: {
+          select: { jobTitle: true, phoneNumber: true, active: true },
+        },
+        permissionGrants: { select: { permission: true } },
       },
     }),
     prisma.clinicInvitation.findMany({
@@ -27,6 +33,7 @@ export async function listClinicTeam(clinicId: string) {
         id: true,
         email: true,
         role: true,
+        jobTitle: true,
         expiresAt: true,
         createdAt: true,
       },

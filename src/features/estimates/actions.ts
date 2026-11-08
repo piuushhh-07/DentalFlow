@@ -1,10 +1,10 @@
 "use server";
 
-import { ClinicRole, Prisma } from "@prisma/client";
+import { ClinicPermission, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireClinicRole } from "@/features/auth/lib/server-auth";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import {
   createTreatmentEstimate,
   TreatmentEstimateActorNotAuthorizedError,
@@ -55,10 +55,10 @@ export async function createTreatmentEstimateAction(
     return { error: "The treatment plan could not be found." };
   }
 
-  const membership = await requireClinicRole(clinicId.data, [
-    ClinicRole.OWNER,
-    ClinicRole.STAFF,
-  ]);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.FINANCIAL_RECORDS,
+  );
   const names = [
     "catalogueItemId",
     "description",
@@ -155,10 +155,10 @@ export async function transitionTreatmentEstimateAction(
     return { error: "Choose a valid estimate status." };
   }
 
-  const membership = await requireClinicRole(clinicId.data, [
-    ClinicRole.OWNER,
-    ClinicRole.STAFF,
-  ]);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.FINANCIAL_RECORDS,
+  );
   let treatmentPlanId: string;
   try {
     const result = await transitionTreatmentEstimate(

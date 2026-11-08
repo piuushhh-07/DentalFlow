@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { ClinicRole } from "@prisma/client";
+import { ClinicPermission, ClinicRole } from "@prisma/client";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import {
+  ClinicAccessDeniedError,
+  ClinicPermissionDeniedError,
+} from "@/features/auth/lib/authorization";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import { AppointmentForm } from "@/features/appointments/components/appointment-form";
 import { AppointmentStatusForm } from "@/features/appointments/components/appointment-status-form";
 import { ScheduleResourceForm } from "@/features/appointments/components/schedule-resource-form";
@@ -49,6 +52,7 @@ export default async function ClinicAppointmentsPage({
   params: { clinicId: string };
   searchParams: {
     date?: string;
+    dentistId?: string;
     patientId?: string;
     treatmentVisitId?: string;
   };
@@ -57,29 +61,37 @@ export default async function ClinicAppointmentsPage({
   if (!clinicId.success) notFound();
   let membership;
   try {
-    membership = await requireClinicMembership(clinicId.data);
+    membership = await requireClinicPermission(
+      clinicId.data,
+      ClinicPermission.APPOINTMENT_MANAGE,
+    );
   } catch (error) {
-    if (error instanceof ClinicAccessDeniedError) notFound();
+    if (
+      error instanceof ClinicAccessDeniedError ||
+      error instanceof ClinicPermissionDeniedError
+    ) {
+      notFound();
+    }
     throw error;
   }
   const today = getClinicToday();
   const date = daySchema.safeParse(searchParams.date ?? today);
   const selectedDate = date.success ? date.data : today;
-  const [
-    appointments,
-    patients,
-    visits,
-    resources,
-    requests,
-    bookingSettings,
-  ] = await Promise.all([
-    listClinicAppointments(membership.clinicId, selectedDate),
-    listAppointmentPatients(membership.clinicId),
-    listAppointmentVisits(membership.clinicId),
-    listAppointmentResources(membership.clinicId),
-    listAppointmentRequests(membership.clinicId),
-    getPublicBookingSettings(membership.clinicId),
-  ]);
+  const [appointments, patients, visits, resources, requests, bookingSettings] =
+    await Promise.all([
+      listClinicAppointments(
+        membership.clinicId,
+        selectedDate,
+        z.string().uuid().safeParse(searchParams.dentistId).success
+          ? searchParams.dentistId
+          : undefined,
+      ),
+      listAppointmentPatients(membership.clinicId),
+      listAppointmentVisits(membership.clinicId),
+      listAppointmentResources(membership.clinicId),
+      listAppointmentRequests(membership.clinicId),
+      getPublicBookingSettings(membership.clinicId),
+    ]);
   let prefill:
     | {
         patientId: string;
@@ -140,7 +152,7 @@ export default async function ClinicAppointmentsPage({
               in Asia/Kolkata time.
             </p>
           </div>
-          <form action={basePath} className="flex items-end gap-2">
+          <form action={basePath} className="flex flex-wrap items-end gap-2">
             <label className="text-sm font-medium text-slate-700">
               Schedule date
               <input
@@ -149,6 +161,21 @@ export default async function ClinicAppointmentsPage({
                 name="date"
                 type="date"
               />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Dentist schedule
+              <select
+                className="mt-1 block h-10 rounded-md border border-slate-300 bg-white px-3"
+                defaultValue={searchParams.dentistId ?? ""}
+                name="dentistId"
+              >
+                <option value="">All dentists</option>
+                {resources.dentists.map((dentist) => (
+                  <option key={dentist.id} value={dentist.id}>
+                    {dentist.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <button
               className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50"
@@ -172,8 +199,8 @@ export default async function ClinicAppointmentsPage({
           )}
           {membership.role !== ClinicRole.OWNER && (
             <p className="mb-3 text-sm text-slate-600">
-              Patients can request a time online. Review requests here; they
-              are not confirmed automatically.
+              Patients can request a time online. Review requests here; they are
+              not confirmed automatically.
             </p>
           )}
           <div className="mt-4">
@@ -206,7 +233,8 @@ export default async function ClinicAppointmentsPage({
                 Create patient
               </Link>
             </p>
-          ) : resources.dentists.length === 0 || resources.chairs.length === 0 ? (
+          ) : resources.dentists.length === 0 ||
+            resources.chairs.length === 0 ? (
             <p className="text-sm text-slate-600">
               Add at least one active dentist and chair before scheduling.
             </p>

@@ -2,11 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Plus, Search, UsersRound } from "lucide-react";
 import { z } from "zod";
+import { ClinicPermission } from "@prisma/client";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
-import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import {
+  ClinicAccessDeniedError,
+  ClinicPermissionDeniedError,
+} from "@/features/auth/lib/authorization";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import {
   formatIndianPhoneNumber,
   patientSearchSchema,
@@ -42,9 +46,15 @@ export default async function PatientListPage({
   let membership;
 
   try {
-    membership = await requireClinicMembership(clinicId.data);
+    membership = await requireClinicPermission(
+      clinicId.data,
+      ClinicPermission.PATIENT_VIEW,
+    );
   } catch (error) {
-    if (error instanceof ClinicAccessDeniedError) {
+    if (
+      error instanceof ClinicAccessDeniedError ||
+      error instanceof ClinicPermissionDeniedError
+    ) {
       notFound();
     }
 

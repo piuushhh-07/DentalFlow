@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  ClinicPermission,
   InsuranceDocumentType,
   InsurancePreAuthorizationStatus,
   Prisma,
@@ -8,7 +9,7 @@ import {
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import {
   archiveInsuranceProvider,
   authorizeInsuranceDocumentUpload,
@@ -102,7 +103,10 @@ export async function createInsuranceProviderAction(formData: FormData) {
     notes: text(formData, "notes"),
   });
   if (!clinicId.success || !parsed.success) errorRedirect("/login", "invalid");
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     await createInsuranceProvider(membership.clinicId, parsed.data);
   } catch (error) {
@@ -129,7 +133,10 @@ export async function updateInsuranceProviderAction(formData: FormData) {
   if (!clinicId.success || !providerId.success || !parsed.success) {
     errorRedirect("/login", "invalid");
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   let updated: boolean;
   try {
     updated = await updateInsuranceProvider(
@@ -157,7 +164,10 @@ export async function archiveInsuranceProviderAction(formData: FormData) {
   const providerId = uuid.safeParse(text(formData, "providerId"));
   if (!clinicId.success || !providerId.success)
     errorRedirect("/login", "invalid");
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   let archived: boolean;
   try {
     archived = await archiveInsuranceProvider(
@@ -195,7 +205,10 @@ export async function createInsurancePolicyAction(formData: FormData) {
     coverageNotes: text(formData, "coverageNotes"),
   });
   if (!clinicId.success || !parsed.success) errorRedirect("/login", "invalid");
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     await createInsurancePolicy(membership.clinicId, parsed.data);
   } catch (error) {
@@ -223,7 +236,10 @@ export async function createInsuranceClaimAction(formData: FormData) {
     notes: text(formData, "notes"),
   });
   if (!clinicId.success || !parsed.success) errorRedirect("/login", "invalid");
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   let claim: Awaited<ReturnType<typeof createInsuranceClaim>>;
   try {
     claim = await createInsuranceClaim(
@@ -271,7 +287,10 @@ export async function updateInsuranceClaimDetailsAction(formData: FormData) {
   if (!clinicId.success || !claimId.success || !parsed.success) {
     errorRedirect("/login", "invalid");
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     await updateInsuranceClaimDetails(
       membership.clinicId,
@@ -299,7 +318,10 @@ export async function updateInsuranceClaimStatusAction(formData: FormData) {
   if (!clinicId.success || !claimId.success || !parsed.success) {
     errorRedirect("/login", "invalid");
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     await updateInsuranceClaimStatus(
       membership.clinicId,
@@ -325,7 +347,10 @@ export async function scheduleInsuranceFollowUpAction(formData: FormData) {
   if (!clinicId.success || !claimId.success || !followUpDate.success) {
     errorRedirect("/login", "invalid");
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     await scheduleInsuranceFollowUp(
       membership.clinicId,
@@ -355,7 +380,10 @@ export async function createInsurancePaymentAction(formData: FormData) {
   if (!clinicId.success || !claimId.success || !parsed.success) {
     errorRedirect("/login", "invalid");
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     await createInsurancePayment(
       membership.clinicId,
@@ -385,7 +413,10 @@ export async function createInsurancePreAuthorizationAction(
     requestReference: text(formData, "requestReference"),
   });
   if (!clinicId.success || !parsed.success) errorRedirect("/login", "invalid");
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   let result: Awaited<ReturnType<typeof createInsurancePreAuthorization>>;
   try {
     result = await createInsurancePreAuthorization(
@@ -421,7 +452,10 @@ export async function updateInsurancePreAuthorizationStatusAction(
   if (!clinicId.success || !preAuthorizationId.success || !parsed.success) {
     errorRedirect("/login", "invalid");
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     await updateInsurancePreAuthorizationStatus(
       membership.clinicId,
@@ -457,7 +491,10 @@ export async function createInsuranceDocumentRequirementAction(
   if (!clinicId.success || !claimId.success || !parsed.success) {
     errorRedirect("/login", "invalid");
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     await createInsuranceDocumentRequirement(
       membership.clinicId,
@@ -490,7 +527,10 @@ export async function registerInsuranceDocumentUploadAction(
   if (!clinicId.success || !claimId.success || !documentId.success) {
     return { error: "The document could not be attached to this claim." };
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     const registration = await registerInsuranceDocumentUpload(
       membership.clinicId,
@@ -525,7 +565,10 @@ export async function authorizeInsuranceDocumentUploadAction(
   if (!clinicId.success || !claimId.success || !documentId.success) {
     return { error: "The document upload could not be prepared." };
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     await authorizeInsuranceDocumentUpload(
       membership.clinicId,
@@ -552,7 +595,10 @@ export async function completeInsuranceDocumentStorageCleanupAction(
   if (!clinicId.success || !claimId.success || !documentId.success) {
     return { error: "The replaced document could not be cleaned up." };
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     const supabase = await createSupabaseServerActionClient();
     const { error: storageError } = await supabase.storage
@@ -596,7 +642,10 @@ export async function updateInsuranceDocumentStatusAction(formData: FormData) {
   ) {
     errorRedirect("/login", "invalid");
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   try {
     await updateInsuranceDocumentStatus(
       membership.clinicId,
@@ -625,7 +674,10 @@ export async function getInsuranceDocumentPathAction(
   if (!clinicId.success || !claimId.success || !documentId.success) {
     return { error: "This document is not available." };
   }
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.INSURANCE,
+  );
   const { getInsuranceDocumentStoragePath } =
     await import("@/features/insurance/lib/insurance-repository");
   const path = await getInsuranceDocumentStoragePath(

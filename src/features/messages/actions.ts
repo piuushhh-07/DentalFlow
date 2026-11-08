@@ -1,12 +1,12 @@
 "use server";
 
-import { ClinicRole, Prisma } from "@prisma/client";
+import { ClinicPermission, ClinicRole, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 
 import {
-  requireClinicMembership,
+  requireClinicPermission,
   requireClinicRole,
 } from "@/features/auth/lib/server-auth";
 import {
@@ -180,7 +180,10 @@ export async function recordManuallySentWhatsAppReminder(
     };
   }
 
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.APPOINTMENT_MANAGE,
+  );
   const input = {
     clinicId: membership.clinicId,
     senderUserId: membership.userId,

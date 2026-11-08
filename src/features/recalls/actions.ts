@@ -4,7 +4,8 @@ import { Prisma, PreventiveRecallStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { ClinicPermission } from "@prisma/client";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import {
   createClinicRecall,
   RecallNotFoundError,
@@ -78,7 +79,10 @@ export async function createRecall(
     };
   }
 
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.TREATMENT_PLANS,
+  );
   let recallId: string;
   try {
     const recall = await createClinicRecall(
@@ -123,7 +127,10 @@ export async function updateRecall(
     };
   }
 
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.TREATMENT_PLANS,
+  );
   try {
     await updateClinicRecall(
       membership.clinicId,
@@ -163,7 +170,10 @@ export async function rescheduleRecall(
     return { error: "Choose a valid due date." };
   }
 
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.TREATMENT_PLANS,
+  );
   try {
     await rescheduleClinicRecall(
       membership.clinicId,
@@ -204,7 +214,10 @@ export async function updateRecallStatus(
     return { error: "Choose a valid recall status." };
   }
 
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.TREATMENT_PLANS,
+  );
   try {
     await updateClinicRecallStatus(
       membership.clinicId,

@@ -23,7 +23,7 @@ const navigationGroups = [
       { label: "Templates", icon: MessageCircle, href: "messages/templates" },
       { label: "Reports", icon: ClipboardList, href: "reports" },
       { label: "Insurance", icon: ShieldCheck, href: "insurance" },
-      { label: "Team", icon: UserRoundPlus, href: "settings/staff" },
+      { label: "Team", icon: UserRoundPlus, href: "team" },
     ],
   },
 ];
@@ -95,8 +95,8 @@ export function AppNavigation({
                           ? "/appointments"
                           : label === "Treatments"
                             ? "/treatments/catalogue"
-                              : label === "Team"
-                                ? "/settings/staff"
+                            : label === "Team"
+                              ? "/team"
                               : "";
 
               return (

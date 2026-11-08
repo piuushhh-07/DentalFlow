@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ClinicInvitationStatus } from "@prisma/client";
+import { ClinicInvitationStatus, ClinicRole } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 
@@ -17,7 +17,7 @@ export async function activatePendingClinicInvitations(
         status: ClinicInvitationStatus.PENDING,
         expiresAt: { gt: now },
       },
-      select: { id: true, clinicId: true, role: true },
+      select: { id: true, clinicId: true, role: true, jobTitle: true },
     });
     for (const invitation of invitations) {
       const accepted = await transaction.clinicInvitation.updateMany({
@@ -44,9 +44,29 @@ export async function activatePendingClinicInvitations(
           userId,
           clinicId: invitation.clinicId,
           role: invitation.role,
+          permissionsConfigured: invitation.role === ClinicRole.STAFF,
         },
         update: {},
       });
+      if (invitation.role === ClinicRole.STAFF) {
+        await transaction.clinicStaffProfile.upsert({
+          where: {
+            userId_clinicId: {
+              userId,
+              clinicId: invitation.clinicId,
+            },
+          },
+          create: {
+            userId,
+            clinicId: invitation.clinicId,
+            jobTitle: invitation.jobTitle,
+          },
+          update: {
+            jobTitle: invitation.jobTitle,
+            active: true,
+          },
+        });
+      }
     }
   });
 }

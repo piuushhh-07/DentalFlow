@@ -1,9 +1,9 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
+import { ClinicPermission, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import {
   DentalClinicalRecordFindingNotFoundError,
   DentalClinicalRecordPatientNotFoundError,
@@ -39,7 +39,10 @@ export async function saveDentalClinicalRecordAction(
     return { error: "The patient record could not be found." };
   }
 
-  const membership = await requireClinicMembership(clinicId);
+  const membership = await requireClinicPermission(
+    clinicId,
+    ClinicPermission.CLINICAL_RECORDS,
+  );
 
   const rawFinding = {
     toothNumber: formData.get("toothNumber") ?? "",

@@ -2,11 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil, UserRound } from "lucide-react";
 import { z } from "zod";
-import { ClinicRole } from "@prisma/client";
+import { ClinicPermission, ClinicRole } from "@prisma/client";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import {
+  ClinicAccessDeniedError,
+  ClinicPermissionDeniedError,
+} from "@/features/auth/lib/authorization";
+import {
+  isClinicPermissionGranted,
+  requireClinicPermission,
+} from "@/features/auth/lib/server-auth";
 import { DeletePatientButton } from "@/features/patients/components/delete-patient-button";
 import { getClinicPatient } from "@/features/patients/lib/patient-repository";
 import { formatIndianPhoneNumber } from "@/features/patients/lib/patient-validation";
@@ -56,9 +62,15 @@ export default async function PatientDetailPage({
   let membership;
 
   try {
-    membership = await requireClinicMembership(clinicId.data);
+    membership = await requireClinicPermission(
+      clinicId.data,
+      ClinicPermission.PATIENT_VIEW,
+    );
   } catch (error) {
-    if (error instanceof ClinicAccessDeniedError) {
+    if (
+      error instanceof ClinicAccessDeniedError ||
+      error instanceof ClinicPermissionDeniedError
+    ) {
       notFound();
     }
 
@@ -72,6 +84,21 @@ export default async function PatientDetailPage({
   }
 
   const [
+    canSeeInsurance,
+    canSeeClinicalRecords,
+    canSeeTreatments,
+    canSeePrescriptions,
+    canSeeFinancials,
+    canEditPatient,
+  ] = await Promise.all([
+    isClinicPermissionGranted(membership, ClinicPermission.INSURANCE),
+    isClinicPermissionGranted(membership, ClinicPermission.CLINICAL_RECORDS),
+    isClinicPermissionGranted(membership, ClinicPermission.TREATMENT_PLANS),
+    isClinicPermissionGranted(membership, ClinicPermission.PRESCRIPTIONS),
+    isClinicPermissionGranted(membership, ClinicPermission.FINANCIAL_RECORDS),
+    isClinicPermissionGranted(membership, ClinicPermission.PATIENT_EDIT),
+  ]);
+  const [
     insurancePolicies,
     odontogramEntries,
     odontogramTreatmentPlans,
@@ -81,14 +108,30 @@ export default async function PatientDetailPage({
     medicineCatalogue,
     treatmentEstimates,
   ] = await Promise.all([
-    listInsurancePolicies(membership.clinicId, "", patient.id),
-    listPatientOdontogramEntries(membership.clinicId, patient.id),
-    listPatientOdontogramTreatmentPlans(membership.clinicId, patient.id),
-    listPatientTreatmentPlans(membership.clinicId, patient.id),
-    listPatientDentalClinicalRecords(membership.clinicId, patient.id),
-    listPatientPrescriptions(membership.clinicId, patient.id),
-    listClinicPrescriptionMedicineCatalogue(membership.clinicId),
-    listPatientTreatmentEstimates(membership.clinicId, patient.id),
+    canSeeInsurance
+      ? listInsurancePolicies(membership.clinicId, "", patient.id)
+      : Promise.resolve([]),
+    canSeeClinicalRecords
+      ? listPatientOdontogramEntries(membership.clinicId, patient.id)
+      : Promise.resolve([]),
+    canSeeClinicalRecords && canSeeTreatments
+      ? listPatientOdontogramTreatmentPlans(membership.clinicId, patient.id)
+      : Promise.resolve([]),
+    canSeeTreatments
+      ? listPatientTreatmentPlans(membership.clinicId, patient.id)
+      : Promise.resolve([]),
+    canSeeClinicalRecords
+      ? listPatientDentalClinicalRecords(membership.clinicId, patient.id)
+      : Promise.resolve([]),
+    canSeePrescriptions
+      ? listPatientPrescriptions(membership.clinicId, patient.id)
+      : Promise.resolve([]),
+    canSeePrescriptions
+      ? listClinicPrescriptionMedicineCatalogue(membership.clinicId)
+      : Promise.resolve([]),
+    canSeeFinancials
+      ? listPatientTreatmentEstimates(membership.clinicId, patient.id)
+      : Promise.resolve([]),
   ]);
   const correctionSource = prescriptions.find(
     (prescription) => prescription.id === searchParams?.amendsPrescriptionId,
@@ -156,13 +199,15 @@ export default async function PatientDetailPage({
                 Export patient data
               </a>
             )}
-            <Link
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              href={`${patientPath}/edit`}
-            >
-              <Pencil aria-hidden="true" className="size-4" />
-              Edit patient
-            </Link>
+            {canEditPatient && (
+              <Link
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                href={`${patientPath}/edit`}
+              >
+                <Pencil aria-hidden="true" className="size-4" />
+                Edit patient
+              </Link>
+            )}
           </div>
         </header>
 
@@ -170,146 +215,161 @@ export default async function PatientDetailPage({
           aria-label="Patient care plans"
           className="mt-6 flex flex-wrap gap-2"
         >
-          <Link
-            className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            href={`${patientPath}/treatments`}
-          >
-            Treatment plans
-          </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            href={`/clinic/${membership.clinicId}/recalls/new?patientId=${patient.id}`}
-          >
-            Create preventive recall
-          </Link>
+          {canSeeTreatments && (
+            <Link
+              className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              href={`${patientPath}/treatments`}
+            >
+              Treatment plans
+            </Link>
+          )}
+          {canSeeTreatments && (
+            <Link
+              className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              href={`/clinic/${membership.clinicId}/recalls/new?patientId=${patient.id}`}
+            >
+              Create preventive recall
+            </Link>
+          )}
         </nav>
 
-        <OdontogramBoard
-          clinicId={membership.clinicId}
-          entries={chartEntries}
-          patientId={patient.id}
-          treatmentPlans={odontogramTreatmentPlans}
-        />
+        {canSeeClinicalRecords && (
+          <OdontogramBoard
+            clinicId={membership.clinicId}
+            entries={chartEntries}
+            patientId={patient.id}
+            treatmentPlans={odontogramTreatmentPlans}
+          />
+        )}
 
-        <ClinicalRecordsPanel
-          clinicId={membership.clinicId}
-          patientId={patient.id}
-          records={clinicalRecords}
-          visits={treatmentVisitOptions}
-          odontogramEntries={chartEntries.map((entry) => ({
-            id: entry.id,
-            toothNumber: entry.toothNumber,
-            dentition: entry.dentition,
-            entryType: entry.entryType,
-            finding: entry.finding,
-          }))}
-        />
+        {canSeeClinicalRecords && (
+          <ClinicalRecordsPanel
+            clinicId={membership.clinicId}
+            patientId={patient.id}
+            records={clinicalRecords}
+            visits={treatmentVisitOptions}
+            odontogramEntries={chartEntries.map((entry) => ({
+              id: entry.id,
+              toothNumber: entry.toothNumber,
+              dentition: entry.dentition,
+              entryType: entry.entryType,
+              finding: entry.finding,
+            }))}
+          />
+        )}
 
-        <PrescriptionsPanel
-          catalogue={medicineCatalogue}
-          clinicId={membership.clinicId}
-          correctionSource={correctionSource}
-          initialVisitId={searchParams?.prescriptionVisitId}
-          patientId={patient.id}
-          patientName={patient.fullName}
-          prescriptions={prescriptions}
-          today={today}
-          visits={treatmentVisitOptions}
-        />
+        {canSeePrescriptions && (
+          <PrescriptionsPanel
+            catalogue={medicineCatalogue}
+            clinicId={membership.clinicId}
+            correctionSource={correctionSource}
+            initialVisitId={searchParams?.prescriptionVisitId}
+            patientId={patient.id}
+            patientName={patient.fullName}
+            prescriptions={prescriptions}
+            today={today}
+            visits={treatmentVisitOptions}
+          />
+        )}
 
-        <PatientEstimatesPanel
-          clinicId={membership.clinicId}
-          estimates={treatmentEstimates}
-          patientId={patient.id}
-        />
+        {canSeeFinancials && (
+          <PatientEstimatesPanel
+            clinicId={membership.clinicId}
+            estimates={treatmentEstimates}
+            patientId={patient.id}
+          />
+        )}
 
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Insurance policies
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Policy references are masked in this summary.
-              </p>
+        {canSeeInsurance && (
+          <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">
+                  Insurance policies
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Policy references are masked in this summary.
+                </p>
+              </div>
+              <Link
+                className="inline-flex min-h-9 items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-slate-50"
+                href={`/clinic/${membership.clinicId}/insurance/policies/new?patientId=${patient.id}`}
+              >
+                Add policy
+              </Link>
             </div>
-            <Link
-              className="inline-flex min-h-9 items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-slate-50"
-              href={`/clinic/${membership.clinicId}/insurance/policies/new?patientId=${patient.id}`}
-            >
-              Add policy
-            </Link>
-          </div>
-          {insurancePolicies.length ? (
-            <ul className="mt-4 divide-y divide-slate-100">
-              {insurancePolicies.map((policy) => {
-                const expired =
-                  policy.validUntil.toISOString().slice(0, 10) < today;
-                return (
-                  <li
-                    className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between"
-                    key={policy.id}
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">
-                        {policy.provider.name} ·{" "}
-                        {maskPolicyIdentifier(policy.policyNumber)}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        Valid through {dateFormatter.format(policy.validUntil)}
-                        {policy.coverageLimit
-                          ? ` · Limit ₹${Number(policy.coverageLimit).toLocaleString("en-IN")}`
-                          : ""}
-                        {policy.deductible !== null
-                          ? ` · Deductible ₹${Number(policy.deductible).toLocaleString("en-IN")}`
-                          : ""}
-                        {policy.coPaymentPercent !== null
-                          ? ` · Co-pay ${policy.coPaymentPercent.toString()}%`
-                          : ""}
-                      </p>
-                      {(policy.coverageNotes || policy.exclusions) && (
-                        <details className="mt-2 text-xs text-slate-600">
-                          <summary className="cursor-pointer font-medium text-teal-800">
-                            Coverage notes and exclusions
-                          </summary>
-                          {policy.coverageNotes && (
-                            <p className="mt-1 whitespace-pre-wrap">
-                              {policy.coverageNotes}
-                            </p>
-                          )}
-                          {policy.exclusions && (
-                            <p className="mt-1 whitespace-pre-wrap">
-                              Exclusions: {policy.exclusions}
-                            </p>
-                          )}
-                        </details>
-                      )}
-                    </div>
-                    <span
-                      className={
-                        expired
-                          ? "text-xs font-semibold text-red-700"
-                          : "text-xs font-semibold text-emerald-700"
-                      }
+            {insurancePolicies.length ? (
+              <ul className="mt-4 divide-y divide-slate-100">
+                {insurancePolicies.map((policy) => {
+                  const expired =
+                    policy.validUntil.toISOString().slice(0, 10) < today;
+                  return (
+                    <li
+                      className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      key={policy.id}
                     >
-                      {expired ? "Expired" : "Current"}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              No insurance policies are recorded for this patient.
-            </p>
-          )}
-          <Link
-            className="mt-4 inline-flex min-h-9 items-center text-sm font-medium text-teal-800 hover:underline"
-            href={`/clinic/${membership.clinicId}/insurance/claims?patientId=${patient.id}`}
-          >
-            View this patient&apos;s insurance claims
-          </Link>
-        </section>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">
+                          {policy.provider.name} ·{" "}
+                          {maskPolicyIdentifier(policy.policyNumber)}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Valid through{" "}
+                          {dateFormatter.format(policy.validUntil)}
+                          {policy.coverageLimit
+                            ? ` · Limit ₹${Number(policy.coverageLimit).toLocaleString("en-IN")}`
+                            : ""}
+                          {policy.deductible !== null
+                            ? ` · Deductible ₹${Number(policy.deductible).toLocaleString("en-IN")}`
+                            : ""}
+                          {policy.coPaymentPercent !== null
+                            ? ` · Co-pay ${policy.coPaymentPercent.toString()}%`
+                            : ""}
+                        </p>
+                        {(policy.coverageNotes || policy.exclusions) && (
+                          <details className="mt-2 text-xs text-slate-600">
+                            <summary className="cursor-pointer font-medium text-teal-800">
+                              Coverage notes and exclusions
+                            </summary>
+                            {policy.coverageNotes && (
+                              <p className="mt-1 whitespace-pre-wrap">
+                                {policy.coverageNotes}
+                              </p>
+                            )}
+                            {policy.exclusions && (
+                              <p className="mt-1 whitespace-pre-wrap">
+                                Exclusions: {policy.exclusions}
+                              </p>
+                            )}
+                          </details>
+                        )}
+                      </div>
+                      <span
+                        className={
+                          expired
+                            ? "text-xs font-semibold text-red-700"
+                            : "text-xs font-semibold text-emerald-700"
+                        }
+                      >
+                        {expired ? "Expired" : "Current"}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                No insurance policies are recorded for this patient.
+              </p>
+            )}
+            <Link
+              className="mt-4 inline-flex min-h-9 items-center text-sm font-medium text-teal-800 hover:underline"
+              href={`/clinic/${membership.clinicId}/insurance/claims?patientId=${patient.id}`}
+            >
+              View this patient&apos;s insurance claims
+            </Link>
+          </section>
+        )}
 
         <section
           aria-labelledby="patient-details-title"

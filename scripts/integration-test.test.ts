@@ -28,8 +28,8 @@ test("diagnostic command runs only the dedicated read-only diagnostic", async ()
     directUrl: "direct-url",
     supabaseUrl: "https://synthetic-test-project.supabase.co",
     anonKey: "synthetic-test-key",
-    runtimeTlsValidated: true,
-    runtimePoolerOptionsValidated: true,
+    runtimeTlsConfigured: true,
+    runtimePoolerOptionsConfigured: true,
   };
   const calls: string[] = [];
   let reportedIdentity = false;
@@ -66,8 +66,8 @@ test("migration diagnostic verifies the migration target and cannot migrate or r
     directUrl: "validated-migration-url",
     supabaseUrl: "https://synthetic-test-project.supabase.co",
     anonKey: "synthetic-test-key",
-    runtimeTlsValidated: true,
-    runtimePoolerOptionsValidated: true,
+    runtimeTlsConfigured: true,
+    runtimePoolerOptionsConfigured: true,
   };
   const calls: string[] = [];
   let reportedIdentity = false;
@@ -118,8 +118,8 @@ test("migration diagnostic reports only the failing stage and preserves safe err
     directUrl: "validated-migration-url",
     supabaseUrl: "https://synthetic-test-project.supabase.co",
     anonKey: "synthetic-test-key",
-    runtimeTlsValidated: true,
-    runtimePoolerOptionsValidated: true,
+    runtimeTlsConfigured: true,
+    runtimePoolerOptionsConfigured: true,
   };
   const runtimeError = new PrismaClientInitializationError(
     "Can't reach synthetic database host",
@@ -151,6 +151,12 @@ test("migration diagnostic reports only the failing stage and preserves safe err
     prismaCode: "none",
     networkCode: "none",
     cause: "server_unreachable",
+    errors: [
+      {
+        type: "PrismaClientInitializationError",
+        message: "Can't reach synthetic database host",
+      },
+    ],
     stage: "runtime_identity",
   });
 });
@@ -162,8 +168,8 @@ test("migration identity failures are distinguished from runtime identity failur
     directUrl: "validated-migration-url",
     supabaseUrl: "https://synthetic-test-project.supabase.co",
     anonKey: "synthetic-test-key",
-    runtimeTlsValidated: true,
-    runtimePoolerOptionsValidated: true,
+    runtimeTlsConfigured: true,
+    runtimePoolerOptionsConfigured: true,
   };
   const migrationError = new PrismaClientInitializationError(
     "Can't reach synthetic migration host",
@@ -209,8 +215,8 @@ test("integration suite failures are attributed to suite execution", async () =>
     directUrl: "validated-migration-url",
     supabaseUrl: "https://synthetic-test-project.supabase.co",
     anonKey: "synthetic-test-key",
-    runtimeTlsValidated: true,
-    runtimePoolerOptionsValidated: true,
+    runtimeTlsConfigured: true,
+    runtimePoolerOptionsConfigured: true,
   };
   const suiteError = new Error("Synthetic test process failure");
 
@@ -244,8 +250,8 @@ test("Schema Engine failures are distinguished from Prisma Client identity failu
     directUrl: "validated-migration-url",
     supabaseUrl: "https://synthetic-test-project.supabase.co",
     anonKey: "synthetic-test-key",
-    runtimeTlsValidated: true,
-    runtimePoolerOptionsValidated: true,
+    runtimeTlsConfigured: true,
+    runtimePoolerOptionsConfigured: true,
   };
   const engineError = new Error(
     "Prisma Schema Engine read-only diagnostic failed",
@@ -298,8 +304,8 @@ test("runtime observations expose only safe host shapes and fixed probe categori
   const observation = formatRuntimeEndpointObservation({
     host,
     port: 6543,
-    tlsValidated: true,
-    poolerOptionsValidated: true,
+    tlsConfigured: true,
+    poolerOptionsConfigured: true,
     dnsOutcome: "resolved",
     ipv4Count: 2,
     ipv6Count: 1,
@@ -309,7 +315,7 @@ test("runtime observations expose only safe host shapes and fixed probe categori
 
   assert.equal(
     observation,
-    "host=supabase-pooler port=6543 tls_validation=pass pooler_validation=pass dns=resolved ipv4=2 ipv6=1 tcp=connected addresses_tested=3",
+    "host=supabase-pooler port=6543 tls_url_configuration=pass pooler_url_configuration=pass dns=resolved ipv4=2 ipv6=1 tcp=connected addresses_tested=3",
   );
   for (const sensitiveValue of [
     host,
@@ -325,8 +331,8 @@ test("runtime observation formatting safely handles probe failures and unsafe va
   const observation = formatRuntimeEndpointObservation({
     host: "unknown-host.example.invalid",
     port: 6543,
-    tlsValidated: false,
-    poolerOptionsValidated: false,
+    tlsConfigured: false,
+    poolerOptionsConfigured: false,
     dnsOutcome: "getaddrinfo failed for secret-host",
     ipv4Count: -1,
     ipv6Count: Number.NaN,
@@ -336,7 +342,7 @@ test("runtime observation formatting safely handles probe failures and unsafe va
 
   assert.equal(
     observation,
-    "host=unrecognized-host port=6543 tls_validation=fail pooler_validation=fail dns=unknown ipv4=0 ipv6=0 tcp=unknown addresses_tested=0",
+    "host=unrecognized-host port=6543 tls_url_configuration=fail pooler_url_configuration=fail dns=unknown ipv4=0 ipv6=0 tcp=unknown addresses_tested=0",
   );
   assert.equal(observation.includes("secret-host"), false);
   assert.equal(observation.includes("password"), false);
@@ -428,7 +434,7 @@ test("classifies recognized message categories without returning message text", 
 
 test("classifies Prisma initialization messages without a Prisma error code or cause", () => {
   const error = new Prisma.PrismaClientInitializationError(
-    "Error querying the database: Connection timed out at ****** endpoint",
+    "Error querying the database: Connection timed out at synthetic-host:5432",
     "6.19.2",
   );
 
@@ -443,12 +449,17 @@ test("classifies Prisma initialization messages without a Prisma error code or c
     prismaCode: "none",
     networkCode: "none",
     cause: "tcp_timeout",
+    errors: [
+      {
+        type: "PrismaClientInitializationError",
+        message:
+          "Error querying the database: Connection timed out at [redacted-endpoint]",
+        metadata: { clientVersion: "6.19.2" },
+      },
+    ],
   });
-  assert.equal(
-    JSON.stringify(diagnostics).includes("Connection timed out"),
-    false,
-  );
-  assert.equal(JSON.stringify(diagnostics).includes("endpoint"), false);
+  assert.equal(JSON.stringify(diagnostics).includes("synthetic-host"), false);
+  assert.equal(JSON.stringify(diagnostics).includes(":5432"), false);
 });
 
 test("classifies safe codes on nested causes and defaults to unknown", () => {
@@ -489,6 +500,17 @@ test("extracts a nested connection cause without exposing error messages", () =>
     prismaCode: "none",
     networkCode: "ECONNREFUSED",
     cause: "connection_refused",
+    errors: [
+      {
+        type: "PrismaClientInitializationError",
+        message: "Can't reach database server at [redacted-url]",
+      },
+      {
+        type: "Error",
+        message: "connect ECONNREFUSED synthetic-host",
+        metadata: { code: "ECONNREFUSED" },
+      },
+    ],
   });
   assert.equal(
     JSON.stringify(diagnostics).includes("synthetic-password"),
@@ -547,7 +569,62 @@ test("extracts an allowlisted Prisma code from a nested cause", () => {
     prismaCode: "P1011",
     networkCode: "none",
     cause: "tls",
+    errors: [
+      {
+        type: "PrismaClientInitializationError",
+        message: "synthetic initialization failure",
+      },
+      {
+        type: "Error",
+        message: "synthetic Prisma cause",
+        metadata: { errorCode: "P1011" },
+      },
+    ],
   });
+});
+
+test("reports sanitized Prisma messages and safe metadata from nested errors", () => {
+  const nested = Object.assign(
+    new Error(
+      "password authentication failed for user postgres.synthetic-project",
+    ),
+    {
+      code: "28P01",
+      meta: {
+        database_error: "role postgres.synthetic-project does not exist",
+        database_url: "postgresql://synthetic-user:synthetic-password@db.invalid/postgres",
+        retryable: false,
+      },
+    },
+  );
+  const error = new PrismaClientInitializationError(
+    "Unable to connect using postgresql://synthetic-user:synthetic-password@db.invalid/postgres",
+    { cause: nested },
+  );
+
+  const diagnostics = safeErrorDiagnostics(error);
+  const serialized = JSON.stringify(diagnostics);
+
+  assert.equal(diagnostics.errors[0]?.message, "Unable to connect using [redacted-url]");
+  assert.equal(
+    diagnostics.errors[1]?.message,
+    "password authentication failed for user [redacted]",
+  );
+  assert.deepEqual(diagnostics.errors[1]?.metadata, {
+    code: "28P01",
+    meta: {
+      database_error: "role [redacted] does not exist",
+      retryable: false,
+    },
+  });
+  for (const secret of [
+    "synthetic-user",
+    "synthetic-password",
+    "db.invalid",
+    "postgresql://",
+  ]) {
+    assert.equal(serialized.includes(secret), false);
+  }
 });
 
 test("redacts URLs, usernames, passwords, tokens, API keys and supplied env values", () => {

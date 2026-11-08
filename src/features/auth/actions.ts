@@ -2,6 +2,7 @@
 
 import {
   ClinicInvitationStatus,
+  StaffJobTitle,
   ClinicRole,
   Prisma,
 } from "@prisma/client";
@@ -146,8 +147,16 @@ export async function inviteClinicStaffAction(
   formData: FormData,
 ): Promise<ClinicTeamActionState> {
   const clinicId = z.string().uuid().safeParse(formData.get("clinicId"));
-  const email = z.string().trim().email().max(254).safeParse(formData.get("email"));
-  if (!clinicId.success || !email.success) {
+  const email = z
+    .string()
+    .trim()
+    .email()
+    .max(254)
+    .safeParse(formData.get("email"));
+  const jobTitle = z
+    .nativeEnum(StaffJobTitle)
+    .safeParse(formData.get("jobTitle") ?? StaffJobTitle.RECEPTIONIST);
+  if (!clinicId.success || !email.success || !jobTitle.success) {
     return { error: "Enter a valid staff email address." };
   }
   const owner = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
@@ -190,16 +199,29 @@ export async function inviteClinicStaffAction(
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60_000);
   let invitationId: string;
   try {
-    const invitation = await prisma.clinicInvitation.create({
-      data: {
-        clinicId: owner.clinicId,
-        email: email.data,
-        normalizedEmail,
-        role: ClinicRole.STAFF,
-        invitedByUserId: owner.userId,
-        expiresAt,
-      },
-      select: { id: true },
+    const invitation = await prisma.$transaction(async (transaction) => {
+      const created = await transaction.clinicInvitation.create({
+        data: {
+          clinicId: owner.clinicId,
+          email: email.data,
+          normalizedEmail,
+          role: ClinicRole.STAFF,
+          jobTitle: jobTitle.data,
+          invitedByUserId: owner.userId,
+          expiresAt,
+        },
+        select: { id: true },
+      });
+      await transaction.clinicStaffAudit.create({
+        data: {
+          clinicId: owner.clinicId,
+          actorUserId: owner.userId,
+          targetEmail: email.data,
+          action: "INVITATION_SENT",
+          details: { jobTitle: jobTitle.data },
+        },
+      });
+      return created;
     });
     invitationId = invitation.id;
   } catch (error) {
@@ -215,10 +237,9 @@ export async function inviteClinicStaffAction(
 
   try {
     const supabase = createSupabaseAdminClient();
-    const { error } = await supabase.auth.admin.inviteUserByEmail(
-      email.data,
-      { redirectTo },
-    );
+    const { error } = await supabase.auth.admin.inviteUserByEmail(email.data, {
+      redirectTo,
+    });
     if (error) {
       await prisma.clinicInvitation.updateMany({
         where: { id: invitationId, status: ClinicInvitationStatus.PENDING },
@@ -229,7 +250,8 @@ export async function inviteClinicStaffAction(
         code: error.code,
       });
       return {
-        error: "The invitation email could not be sent. Check the email and try again.",
+        error:
+          "The invitation email could not be sent. Check the email and try again.",
       };
     }
   } catch (error) {
@@ -263,16 +285,41 @@ export async function removeClinicStaffAction(
   if (userId.data === owner.userId) {
     return { error: "You cannot remove your own owner access." };
   }
-  const removed = await prisma.clinicMembership.deleteMany({
+  const member = await prisma.clinicMembership.findFirst({
     where: {
       clinicId: owner.clinicId,
       userId: userId.data,
       role: ClinicRole.STAFF,
+      active: true,
     },
+    select: { userId: true },
   });
-  if (removed.count === 0) {
+  if (!member) {
     return { error: "This staff membership is no longer available." };
   }
+  await prisma.$transaction([
+    prisma.clinicMembership.updateMany({
+      where: {
+        clinicId: owner.clinicId,
+        userId: userId.data,
+        role: ClinicRole.STAFF,
+        active: true,
+      },
+      data: { active: false },
+    }),
+    prisma.clinicStaffProfile.updateMany({
+      where: { clinicId: owner.clinicId, userId: userId.data },
+      data: { active: false },
+    }),
+    prisma.clinicStaffAudit.create({
+      data: {
+        clinicId: owner.clinicId,
+        actorUserId: owner.userId,
+        targetUserId: userId.data,
+        action: "ACCESS_DEACTIVATED",
+      },
+    }),
+  ]);
   revalidatePath(`/clinic/${owner.clinicId}/settings/staff`);
   return { success: "Staff access removed." };
 }
@@ -282,22 +329,48 @@ export async function revokeClinicInvitationAction(
   formData: FormData,
 ): Promise<ClinicTeamActionState> {
   const clinicId = z.string().uuid().safeParse(formData.get("clinicId"));
-  const invitationId = z.string().uuid().safeParse(formData.get("invitationId"));
+  const invitationId = z
+    .string()
+    .uuid()
+    .safeParse(formData.get("invitationId"));
   if (!clinicId.success || !invitationId.success) {
     return { error: "Choose a valid pending invitation." };
   }
   const owner = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
-  const revoked = await prisma.clinicInvitation.updateMany({
+  const pendingInvitation = await prisma.clinicInvitation.findFirst({
     where: {
       id: invitationId.data,
       clinicId: owner.clinicId,
       status: ClinicInvitationStatus.PENDING,
     },
-    data: { status: ClinicInvitationStatus.REVOKED },
+    select: { email: true },
   });
-  if (revoked.count === 0) {
+  if (!pendingInvitation) {
     return { error: "This invitation is no longer pending." };
   }
+  const revoked = await prisma.$transaction(async (transaction) => {
+    const result = await transaction.clinicInvitation.updateMany({
+      where: {
+        id: invitationId.data,
+        clinicId: owner.clinicId,
+        status: ClinicInvitationStatus.PENDING,
+      },
+      data: { status: ClinicInvitationStatus.REVOKED },
+    });
+    if (result.count === 1) {
+      await transaction.clinicStaffAudit.create({
+        data: {
+          clinicId: owner.clinicId,
+          actorUserId: owner.userId,
+          targetEmail: pendingInvitation.email,
+          action: "INVITATION_REVOKED",
+        },
+      });
+    }
+    return result;
+  });
+  if (revoked.count === 0)
+    return { error: "This invitation is no longer pending." };
   revalidatePath(`/clinic/${owner.clinicId}/settings/staff`);
   return { success: "Invitation revoked. It will not grant clinic access." };
 }

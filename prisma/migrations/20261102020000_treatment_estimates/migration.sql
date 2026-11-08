@@ -237,7 +237,7 @@ DECLARE
   line_subtotal NUMERIC;
   matching_audit BOOLEAN;
   current_finalized_at TIMESTAMPTZ(6);
-  current_status "TreatmentEstimateStatus";
+  current_status public."TreatmentEstimateStatus";
 BEGIN
   SELECT estimate."finalizedAt", estimate."status"
     INTO current_finalized_at, current_status

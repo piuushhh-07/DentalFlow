@@ -1,10 +1,10 @@
 "use server";
 
-import { ClinicRole, Prisma } from "@prisma/client";
+import { ClinicPermission, ClinicRole, Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import {
   cancelClinicTreatmentPlan,
   createClinicTreatmentPlan,
@@ -72,7 +72,10 @@ export async function createTreatmentPlan(
     return { error: "The patient record could not be found." };
   }
 
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.TREATMENT_PLANS,
+  );
   const parsed = createTreatmentPlanSchema.safeParse({
     type: formData.get("type"),
     customName: formData.get("customName") ?? "",
@@ -122,7 +125,10 @@ export async function updateTreatmentPlan(
     return { error: "The treatment plan could not be found." };
   }
 
-  const membership = await requireClinicMembership(ids.clinicId.data);
+  const membership = await requireClinicPermission(
+    ids.clinicId.data,
+    ClinicPermission.TREATMENT_PLANS,
+  );
   const parsed = updateTreatmentPlanSchema.safeParse({
     type: formData.get("type"),
     customName: formData.get("customName") ?? "",
@@ -181,7 +187,10 @@ export async function updateTreatmentVisitStatus(
     return { error: "Choose a valid visit status." };
   }
 
-  const membership = await requireClinicMembership(ids.clinicId.data);
+  const membership = await requireClinicPermission(
+    ids.clinicId.data,
+    ClinicPermission.TREATMENT_PLANS,
+  );
   try {
     await updateClinicTreatmentVisitStatus(
       membership.clinicId,
@@ -230,7 +239,10 @@ export async function rescheduleTreatmentVisit(
     };
   }
 
-  const membership = await requireClinicMembership(ids.clinicId.data);
+  const membership = await requireClinicPermission(
+    ids.clinicId.data,
+    ClinicPermission.TREATMENT_PLANS,
+  );
   try {
     await rescheduleClinicTreatmentVisit(
       membership.clinicId,
@@ -267,7 +279,10 @@ export async function cancelTreatmentPlan(
     return { error: "The treatment plan could not be found." };
   }
 
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.TREATMENT_PLANS,
+  );
   try {
     await cancelClinicTreatmentPlan(
       membership.clinicId,
@@ -322,7 +337,10 @@ export async function recordFinancialEntry(
 
   const membership =
     parsed.data.entryType === "PAYMENT"
-      ? await requireClinicMembership(clinicId.data)
+      ? await requireClinicPermission(
+          clinicId.data,
+          ClinicPermission.FINANCIAL_RECORDS,
+        )
       : await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
   try {
     await createTreatmentPlanFinancialEntry(

@@ -1,3 +1,4 @@
+import { ClinicPermission } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Search } from "lucide-react";
@@ -6,7 +7,7 @@ import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import { formatIndianPhoneNumber } from "@/features/patients/lib/patient-validation";
 import { InsuranceNavigation } from "@/features/insurance/components/insurance-navigation";
 import { PreAuthorizationForm } from "@/features/insurance/components/pre-authorization-form";
@@ -31,7 +32,10 @@ export default async function NewPreAuthorizationPage({
   if (!clinicId.success) notFound();
   let membership;
   try {
-    membership = await requireClinicMembership(clinicId.data);
+    membership = await requireClinicPermission(
+      clinicId.data,
+      ClinicPermission.INSURANCE,
+    );
   } catch (error) {
     if (error instanceof ClinicAccessDeniedError) notFound();
     throw error;

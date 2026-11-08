@@ -10,10 +10,14 @@ import {
   UsersRound,
 } from "lucide-react";
 import { z } from "zod";
+import { ClinicPermission } from "@prisma/client";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import {
+  ClinicAccessDeniedError,
+  ClinicPermissionDeniedError,
+} from "@/features/auth/lib/authorization";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import { getClinicReportMetrics } from "@/features/reports/lib/report-repository";
 import {
   formatReportDateRange,
@@ -35,9 +39,17 @@ export default async function ClinicReportsPage({
 
   let membership;
   try {
-    membership = await requireClinicMembership(parsedClinicId.data);
+    membership = await requireClinicPermission(
+      parsedClinicId.data,
+      ClinicPermission.REPORTS,
+    );
   } catch (error) {
-    if (error instanceof ClinicAccessDeniedError) notFound();
+    if (
+      error instanceof ClinicAccessDeniedError ||
+      error instanceof ClinicPermissionDeniedError
+    ) {
+      notFound();
+    }
     throw error;
   }
 

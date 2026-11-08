@@ -22,8 +22,8 @@ type TestDatabaseConfig = Readonly<{
   directUrl: string;
   supabaseUrl: string;
   anonKey: string;
-  runtimeTlsValidated: boolean;
-  runtimePoolerOptionsValidated: boolean;
+  runtimeTlsConfigured: boolean;
+  runtimePoolerOptionsConfigured: boolean;
 }>;
 
 type DatabaseIdentity = Readonly<{
@@ -312,11 +312,74 @@ export function sanitizeDiagnosticMessage(
   return sanitized.slice(0, 1200);
 }
 
+const sensitiveMetadataKey =
+  /(?:password|passwd|secret|token|api.?key|anon.?key|service.?role|credential|connection.?string|database.?url|direct.?url|username|user)/i;
+
+function sanitizeMetadataValue(value: unknown, depth = 0): unknown {
+  if (value === null || typeof value === "boolean" || typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "string") {
+    return sanitizeDiagnosticMessage(value);
+  }
+  if (depth >= 3 || typeof value !== "object") return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 20)
+      .map((item) => sanitizeMetadataValue(item, depth + 1))
+      .filter((item) => item !== undefined);
+  }
+
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, descriptor] of Object.entries(
+    Object.getOwnPropertyDescriptors(value),
+  ).slice(0, 20)) {
+    if (sensitiveMetadataKey.test(key) || !("value" in descriptor)) continue;
+    const item = sanitizeMetadataValue(descriptor.value, depth + 1);
+    if (item !== undefined) sanitized[key] = item;
+  }
+  return sanitized;
+}
+
+function safeErrorDetails(error: unknown): ReadonlyArray<
+  Readonly<{
+    type: string;
+    message?: string;
+    metadata?: Readonly<Record<string, unknown>>;
+  }>
+> {
+  return errorChain(error).map((item) => {
+    const message = readOwnDataProperty(item, "message");
+    const metadata: Record<string, unknown> = {};
+    for (const key of [
+      "code",
+      "errorCode",
+      "clientVersion",
+      "batchRequestIdx",
+      "meta",
+    ]) {
+      const value = readOwnDataProperty(item, key);
+      if (value === undefined) continue;
+      const sanitized = sanitizeMetadataValue(value);
+      if (sanitized !== undefined) metadata[key] = sanitized;
+    }
+
+    return {
+      type: safeErrorType(item),
+      ...(typeof message === "string"
+        ? { message: sanitizeDiagnosticMessage(message) }
+        : {}),
+      ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+    };
+  });
+}
+
 export function safeErrorDiagnostics(error: unknown): Readonly<{
   type: string;
   prismaCode: string;
   networkCode: string;
   cause: string;
+  errors: ReturnType<typeof safeErrorDetails>;
   stage?: DiagnosticStage;
 }> {
   const stage =
@@ -328,6 +391,7 @@ export function safeErrorDiagnostics(error: unknown): Readonly<{
     prismaCode: prismaErrorCode(error),
     networkCode: underlyingNetworkCode(error),
     cause: classifyErrorCause(error),
+    errors: safeErrorDetails(error),
     ...(stage ? { stage } : {}),
   };
 }
@@ -339,7 +403,7 @@ function reportSetupFailure(error: unknown): void {
       ? "Integration test suite failed"
       : "Integration test setup failed";
   console.error(
-    `${failureType} (type=${diagnostics.type}; prismaCode=${diagnostics.prismaCode}; networkCode=${diagnostics.networkCode}; cause=${diagnostics.cause}${diagnostics.stage ? `; stage=${diagnostics.stage}` : ""}).`,
+    `${failureType} (type=${diagnostics.type}; prismaCode=${diagnostics.prismaCode}; networkCode=${diagnostics.networkCode}; cause=${diagnostics.cause}${diagnostics.stage ? `; stage=${diagnostics.stage}` : ""}; errors=${JSON.stringify(diagnostics.errors)}).`,
   );
 }
 
@@ -505,12 +569,12 @@ function loadAndValidateTestConfig(): TestDatabaseConfig {
   const directUrl = required("DENTALFLOW_TEST_DIRECT_URL");
   const runtimeIdentity = connectionIdentity(databaseUrl);
   const directIdentity = connectionIdentity(directUrl);
-  const runtimeTlsValidated = hasSingleQueryValue(
+  const runtimeTlsConfigured = hasSingleQueryValue(
     runtimeIdentity.query,
     "sslmode",
     "require",
   );
-  const runtimePoolerOptionsValidated =
+  const runtimePoolerOptionsConfigured =
     runtimeIdentity.port === "6543" &&
     runtimeIdentity.host.endsWith(".pooler.supabase.com") &&
     hasSingleQueryValue(runtimeIdentity.query, "pgbouncer", "true") &&
@@ -537,7 +601,7 @@ function loadAndValidateTestConfig(): TestDatabaseConfig {
     }
   }
 
-  if (!runtimeTlsValidated || !runtimePoolerOptionsValidated) {
+  if (!runtimeTlsConfigured || !runtimePoolerOptionsConfigured) {
     throw new IntegrationTestError(
       "The test runtime URL must use the Supabase transaction pooler on port 6543 with pgbouncer=true, connection_limit=1, and sslmode=require.",
     );
@@ -619,8 +683,8 @@ function loadAndValidateTestConfig(): TestDatabaseConfig {
     directUrl,
     supabaseUrl,
     anonKey: required("DENTALFLOW_TEST_SUPABASE_ANON_KEY"),
-    runtimeTlsValidated,
-    runtimePoolerOptionsValidated,
+    runtimeTlsConfigured,
+    runtimePoolerOptionsConfigured,
   };
 }
 
@@ -747,8 +811,8 @@ export function formatRuntimeEndpointObservation(
   input: Readonly<{
     host: string;
     port: number;
-    tlsValidated: boolean;
-    poolerOptionsValidated: boolean;
+    tlsConfigured: boolean;
+    poolerOptionsConfigured: boolean;
     dnsOutcome: string;
     ipv4Count: number;
     ipv6Count: number;
@@ -779,8 +843,8 @@ export function formatRuntimeEndpointObservation(
   return [
     `host=${safeEndpointHostIdentifier(input.host)}`,
     `port=${Number.isInteger(input.port) && input.port > 0 && input.port <= 65535 ? input.port : "unknown"}`,
-    `tls_validation=${input.tlsValidated ? "pass" : "fail"}`,
-    `pooler_validation=${input.poolerOptionsValidated ? "pass" : "fail"}`,
+    `tls_url_configuration=${input.tlsConfigured ? "pass" : "fail"}`,
+    `pooler_url_configuration=${input.poolerOptionsConfigured ? "pass" : "fail"}`,
     `dns=${safeDnsOutcomes.has(input.dnsOutcome) ? input.dnsOutcome : "unknown"}`,
     `ipv4=${safeCount(input.ipv4Count)}`,
     `ipv6=${safeCount(input.ipv6Count)}`,
@@ -817,8 +881,8 @@ async function reportRuntimeEndpointObservation(
     `Connection diagnostic runtime: ${formatRuntimeEndpointObservation({
       host: endpoint.host,
       port: endpoint.port,
-      tlsValidated: config.runtimeTlsValidated,
-      poolerOptionsValidated: config.runtimePoolerOptionsValidated,
+      tlsConfigured: config.runtimeTlsConfigured,
+      poolerOptionsConfigured: config.runtimePoolerOptionsConfigured,
       dnsOutcome: dns.errorCode ?? "resolved",
       ipv4Count: dns.addresses.filter(({ family }) => family === 4).length,
       ipv6Count: dns.addresses.filter(({ family }) => family === 6).length,

@@ -4,7 +4,8 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { ClinicPermission } from "@prisma/client";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import {
   createPatientOdontogramEntry,
   OdontogramCorrectionConflictError,
@@ -43,7 +44,10 @@ export async function recordOdontogramEntry(
     return { error: "The patient record could not be found." };
   }
 
-  const membership = await requireClinicMembership(clinicId.data);
+  const membership = await requireClinicPermission(
+    clinicId.data,
+    ClinicPermission.CLINICAL_RECORDS,
+  );
   const parsed = odontogramEntrySchema.safeParse({
     toothNumber: formData.get("toothNumber"),
     dentition: formData.get("dentition"),

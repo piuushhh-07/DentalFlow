@@ -1,10 +1,10 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
+import { ClinicPermission, Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { requireClinicPermission } from "@/features/auth/lib/server-auth";
 import {
   BillingAccessRestrictedError,
   BillingLimitReachedError,
@@ -67,7 +67,10 @@ export async function createPatient(
     return { error: "Select a valid clinic and try again." };
   }
 
-  const membership = await requireClinicMembership(requestedClinicId.data);
+  const membership = await requireClinicPermission(
+    requestedClinicId.data,
+    ClinicPermission.PATIENT_EDIT,
+  );
   const parsed = readPatientInput(formData);
 
   if (!parsed.success) {
@@ -128,7 +131,10 @@ export async function updatePatient(
     return { error: "This patient record could not be found." };
   }
 
-  const membership = await requireClinicMembership(requestedClinicId.data);
+  const membership = await requireClinicPermission(
+    requestedClinicId.data,
+    ClinicPermission.PATIENT_EDIT,
+  );
   const parsed = readPatientInput(formData);
 
   if (!parsed.success) {
@@ -182,7 +188,10 @@ export async function deletePatient(
     return { error: "This patient record could not be found." };
   }
 
-  const membership = await requireClinicMembership(requestedClinicId.data);
+  const membership = await requireClinicPermission(
+    requestedClinicId.data,
+    ClinicPermission.PATIENT_EDIT,
+  );
 
   try {
     const deleted = await deleteClinicPatient(
@@ -226,7 +235,9 @@ export async function requestPatientPortalMagicLink(
       : undefined);
   if (!siteUrl) {
     console.error("Patient portal magic link requires NEXT_PUBLIC_SITE_URL.");
-    return { error: "Patient portal sign-in is not configured. Contact the clinic." };
+    return {
+      error: "Patient portal sign-in is not configured. Contact the clinic.",
+    };
   }
 
   let redirectTo: string;
@@ -236,7 +247,9 @@ export async function requestPatientPortalMagicLink(
     console.error("Patient portal site URL is invalid.", {
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
-    return { error: "Patient portal sign-in is not configured. Contact the clinic." };
+    return {
+      error: "Patient portal sign-in is not configured. Contact the clinic.",
+    };
   }
 
   const supabase = await createSupabaseServerActionClient();
@@ -249,7 +262,9 @@ export async function requestPatientPortalMagicLink(
       status: error.status,
       code: error.code,
     });
-    return { error: "We couldn't send a sign-in link. Please try again later." };
+    return {
+      error: "We couldn't send a sign-in link. Please try again later.",
+    };
   }
 
   return {
