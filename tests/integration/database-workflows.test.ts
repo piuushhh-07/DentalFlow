@@ -1179,6 +1179,19 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.equal(
         await updateClinicPatient(clinicAId, patientB.id, patientInput),
         false,
+        "Clinic A cannot update a patient owned by clinic B.",
+      );
+      assert.equal(
+        await deleteClinicPatient(clinicAId, patientB.id),
+        false,
+        "Clinic A cannot delete a patient owned by clinic B.",
+      );
+      assert.ok(
+        await freshReader.patient.findFirst({
+          where: { id: patientB.id, clinicId: clinicBId },
+          select: { id: true },
+        }),
+        "A denied cross-clinic delete must leave the clinic B patient intact.",
       );
       await assert.rejects(
         createClinicTreatmentPlan(clinicAId, patientB.id, planInput),
