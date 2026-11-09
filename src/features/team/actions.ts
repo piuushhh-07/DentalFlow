@@ -140,8 +140,6 @@ export async function changeClinicMemberRole(
   return mutateMembership(formData, "change-role");
 }
 
-export async function removeClinicMember(
-  formData: FormData,
-): Promise<never> {
+export async function removeClinicMember(formData: FormData): Promise<never> {
   return mutateMembership(formData, "remove");
 }
