@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
-import { validateMembershipMutation } from "@/features/team/lib/team-management";
+import {
+  validateMembershipMutation,
+} from "@/features/team/lib/team-management";
 import { prisma } from "@/lib/db/prisma";
 
 type TeamActionStatus =
