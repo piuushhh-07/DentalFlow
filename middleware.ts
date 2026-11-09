@@ -6,18 +6,15 @@ import { isLocalDemoEnabled } from "@/features/demo/lib/demo-mode";
 import { getSupabasePublicEnvironment } from "@/lib/supabase/config";
 
 export async function middleware(request: NextRequest) {
-  const isDemoRoute =
-    request.nextUrl.pathname === "/demo" ||
-    request.nextUrl.pathname.startsWith("/demo/");
+  const pathname = request.nextUrl.pathname;
+  const isDemoRoute = pathname === "/demo" || pathname.startsWith("/demo/");
   const isPublicBookingRoute =
-    request.nextUrl.pathname === "/book" ||
-    request.nextUrl.pathname.startsWith("/book/");
+    pathname === "/book" || pathname.startsWith("/book/");
   const isPatientPortalRoute =
-    request.nextUrl.pathname === "/portal" ||
-    request.nextUrl.pathname.startsWith("/portal/");
-  const isAuthCallbackRoute = request.nextUrl.pathname === "/auth/callback";
-  const isWhatsAppReminderJob =
-    request.nextUrl.pathname === "/api/cron/whatsapp-reminders";
+    pathname === "/portal" || pathname.startsWith("/portal/");
+  const isAuthCallbackRoute = pathname === "/auth/callback";
+  const isWhatsAppReminderJob = pathname === "/api/cron/whatsapp-reminders";
+
   if (isDemoRoute) {
     if (
       isLocalDemoEnabled(
@@ -28,6 +25,17 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
     return new NextResponse(null, { status: 404 });
+  }
+
+  // These routes implement their own access checks (or are intentionally
+  // public), so avoid creating a Supabase client for them in middleware.
+  if (
+    isPublicBookingRoute ||
+    isPatientPortalRoute ||
+    isAuthCallbackRoute ||
+    isWhatsAppReminderJob
+  ) {
+    return NextResponse.next();
   }
 
   const environment = getSupabasePublicEnvironment();
@@ -60,8 +68,11 @@ export async function middleware(request: NextRequest) {
   let error: unknown = null;
 
   try {
-    const result = await supabase.auth.getUser();
-    user = result.data.user;
+    // Middleware uses the cookie-backed session only for redirect UX.
+    // Protected pages, route handlers, and server actions must still verify
+    // the user with auth.getUser() before accessing clinic data.
+    const result = await supabase.auth.getSession();
+    user = result.data.session?.user ?? null;
     error = result.error;
   } catch (authError) {
     error = authError;
@@ -72,16 +83,7 @@ export async function middleware(request: NextRequest) {
     error = null;
   }
 
-  if (
-    isPublicBookingRoute ||
-    isPatientPortalRoute ||
-    isAuthCallbackRoute ||
-    isWhatsAppReminderJob
-  ) {
-    return response;
-  }
-
-  const isLoginPage = request.nextUrl.pathname === "/login";
+  const isLoginPage = pathname === "/login";
 
   if (error) {
     if (isLoginPage) {
