@@ -9,24 +9,24 @@ This matrix defines the least-privilege baseline for clinic membership roles. Au
 
 ## Permission matrix
 
-| Capability | OWNER | STAFF | Enforcement notes |
-|---|---:|---:|---|
-| Open clinic workspace and read clinic records | Allow | Allow | Require an active membership for the requested clinic on every server read. |
-| Create and update patient demographics / contact details | Allow | Allow | Scope every query by the verified clinic ID. |
-| Delete a patient | Allow | Deny | OWNER-only. This is now enforced in `deletePatient`; retain clinical-history safeguards. Prefer archival/retention workflows over deletion for real clinical records. |
-| Read/update medical history and odontogram | Allow | Allow | Membership required; preserve actor attribution and record history. |
-| Create/update treatment plans and visits; reschedule/cancel visits | Allow | Allow | Membership required; verify patient, plan, and visit all belong to the same clinic. |
-| Create and amend prescriptions | Allow | Allow | Existing action explicitly requires OWNER or STAFF; retain author identity and amendment history. |
-| Create/update estimates and record financial entries | Allow | Allow | Existing estimate action accepts OWNER/STAFF; financial operations need immutable/auditable corrections. |
-| Create/update appointments and status | Allow | Allow | Membership required; patient and linked visit must be clinic-scoped. |
-| Manage recalls and follow-ups | Allow | Allow | Membership required; prevent cross-clinic patient/recall IDs. |
-| Process insurance policies, claims, documents, and payments | Allow | Allow | Membership required; private document access must independently enforce clinic and document ownership. |
-| Record consent-gated manual WhatsApp reminders | Allow | Allow | Membership required; never represent a manual confirmation as provider-verified delivery. |
-| Edit/reset clinic WhatsApp templates | Allow | Deny | Existing action is OWNER-only. |
-| Manage clinic treatment catalogue / activate or archive catalogue items | Allow | Deny | Existing catalogue status action is OWNER-only. |
-| Manage staff membership, role assignments, invitations, and offboarding | Allow | Deny | Owner-only when implemented; protect last-owner and self-removal cases. No assumption that a UI-only control is secure. |
-| Manage subscription, plan, and billing settings | Allow | Deny | Existing billing actions are designed as OWNER-only. Webhooks remain server-to-server and are not clinic-role actions. |
-| Platform-wide administration or support access | Deny | Deny | Neither clinic role grants platform-operator privileges. Use a separate audited support identity/workflow if introduced. |
+| Capability                                                              | OWNER | STAFF | Enforcement notes                                                                                                                                                     |
+|-----------------------------------------------------------------------|----:|----:|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Open clinic workspace and read clinic records                           | Allow | Allow | Require an active membership for the requested clinic on every server read.                                                                                           |
+| Create and update patient demographics / contact details                | Allow | Allow | Scope every query by the verified clinic ID.                                                                                                                          |
+| Delete a patient                                                        | Allow | Deny  | OWNER-only. This is now enforced in `deletePatient`; retain clinical-history safeguards. Prefer archival/retention workflows over deletion for real clinical records. |
+| Read/update medical history and odontogram                              | Allow | Allow | Membership required; preserve actor attribution and record history.                                                                                                   |
+| Create/update treatment plans and visits; reschedule/cancel visits      | Allow | Allow | Membership required; verify patient, plan, and visit all belong to the same clinic.                                                                                   |
+| Create and amend prescriptions                                          | Allow | Allow | Existing action explicitly requires OWNER or STAFF; retain author identity and amendment history.                                                                     |
+| Create/update estimates and record financial entries                    | Allow | Allow | Existing estimate action accepts OWNER/STAFF; financial operations need immutable/auditable corrections.                                                              |
+| Create/update appointments and status                                   | Allow | Allow | Membership required; patient and linked visit must be clinic-scoped.                                                                                                  |
+| Manage recalls and follow-ups                                           | Allow | Allow | Membership required; prevent cross-clinic patient/recall IDs.                                                                                                         |
+| Process insurance policies, claims, documents, and payments             | Allow | Allow | Membership required; private document access must independently enforce clinic and document ownership.                                                                |
+| Record consent-gated manual WhatsApp reminders                          | Allow | Allow | Membership required; never represent a manual confirmation as provider-verified delivery.                                                                             |
+| Edit/reset clinic WhatsApp templates                                    | Allow | Deny  | Existing action is OWNER-only.                                                                                                                                        |
+| Manage clinic treatment catalogue / activate or archive catalogue items | Allow | Deny  | Existing catalogue status action is OWNER-only.                                                                                                                       |
+| Manage staff membership, role assignments, invitations, and offboarding | Allow | Deny  | Owner-only when implemented; protect last-owner and self-removal cases. No assumption that a UI-only control is secure.                                               |
+| Manage subscription, plan, and billing settings                         | Allow | Deny  | Existing billing actions are designed as OWNER-only. Webhooks remain server-to-server and are not clinic-role actions.                                                |
+| Platform-wide administration or support access                          | Deny  | Deny  | Neither clinic role grants platform-operator privileges. Use a separate audited support identity/workflow if introduced.                                              |
 
 ## Implementation status and guardrails
 
