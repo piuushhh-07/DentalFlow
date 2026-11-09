@@ -25,10 +25,26 @@ import {
   canTransitionAppointment,
   type AppointmentInput,
 } from "@/features/appointments/lib/appointment-validation";
+import {
+  getPublicAppointmentRateLimitConfig,
+  isPublicAppointmentRequestRateLimited,
+} from "@/features/appointments/lib/appointment-rate-limit";
+import {
+  getPublicBookingPhoneLockKey,
+  isDuplicatePublicBookingRequest,
+  PUBLIC_BOOKING_IDEMPOTENCY_WINDOW_MS,
+} from "@/features/appointments/lib/public-booking-idempotency";
 
 export class AppointmentPatientNotFoundError extends Error {}
 export class AppointmentVisitNotFoundError extends Error {}
 export class AppointmentResourceNotFoundError extends Error {}
+export class ScheduleResourceDuplicateError extends Error {
+  constructor() {
+    super("A schedule resource with this name already exists in this clinic.");
+    this.name = "ScheduleResourceDuplicateError";
+  }
+}
+export class ScheduleResourceNotFoundError extends Error {}
 export class AppointmentRequestNotFoundError extends Error {}
 export class AppointmentRequestConflictError extends Error {}
 export class AppointmentRequestRateLimitError extends Error {}
@@ -99,6 +115,8 @@ async function assertNoSchedulingConflict(
           id: true,
           scheduledAt: true,
           durationMinutes: true,
+          dentistId: true,
+          chairId: true,
           dentistName: true,
           chairLabel: true,
           status: true,
@@ -111,6 +129,8 @@ async function assertNoSchedulingConflict(
         id: excludeId,
         startAt,
         durationMinutes: input.durationMinutes,
+        dentistId: input.dentistId,
+        chairId: input.chairId,
         dentistName: resources.dentistName,
         chairLabel: resources.chairLabel,
       },
@@ -355,6 +375,22 @@ export async function listAppointmentResources(clinicId: string) {
   return { dentists, chairs };
 }
 
+export async function listScheduleResources(clinicId: string) {
+  const [dentists, chairs] = await Promise.all([
+    prisma.clinicDentist.findMany({
+      where: { clinicId },
+      orderBy: [{ active: "desc" }, { name: "asc" }],
+      select: { id: true, name: true, active: true },
+    }),
+    prisma.treatmentChair.findMany({
+      where: { clinicId },
+      orderBy: [{ active: "desc" }, { label: "asc" }],
+      select: { id: true, label: true, active: true },
+    }),
+  ]);
+  return { dentists, chairs };
+}
+
 export async function getPublicBookingClinic(slug: string) {
   return prisma.clinic.findFirst({
     where: { publicBookingSlug: slug, publicBookingEnabled: true },
@@ -395,7 +431,9 @@ export async function setPublicBookingEnabled(
     data: { publicBookingEnabled: enabled },
   });
   if (result.count !== 1) {
-    throw new Error("The clinic could not be found while updating booking settings.");
+    throw new Error(
+      "The clinic could not be found while updating booking settings.",
+    );
   }
 }
 
@@ -421,6 +459,10 @@ export async function createPublicAppointmentRequest(
     notes: string | null;
   }>,
 ) {
+  const rateLimit = getPublicAppointmentRateLimitConfig(
+    process.env.PUBLIC_APPOINTMENT_RATE_LIMIT_MAX_REQUESTS,
+    process.env.PUBLIC_APPOINTMENT_RATE_LIMIT_WINDOW_MINUTES,
+  );
   const startAt = input.requestedAt;
   const endAt = new Date(startAt.getTime() + 30 * 60_000);
   const overlapStart = new Date(startAt.getTime() - 8 * 60 * 60_000);
@@ -436,84 +478,143 @@ export async function createPublicAppointmentRequest(
   ]);
   if (!dentist || !chair) throw new AppointmentResourceNotFoundError();
 
-  return prisma.$transaction(
-    async (transaction) => {
-      const recentRequestCount = await transaction.appointmentRequest.count({
-        where: {
-          clinicId,
-          phoneNumber: input.phoneNumber,
-          createdAt: { gte: new Date(Date.now() - 60 * 60_000) },
-        },
-      });
-      if (recentRequestCount >= 3) {
-        throw new AppointmentRequestRateLimitError();
-      }
-
-      const [appointments, requests] = await Promise.all([
-        transaction.appointment.findMany({
-          where: {
-            clinicId,
-            status: { notIn: [...INACTIVE_STATUSES] },
-            scheduledAt: { gte: overlapStart, lt: endAt },
-            OR: [{ dentistId: dentist.id }, { chairId: chair.id }],
-          },
-          select: {
-            id: true,
-            scheduledAt: true,
-            durationMinutes: true,
-            dentistName: true,
-            chairLabel: true,
-            status: true,
-          },
-        }),
-        transaction.appointmentRequest.findMany({
-          where: {
-            clinicId,
-            status: AppointmentRequestStatus.PENDING,
-            requestedAt: { gte: overlapStart, lt: endAt },
-            OR: [{ dentistId: dentist.id }, { chairId: chair.id }],
-          },
-          select: {
-            requestedAt: true,
-            durationMinutes: true,
-            dentistId: true,
-            chairId: true,
-          },
-        }),
-      ]);
-      const overlaps = (otherStart: Date, otherDuration: number) =>
-        startAt.getTime() < otherStart.getTime() + otherDuration * 60_000 &&
-        otherStart.getTime() < endAt.getTime();
-      if (
-        appointments.some((appointment) =>
-          overlaps(appointment.scheduledAt, appointment.durationMinutes),
-        ) ||
-        requests.some(
-          (request) =>
-            (request.dentistId === dentist.id || request.chairId === chair.id) &&
-            overlaps(request.requestedAt, request.durationMinutes),
-        )
-      ) {
-        throw new AppointmentRequestConflictError();
-      }
-
-      return transaction.appointmentRequest.create({
-        data: {
-          clinicId,
-          patientName: input.patientName,
-          phoneNumber: input.phoneNumber,
-          requestedAt: startAt,
-          durationMinutes: 30,
-          type: "Consultation",
-          dentistId: dentist.id,
-          chairId: chair.id,
-          notes: input.notes,
-        },
-        select: { id: true },
-      });
-    },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  const now = new Date();
+  const idempotencyCutoff = new Date(
+    now.getTime() - PUBLIC_BOOKING_IDEMPOTENCY_WINDOW_MS,
   );
+  const phoneLockKey = getPublicBookingPhoneLockKey(
+    clinicId,
+    input.phoneNumber,
+  );
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (transaction) => {
+          await transaction.$queryRaw`
+            SELECT pg_advisory_xact_lock(hashtext(${phoneLockKey}))
+          `;
+
+          const recentRequests = await transaction.appointmentRequest.findMany({
+            where: {
+              clinicId,
+              phoneNumber: input.phoneNumber,
+              requestedAt: startAt,
+              status: AppointmentRequestStatus.PENDING,
+              createdAt: { gte: idempotencyCutoff, lte: now },
+            },
+            select: {
+              id: true,
+              clinicId: true,
+              patientName: true,
+              phoneNumber: true,
+              requestedAt: true,
+              dentistId: true,
+              chairId: true,
+              notes: true,
+              createdAt: true,
+            },
+          });
+          const duplicate = recentRequests.find((request) =>
+            isDuplicatePublicBookingRequest(request, clinicId, input, now),
+          );
+          if (duplicate) return { id: duplicate.id };
+
+          const recentRequestCount = await transaction.appointmentRequest.count(
+            {
+              where: {
+                clinicId,
+                phoneNumber: input.phoneNumber,
+                createdAt: {
+                  gte: new Date(Date.now() - rateLimit.windowMinutes * 60_000),
+                },
+              },
+            },
+          );
+          if (
+            isPublicAppointmentRequestRateLimited(
+              recentRequestCount,
+              rateLimit.maxRequests,
+            )
+          ) {
+            throw new AppointmentRequestRateLimitError();
+          }
+
+          const [appointments, requests] = await Promise.all([
+            transaction.appointment.findMany({
+              where: {
+                clinicId,
+                status: { notIn: [...INACTIVE_STATUSES] },
+                scheduledAt: { gte: overlapStart, lt: endAt },
+                OR: [{ dentistId: dentist.id }, { chairId: chair.id }],
+              },
+              select: {
+                id: true,
+                scheduledAt: true,
+                durationMinutes: true,
+                dentistId: true,
+                chairId: true,
+                dentistName: true,
+                chairLabel: true,
+                status: true,
+              },
+            }),
+            transaction.appointmentRequest.findMany({
+              where: {
+                clinicId,
+                status: AppointmentRequestStatus.PENDING,
+                requestedAt: { gte: overlapStart, lt: endAt },
+                OR: [{ dentistId: dentist.id }, { chairId: chair.id }],
+              },
+              select: {
+                requestedAt: true,
+                durationMinutes: true,
+                dentistId: true,
+                chairId: true,
+              },
+            }),
+          ]);
+          const overlaps = (otherStart: Date, otherDuration: number) =>
+            startAt.getTime() < otherStart.getTime() + otherDuration * 60_000 &&
+            otherStart.getTime() < endAt.getTime();
+          if (
+            appointments.some((appointment) =>
+              overlaps(appointment.scheduledAt, appointment.durationMinutes),
+            ) ||
+            requests.some(
+              (request) =>
+                (request.dentistId === dentist.id ||
+                  request.chairId === chair.id) &&
+                overlaps(request.requestedAt, request.durationMinutes),
+            )
+          ) {
+            throw new AppointmentRequestConflictError();
+          }
+
+          return transaction.appointmentRequest.create({
+            data: {
+              clinicId,
+              patientName: input.patientName,
+              phoneNumber: input.phoneNumber,
+              requestedAt: startAt,
+              durationMinutes: 30,
+              type: "Consultation",
+              dentistId: dentist.id,
+              chairId: chair.id,
+              notes: input.notes,
+            },
+            select: { id: true },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (attempt === 0 && isSerializationFailure(error)) continue;
+      throw error;
+    }
+  }
+
+  throw new Error("Public appointment request retry limit exceeded.");
 }
 
 export async function rejectAppointmentRequest(
@@ -654,15 +755,87 @@ export async function createScheduleResource(
   name: string,
 ) {
   if (kind === "dentist") {
+    const duplicate = await prisma.clinicDentist.findFirst({
+      where: { clinicId, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicate) throw new ScheduleResourceDuplicateError();
     return prisma.clinicDentist.create({
       data: { clinicId, name },
       select: { id: true },
     });
   }
+  const duplicate = await prisma.treatmentChair.findFirst({
+    where: { clinicId, label: { equals: name, mode: "insensitive" } },
+    select: { id: true },
+  });
+  if (duplicate) throw new ScheduleResourceDuplicateError();
   return prisma.treatmentChair.create({
     data: { clinicId, label: name },
     select: { id: true },
   });
+}
+
+export async function renameScheduleResource(
+  clinicId: string,
+  kind: "dentist" | "chair",
+  resourceId: string,
+  name: string,
+) {
+  if (kind === "dentist") {
+    const duplicate = await prisma.clinicDentist.findFirst({
+      where: {
+        clinicId,
+        id: { not: resourceId },
+        name: { equals: name, mode: "insensitive" },
+      },
+      select: { id: true },
+    });
+    if (duplicate) throw new ScheduleResourceDuplicateError();
+    const result = await prisma.clinicDentist.updateMany({
+      where: { id: resourceId, clinicId },
+      data: { name },
+    });
+    if (result.count !== 1) throw new ScheduleResourceNotFoundError();
+    return;
+  }
+
+  const duplicate = await prisma.treatmentChair.findFirst({
+    where: {
+      clinicId,
+      id: { not: resourceId },
+      label: { equals: name, mode: "insensitive" },
+    },
+    select: { id: true },
+  });
+  if (duplicate) throw new ScheduleResourceDuplicateError();
+  const result = await prisma.treatmentChair.updateMany({
+    where: { id: resourceId, clinicId },
+    data: { label: name },
+  });
+  if (result.count !== 1) throw new ScheduleResourceNotFoundError();
+}
+
+export async function setScheduleResourceActive(
+  clinicId: string,
+  kind: "dentist" | "chair",
+  resourceId: string,
+  active: boolean,
+) {
+  if (kind === "dentist") {
+    const result = await prisma.clinicDentist.updateMany({
+      where: { id: resourceId, clinicId },
+      data: { active },
+    });
+    if (result.count !== 1) throw new ScheduleResourceNotFoundError();
+    return;
+  }
+
+  const result = await prisma.treatmentChair.updateMany({
+    where: { id: resourceId, clinicId },
+    data: { active },
+  });
+  if (result.count !== 1) throw new ScheduleResourceNotFoundError();
 }
 
 async function createClinicAppointmentTransaction(

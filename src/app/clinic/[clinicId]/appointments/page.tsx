@@ -18,6 +18,7 @@ import {
   listAppointmentResources,
   listAppointmentVisits,
   listClinicAppointments,
+  listScheduleResources,
 } from "@/features/appointments/lib/appointment-repository";
 import { getClinicToday } from "@/features/follow-ups/lib/follow-up-validation";
 import { toClinicDateInput } from "@/features/treatments/lib/treatment-validation";
@@ -72,6 +73,7 @@ export default async function ClinicAppointmentsPage({
     resources,
     requests,
     bookingSettings,
+    scheduleResources,
   ] = await Promise.all([
     listClinicAppointments(membership.clinicId, selectedDate),
     listAppointmentPatients(membership.clinicId),
@@ -79,6 +81,9 @@ export default async function ClinicAppointmentsPage({
     listAppointmentResources(membership.clinicId),
     listAppointmentRequests(membership.clinicId),
     getPublicBookingSettings(membership.clinicId),
+    membership.role === ClinicRole.OWNER
+      ? listScheduleResources(membership.clinicId)
+      : Promise.resolve({ dentists: [], chairs: [] }),
   ]);
   let prefill:
     | {
@@ -190,7 +195,11 @@ export default async function ClinicAppointmentsPage({
               <h2 className="mb-3 text-sm font-semibold text-slate-900">
                 Schedule resources
               </h2>
-              <ScheduleResourceForm clinicId={membership.clinicId} />
+              <ScheduleResourceForm
+                chairs={scheduleResources.chairs}
+                clinicId={membership.clinicId}
+                dentists={scheduleResources.dentists}
+              />
             </div>
           )}
           <h2 className="mb-4 text-lg font-semibold text-slate-900">

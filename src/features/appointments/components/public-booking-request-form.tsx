@@ -1,6 +1,6 @@
 "use client";
 
-import { useFormState } from "react-dom";
+import { FormEvent, useRef, useState } from "react";
 
 import {
   createPublicBookingRequestAction,
@@ -22,23 +22,39 @@ export function PublicBookingRequestForm({
   dentists,
   chairs,
 }: PublicBookingRequestFormProps) {
-  const [state, formAction] = useFormState(
-    createPublicBookingRequestAction,
-    initialState,
-  );
+  const [state, setState] = useState(initialState);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const isAvailable = dentists.length > 0 && chairs.length > 0;
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      const nextState = await createPublicBookingRequestAction(
+        state,
+        new FormData(event.currentTarget),
+      );
+      setState(nextState);
+    } catch {
+      setState({
+        error: "We couldn't send your request. Please try again later.",
+      });
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="space-y-4">
+    <form className="space-y-4" onSubmit={handleSubmit}>
       <input name="slug" type="hidden" value={slug} />
       <label className="absolute -left-[10000px] h-px w-px overflow-hidden">
         Website
-        <input
-          autoComplete="off"
-          name="website"
-          tabIndex={-1}
-          type="text"
-        />
+        <input autoComplete="off" name="website" tabIndex={-1} type="text" />
       </label>
       <label className="block text-sm font-medium text-slate-700">
         Your name
@@ -75,7 +91,12 @@ export function PublicBookingRequestForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-medium text-slate-700">
           Preferred dentist
-          <select className={inputClass} defaultValue="" name="dentistId" required>
+          <select
+            className={inputClass}
+            defaultValue=""
+            name="dentistId"
+            required
+          >
             <option disabled value="">
               Choose a dentist
             </option>
@@ -88,7 +109,12 @@ export function PublicBookingRequestForm({
         </label>
         <label className="block text-sm font-medium text-slate-700">
           Preferred chair
-          <select className={inputClass} defaultValue="" name="chairId" required>
+          <select
+            className={inputClass}
+            defaultValue=""
+            name="chairId"
+            required
+          >
             <option disabled value="">
               Choose a chair
             </option>
@@ -120,10 +146,10 @@ export function PublicBookingRequestForm({
       )}
       <button
         className="h-11 w-full rounded-md bg-teal-800 px-5 text-sm font-semibold text-white hover:bg-teal-900 disabled:cursor-not-allowed disabled:bg-slate-400"
-        disabled={!isAvailable}
+        disabled={!isAvailable || isSubmitting}
         type="submit"
       >
-        Request appointment
+        {isSubmitting ? "Submitting..." : "Request appointment"}
       </button>
       <p className="text-xs leading-5 text-slate-500">
         This is a request only. Your appointment is not confirmed until the

@@ -84,7 +84,7 @@ export function isManuallyConfirmedMessageStatus(
 
 export function isSameManualReminderSubmission(
   existing: Readonly<{
-    senderUserId: string;
+    senderUserId: string | null;
     patientId: string;
     treatmentVisitId: string | null;
     preventiveRecallId: string | null;

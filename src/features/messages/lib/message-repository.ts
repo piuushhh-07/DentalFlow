@@ -97,6 +97,7 @@ export async function recordManualWhatsAppReminder(
     input.clinicId,
     input.clientRequestId,
   );
+
   if (existing) {
     const patientId =
       input.kind === "treatment-visit"
@@ -118,10 +119,18 @@ export async function recordManualWhatsAppReminder(
               select: { patientId: true },
             })
           )?.patientId;
+
     if (
       !patientId ||
       existing.senderUserId === null ||
-      !isSameManualReminderSubmission(existing, input, patientId) ||
+      !isSameManualReminderSubmission(
+        {
+          ...existing,
+          senderUserId: existing.senderUserId,
+        },
+        input,
+        patientId,
+      ) ||
       !existing.manuallyConfirmedSentAt
     ) {
       throw new ReminderIdempotencyConflictError();
@@ -148,7 +157,9 @@ export async function recordManualWhatsAppReminder(
           },
           select: { patientId: true, status: true },
         });
+
         if (!visit) throw new ReminderRecordNotFoundError();
+
         if (
           !canTransitionTreatmentVisit(
             visit.status,
@@ -157,6 +168,7 @@ export async function recordManualWhatsAppReminder(
         ) {
           throw new ReminderRecordInactiveError();
         }
+
         patientId = visit.patientId;
         visitStatus = visit.status;
       } else {
@@ -167,10 +179,13 @@ export async function recordManualWhatsAppReminder(
           },
           select: { patientId: true, status: true },
         });
+
         if (!recall) throw new ReminderRecordNotFoundError();
+
         if (recall.status !== PreventiveRecallStatus.ACTIVE) {
           throw new ReminderRecordInactiveError();
         }
+
         patientId = recall.patientId;
       }
 
@@ -183,7 +198,9 @@ export async function recordManualWhatsAppReminder(
           whatsappOptedInAt: true,
         },
       });
+
       if (!patient) throw new ReminderRecordNotFoundError();
+
       assertWhatsAppConsent(patient);
       toWhatsAppNumber(patient.phoneNumber);
 
@@ -197,11 +214,13 @@ export async function recordManualWhatsAppReminder(
             select: { id: true, name: true },
           })
         : null;
+
       if (input.templateId && !messageTemplate) {
         throw new ReminderTemplateNotFoundError();
       }
 
       const timestamp = new Date();
+
       const created = await transaction.messageLog.create({
         data: {
           clinicId: input.clinicId,
@@ -226,6 +245,7 @@ export async function recordManualWhatsAppReminder(
         if (visitStatus === null) {
           throw new ReminderRecordInactiveError();
         }
+
         const visit = await transaction.treatmentVisit.updateMany({
           where: {
             id: input.relatedRecordId,
@@ -235,6 +255,7 @@ export async function recordManualWhatsAppReminder(
           },
           data: { status: TreatmentVisitStatus.REMINDER_SENT },
         });
+
         if (visit.count !== 1) throw new ReminderRecordInactiveError();
       }
 
@@ -255,6 +276,7 @@ export async function tryGetRecordedReminderAfterConflict(
     input.clinicId,
     input.clientRequestId,
   );
+
   if (
     !existing ||
     existing.status !== MessageLogStatus.MANUALLY_RECORDED_SENT ||
@@ -264,6 +286,7 @@ export async function tryGetRecordedReminderAfterConflict(
   }
 
   const related = relationIds(input);
+
   if (
     existing.senderUserId !== input.senderUserId ||
     existing.treatmentVisitId !== related.treatmentVisitId ||
@@ -290,10 +313,12 @@ export function isMessageLogUniqueConflict(error: unknown): boolean {
   }
 
   const target = error.meta?.target;
+
   const isRequestIdTarget = (field: unknown) =>
     typeof field === "string" &&
     (field.includes("clientRequestId") ||
       field.includes("message_logs_clinicId_clientRequestId_key"));
+
   return typeof target === "string"
     ? isRequestIdTarget(target)
     : Array.isArray(target) && target.some(isRequestIdTarget);

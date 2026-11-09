@@ -23,9 +23,13 @@ import {
   AppointmentTransitionError,
   AppointmentVisitAlreadyScheduledError,
   AppointmentVisitNotFoundError,
+  ScheduleResourceDuplicateError,
+  ScheduleResourceNotFoundError,
   createClinicAppointment,
   createPublicAppointmentRequest,
   createScheduleResource,
+  renameScheduleResource,
+  setScheduleResourceActive,
   approveAppointmentRequest,
   getPublicBookingClinic,
   rejectAppointmentRequest,
@@ -106,21 +110,122 @@ function userFacingAppointmentError(error: unknown): string {
   return "We couldn't save the appointment. Please try again.";
 }
 
-export async function createScheduleResourceAction(formData: FormData) {
+export async function createScheduleResourceAction(
+  _previousState: AppointmentActionState,
+  formData: FormData,
+): Promise<AppointmentActionState> {
   const clinicId = z.string().uuid().safeParse(formData.get("clinicId"));
   const kind = z.enum(["dentist", "chair"]).safeParse(formData.get("kind"));
-  const name = z.string().trim().min(2).max(120).safeParse(formData.get("name"));
+  const name = z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/\s+/g, " "))
+    .pipe(z.string().min(2).max(120))
+    .safeParse(formData.get("name"));
   if (!clinicId.success || !kind.success || !name.success) {
-    throw new Error("Provide a valid clinic, resource type, and name.");
+    return { error: "Provide a valid clinic, resource type, and name." };
   }
   const membership = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
   try {
     await createScheduleResource(membership.clinicId, kind.data, name.data);
   } catch (error) {
     logAppointmentError(error);
-    throw new Error("Unable to add this schedule resource.", { cause: error });
+    if (error instanceof ScheduleResourceDuplicateError) {
+      return { error: error.message };
+    }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return { error: "A resource with this name already exists in this clinic." };
+    }
+    return { error: "We couldn't add this schedule resource. Please try again." };
   }
   revalidatePath(`/clinic/${membership.clinicId}/appointments`);
+  return {
+    success:
+      kind.data === "dentist"
+        ? "Dentist added successfully."
+        : "Treatment chair added successfully.",
+  };
+}
+
+export async function renameScheduleResourceAction(
+  _previousState: AppointmentActionState,
+  formData: FormData,
+): Promise<AppointmentActionState> {
+  const clinicId = z.string().uuid().safeParse(formData.get("clinicId"));
+  const kind = z.enum(["dentist", "chair"]).safeParse(formData.get("kind"));
+  const resourceId = z.string().uuid().safeParse(formData.get("resourceId"));
+  const name = z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/\s+/g, " "))
+    .pipe(z.string().min(2).max(120))
+    .safeParse(formData.get("name"));
+  if (!clinicId.success || !kind.success || !resourceId.success || !name.success) {
+    return { error: "Provide a valid resource and name." };
+  }
+  const membership = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
+  try {
+    await renameScheduleResource(
+      membership.clinicId,
+      kind.data,
+      resourceId.data,
+      name.data,
+    );
+  } catch (error) {
+    logAppointmentError(error);
+    if (error instanceof ScheduleResourceDuplicateError) {
+      return { error: error.message };
+    }
+    if (error instanceof ScheduleResourceNotFoundError) {
+      return { error: "This resource is not available in this clinic." };
+    }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return { error: "A resource with this name already exists in this clinic." };
+    }
+    return { error: "We couldn't rename this resource. Please try again." };
+  }
+  revalidatePath(`/clinic/${membership.clinicId}/appointments`);
+  return { success: "Resource renamed successfully." };
+}
+
+export async function setScheduleResourceActiveAction(
+  _previousState: AppointmentActionState,
+  formData: FormData,
+): Promise<AppointmentActionState> {
+  const clinicId = z.string().uuid().safeParse(formData.get("clinicId"));
+  const kind = z.enum(["dentist", "chair"]).safeParse(formData.get("kind"));
+  const resourceId = z.string().uuid().safeParse(formData.get("resourceId"));
+  const active = z.enum(["true", "false"]).safeParse(formData.get("active"));
+  if (!clinicId.success || !kind.success || !resourceId.success || !active.success) {
+    return { error: "Provide a valid resource and status." };
+  }
+  const membership = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
+  try {
+    await setScheduleResourceActive(
+      membership.clinicId,
+      kind.data,
+      resourceId.data,
+      active.data === "true",
+    );
+  } catch (error) {
+    logAppointmentError(error);
+    if (error instanceof ScheduleResourceNotFoundError) {
+      return { error: "This resource is not available in this clinic." };
+    }
+    return { error: "We couldn't update this resource. Please try again." };
+  }
+  revalidatePath(`/clinic/${membership.clinicId}/appointments`);
+  return {
+    success: active.data === "true"
+      ? "Resource activated successfully."
+      : "Resource deactivated successfully.",
+  };
 }
 
 export async function createPublicBookingRequestAction(

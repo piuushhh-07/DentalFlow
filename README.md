@@ -117,6 +117,15 @@ the transaction pooler for migrations. Copy the exact host, username and TLS
 parameters from the Supabase dashboard for your project and network. Do not
 expose either database URL to browser code.
 
+Public appointment booking requests are limited to 3 per phone number, per
+clinic, in a rolling 60-minute window by default. The optional
+`PUBLIC_APPOINTMENT_RATE_LIMIT_MAX_REQUESTS` and
+`PUBLIC_APPOINTMENT_RATE_LIMIT_WINDOW_MINUTES` settings are server-only. For
+local development, set the first to `20` in `.env.local`; production keeps the
+default of 3 unless its server-side environment is explicitly configured.
+Invalid values fall back to the defaults. Do not use `NEXT_PUBLIC_` for these
+settings.
+
 Prisma is pinned to version 6.19.2. Its schema uses the Prisma 6
 `url`/`directUrl` datasource settings; it does not use Prisma 7's config-file
 datasource API.

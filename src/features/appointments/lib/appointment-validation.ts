@@ -42,6 +42,15 @@ export const appointmentStatusSchema = z.object({
 
 export type AppointmentInput = z.output<typeof createAppointmentSchema>;
 
+const scheduleResourceNameSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/\s+/g, " "))
+  .pipe(z.string().min(2).max(120));
+
+export const dentistNameSchema = scheduleResourceNameSchema;
+export const chairLabelSchema = scheduleResourceNameSchema;
+
 export function appointmentStartAt(date: string, time: string): Date {
   return new Date(`${date}T${time}:00+05:30`);
 }
@@ -85,6 +94,8 @@ export function appointmentsConflict(
     id?: string;
     startAt: Date;
     durationMinutes: number;
+    dentistId?: string | null;
+    chairId?: string | null;
     dentistName: string;
     chairLabel: string;
   }>,
@@ -92,6 +103,8 @@ export function appointmentsConflict(
     id: string;
     scheduledAt: Date;
     durationMinutes: number;
+    dentistId: string | null;
+    chairId: string | null;
     dentistName: string;
     chairLabel: string;
     status: AppointmentStatus;
@@ -111,12 +124,21 @@ export function appointmentsConflict(
     const existingEnd = existingStart + appointment.durationMinutes * 60_000;
     const overlaps =
       requested.startAt.getTime() < existingEnd && existingStart < requestedEnd;
-    return (
-      overlaps &&
-      (appointment.dentistName.toLocaleLowerCase() ===
-        requested.dentistName.toLocaleLowerCase() ||
-        appointment.chairLabel.toLocaleLowerCase() ===
-          requested.chairLabel.toLocaleLowerCase())
-    );
+    if (!overlaps) return false;
+
+    const dentistMatches =
+      appointment.dentistId !== null && requested.dentistId != null
+        ? appointment.dentistId === requested.dentistId
+        : appointment.dentistId === null &&
+          appointment.dentistName.toLowerCase() ===
+            requested.dentistName.toLowerCase();
+    const chairMatches =
+      appointment.chairId !== null && requested.chairId != null
+        ? appointment.chairId === requested.chairId
+        : appointment.chairId === null &&
+          appointment.chairLabel.toLowerCase() ===
+            requested.chairLabel.toLowerCase();
+
+    return dentistMatches || chairMatches;
   });
 }
