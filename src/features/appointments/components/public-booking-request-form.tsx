@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 
 import {
   createPublicBookingRequestAction,
@@ -39,7 +39,8 @@ export function PublicBookingRequestForm({
         new FormData(event.currentTarget),
       );
       setState(nextState);
-    } catch {
+    } catch (error) {
+      console.error("Public booking request submission failed.", error);
       setState({
         error: "We couldn't send your request. Please try again later.",
       });
