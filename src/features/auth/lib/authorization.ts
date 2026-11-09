@@ -4,6 +4,7 @@ export type ClinicMembershipRecord = Readonly<{
   clinicId: string;
   userId: string;
   role: ClinicRole;
+  revokedAt?: Date | null;
 }>;
 
 export type VerifiedClinicMembership = Readonly<{
@@ -47,6 +48,7 @@ export function authorizeClinicMembership(
     !hasValidAuthIdentity ||
     !hasValidClinicSelection ||
     !membership ||
+    membership.revokedAt != null ||
     typeof membership.userId !== "string" ||
     typeof membership.clinicId !== "string" ||
     membership.userId !== authenticatedUserId ||
