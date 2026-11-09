@@ -7,15 +7,13 @@ import { getSupabasePublicEnvironment } from "@/lib/supabase/config";
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const isDemoRoute =
-    pathname === "/demo" || pathname.startsWith("/demo/");
+  const isDemoRoute = pathname === "/demo" || pathname.startsWith("/demo/");
   const isPublicBookingRoute =
     pathname === "/book" || pathname.startsWith("/book/");
   const isPatientPortalRoute =
     pathname === "/portal" || pathname.startsWith("/portal/");
   const isAuthCallbackRoute = pathname === "/auth/callback";
-  const isWhatsAppReminderJob =
-    pathname === "/api/cron/whatsapp-reminders";
+  const isWhatsAppReminderJob = pathname === "/api/cron/whatsapp-reminders";
 
   if (isDemoRoute) {
     if (
