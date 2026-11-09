@@ -323,3 +323,20 @@ export function isMessageLogUniqueConflict(error: unknown): boolean {
     ? isRequestIdTarget(target)
     : Array.isArray(target) && target.some(isRequestIdTarget);
 }
+
+export async function listPatientMessageHistory(
+  clinicId: string,
+  patientId: string,
+) {
+  return prisma.messageLog.findMany({
+    where: { clinicId, patientId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: 20,
+    select: {
+      id: true,
+      createdAt: true,
+      status: true,
+      templateNameSnapshot: true,
+    },
+  });
+}

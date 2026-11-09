@@ -72,6 +72,12 @@ export type TreatmentFinancialEntryInput = z.output<
   typeof treatmentFinancialEntrySchema
 >;
 
+export const financialEntryTypeLabels: Record<FinancialEntryType, string> = {
+  PAYMENT: "Payment",
+  DISCOUNT: "Discount",
+  REFUND: "Refund",
+};
+
 export const treatmentCatalogueItemSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(2).max(160),

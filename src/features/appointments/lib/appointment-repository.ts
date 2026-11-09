@@ -1079,6 +1079,51 @@ export async function listClinicAppointmentsInRange(
   });
 }
 
+export async function listPatientAppointments(
+  clinicId: string,
+  patientId: string,
+) {
+  const now = new Date();
+  const patientScope = { clinicId, patientId };
+  const upcomingWhere = {
+    ...patientScope,
+    scheduledAt: { gte: now },
+    status: { not: AppointmentStatus.CANCELLED },
+  };
+  const [upcomingCount, upcoming, past] = await Promise.all([
+    prisma.appointment.count({ where: upcomingWhere }),
+    prisma.appointment.findMany({
+      where: upcomingWhere,
+      orderBy: [{ scheduledAt: "asc" }, { createdAt: "asc" }],
+      take: 8,
+      select: {
+        id: true,
+        scheduledAt: true,
+        durationMinutes: true,
+        dentistName: true,
+        chairLabel: true,
+        type: true,
+        status: true,
+      },
+    }),
+    prisma.appointment.findMany({
+      where: { ...patientScope, scheduledAt: { lt: now } },
+      orderBy: [{ scheduledAt: "desc" }, { createdAt: "desc" }],
+      take: 8,
+      select: {
+        id: true,
+        scheduledAt: true,
+        durationMinutes: true,
+        dentistName: true,
+        chairLabel: true,
+        type: true,
+        status: true,
+      },
+    }),
+  ]);
+  return { upcomingCount, upcoming, past };
+}
+
 export async function countClinicAppointments(clinicId: string, date: string) {
   return prisma.appointment.count({
     where: {

@@ -110,6 +110,22 @@ export async function listClinicRecalls(
   return { recalls, pagination };
 }
 
+export async function listPatientRecalls(clinicId: string, patientId: string) {
+  return prisma.preventiveRecall.findMany({
+    where: { clinicId, patientId },
+    orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+    take: 20,
+    select: {
+      id: true,
+      type: true,
+      customName: true,
+      dueDate: true,
+      status: true,
+      createdAt: true,
+    },
+  });
+}
+
 export async function listClinicRecallPatients(
   clinicId: string,
   query: string,
