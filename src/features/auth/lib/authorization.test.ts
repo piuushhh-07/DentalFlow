@@ -28,6 +28,19 @@ test("authorizes only the matching user and clinic membership", () => {
   });
 });
 
+test("denies a revoked clinic membership", () => {
+  assert.throws(
+    () =>
+      authorizeClinicMembership(userId, clinicId, {
+        userId,
+        clinicId,
+        role: ClinicRole.OWNER,
+        revokedAt: new Date("2026-11-09T00:00:00.000Z"),
+      }),
+    ClinicAccessDeniedError,
+  );
+});
+
 test("denies a missing membership", () => {
   assert.throws(
     () => authorizeClinicMembership(userId, clinicId, null),
@@ -134,6 +147,28 @@ test("allows template editing only for an owner membership", () => {
         role: ClinicRole.OWNER,
       }),
     ClinicAccessDeniedError,
+  );
+});
+
+test("restricts destructive patient operations to clinic owners", () => {
+  const owner = authorizeClinicMembership(userId, clinicId, {
+    userId,
+    clinicId,
+    role: ClinicRole.OWNER,
+  });
+  assert.equal(
+    authorizeClinicRole(owner, [ClinicRole.OWNER]).role,
+    ClinicRole.OWNER,
+  );
+
+  const staff = authorizeClinicMembership(userId, clinicId, {
+    userId,
+    clinicId,
+    role: ClinicRole.STAFF,
+  });
+  assert.throws(
+    () => authorizeClinicRole(staff, [ClinicRole.OWNER]),
+    ClinicRoleDeniedError,
   );
 });
 

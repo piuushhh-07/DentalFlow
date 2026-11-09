@@ -50,17 +50,17 @@ export async function requireClinicMembership(
   }
 
   const user = await getAuthenticatedUser();
-  const membership = await prisma.clinicMembership.findUnique({
+  const membership = await prisma.clinicMembership.findFirst({
     where: {
-      userId_clinicId: {
-        userId: user.id,
-        clinicId: parsedClinicId.data,
-      },
+      userId: user.id,
+      clinicId: parsedClinicId.data,
+      revokedAt: null,
     },
     select: {
       userId: true,
       clinicId: true,
       role: true,
+      revokedAt: true,
     },
   });
 
