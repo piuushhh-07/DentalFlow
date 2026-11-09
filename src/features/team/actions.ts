@@ -36,9 +36,7 @@ async function mutateMembership(
   const membershipId = parseUuid(formData.get("membershipId"));
   const requestedRole = formData.get("role");
 
-  if (!clinicId || !membershipId) {
-    redirect("/clinics");
-  }
+  if (!clinicId || !membershipId) redirect("/clinics");
 
   const actor = await requireClinicRole(clinicId, [ClinicRole.OWNER]);
 
@@ -55,39 +53,27 @@ async function mutateMembership(
   try {
     status = await prisma.$transaction(
       async (transaction) => {
-        const actorMembership = await transaction.clinicMembership.findUnique({
-          where: {
-            userId_clinicId: {
-              userId: actor.userId,
-              clinicId,
-            },
-          },
+        const actorMembership = await transaction.clinicMembership.findFirst({
+          where: { userId: actor.userId, clinicId, revokedAt: null },
           select: { role: true },
         });
-        });
 
-        if (actorMembership?.role !== ClinicRole.OWNER) {
-          return "unavailable";
-        }
+        if (actorMembership?.role !== ClinicRole.OWNER) return "unavailable";
 
         const target = await transaction.clinicMembership.findFirst({
-          where: { id: membershipId, clinicId },
+          where: { id: membershipId, clinicId, revokedAt: null },
           select: { id: true, role: true },
         });
 
         if (!target) return "not-found";
 
         const ownerCount = await transaction.clinicMembership.count({
-          where: { clinicId, role: ClinicRole.OWNER },
+          where: { clinicId, role: ClinicRole.OWNER, revokedAt: null },
         });
 
         const invariantError = validateMembershipMutation(
           kind === "remove"
-            ? {
-                kind,
-                currentRole: target.role,
-                ownerCount,
-              }
+            ? { kind, currentRole: target.role, ownerCount }
             : {
                 kind,
                 currentRole: target.role,
@@ -100,14 +86,25 @@ async function mutateMembership(
         if (invariantError) return "unavailable";
 
         if (kind === "remove") {
-          const result = await transaction.clinicMembership.deleteMany({
-            where: { id: target.id, clinicId, role: target.role },
+          const result = await transaction.clinicMembership.updateMany({
+            where: {
+              id: target.id,
+              clinicId,
+              role: target.role,
+              revokedAt: null,
+            },
+            data: { revokedAt: new Date() },
           });
           return result.count === 1 ? "removed" : "conflict";
         }
 
         const result = await transaction.clinicMembership.updateMany({
-          where: { id: target.id, clinicId, role: target.role },
+          where: {
+            id: target.id,
+            clinicId,
+            role: target.role,
+            revokedAt: null,
+          },
           data: { role: requestedRole as ClinicRole },
         });
         return result.count === 1 ? "updated" : "conflict";
