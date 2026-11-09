@@ -71,13 +71,15 @@ export default async function InsuranceProvidersPage({
               Keep insurer and TPA contact details and claim instructions.
             </p>
           </div>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
-            href={`${basePath}/new`}
-          >
-            <Plus aria-hidden="true" className="size-4" />
-            Add provider
-          </Link>
+          {membership.role === "OWNER" && (
+            <Link
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+              href={`${basePath}/new`}
+            >
+              <Plus aria-hidden="true" className="size-4" />
+              Add provider
+            </Link>
+          )}
         </header>
         <div className="mt-6">
           <InsuranceNavigation
@@ -148,7 +150,7 @@ export default async function InsuranceProvidersPage({
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2">
-                    {!provider.archivedAt && (
+                    {membership.role === "OWNER" && !provider.archivedAt && (
                       <>
                         <Link
                           className="inline-flex min-h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-slate-50"

@@ -1,10 +1,13 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
+import { ClinicRole, Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import {
+  requireClinicMembership,
+  requireClinicRole,
+} from "@/features/auth/lib/server-auth";
 import {
   BillingAccessRestrictedError,
   BillingLimitReachedError,
@@ -172,7 +175,9 @@ export async function deletePatient(
     return { error: "This patient record could not be found." };
   }
 
-  const membership = await requireClinicMembership(requestedClinicId.data);
+  const membership = await requireClinicRole(requestedClinicId.data, [
+    ClinicRole.OWNER,
+  ]);
 
   try {
     const deleted = await deleteClinicPatient(
