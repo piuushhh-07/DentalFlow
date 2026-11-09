@@ -7,7 +7,7 @@ export async function getUserClinicMemberships(
   userId: string,
 ): Promise<ExistingClinicMembership[]> {
   const memberships = await prisma.clinicMembership.findMany({
-    where: { userId },
+    where: { userId, revokedAt: null },
     select: {
       clinicId: true,
       clinic: { select: { name: true } },

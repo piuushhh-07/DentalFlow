@@ -155,8 +155,8 @@ export async function createDigitalPrescription(
             address: true,
           },
         }),
-        transaction.clinicMembership.findUnique({
-          where: { userId_clinicId: { userId: authorUserId, clinicId } },
+        transaction.clinicMembership.findFirst({
+          where: { userId: authorUserId, clinicId, revokedAt: null },
           select: { user: { select: { displayName: true } } },
         }),
       ]);
