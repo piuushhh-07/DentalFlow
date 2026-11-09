@@ -577,26 +577,28 @@ export default async function PatientDetailPage({
           </div>
         </section>
 
-        <section
-          aria-labelledby="delete-patient-title"
-          className="mt-6 rounded-xl border border-red-200 bg-white p-5 sm:p-6"
-        >
-          <h2
-            className="text-sm font-semibold text-slate-900"
-            id="delete-patient-title"
+        {membership.role === "OWNER" && (
+          <section
+            aria-labelledby="delete-patient-title"
+            className="mt-6 rounded-xl border border-red-200 bg-white p-5 sm:p-6"
           >
-            Delete patient
-          </h2>
-          <p className="mb-4 mt-1 text-sm leading-5 text-slate-600">
-            This also removes treatment plans and recalls. A patient with
-            message or clinical chart history cannot be deleted so the audit
-            trail is preserved.
-          </p>
-          <DeletePatientButton
-            clinicId={membership.clinicId}
-            patientId={patient.id}
-          />
-        </section>
+            <h2
+              className="text-sm font-semibold text-slate-900"
+              id="delete-patient-title"
+            >
+              Delete patient
+            </h2>
+            <p className="mb-4 mt-1 text-sm leading-5 text-slate-600">
+              This also removes treatment plans and recalls. A patient with
+              message or clinical chart history cannot be deleted so the audit
+              trail is preserved.
+            </p>
+            <DeletePatientButton
+              clinicId={membership.clinicId}
+              patientId={patient.id}
+            />
+          </section>
+        )}
       </div>
     </AppShell>
   );

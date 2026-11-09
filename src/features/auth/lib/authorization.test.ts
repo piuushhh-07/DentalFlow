@@ -137,6 +137,28 @@ test("allows template editing only for an owner membership", () => {
   );
 });
 
+test("restricts destructive patient operations to clinic owners", () => {
+  const owner = authorizeClinicMembership(userId, clinicId, {
+    userId,
+    clinicId,
+    role: ClinicRole.OWNER,
+  });
+  assert.equal(
+    authorizeClinicRole(owner, [ClinicRole.OWNER]).role,
+    ClinicRole.OWNER,
+  );
+
+  const staff = authorizeClinicMembership(userId, clinicId, {
+    userId,
+    clinicId,
+    role: ClinicRole.STAFF,
+  });
+  assert.throws(
+    () => authorizeClinicRole(staff, [ClinicRole.OWNER]),
+    ClinicRoleDeniedError,
+  );
+});
+
 test("rejects malformed memberships and invalid role checks without crashing", () => {
   assert.throws(
     () =>
