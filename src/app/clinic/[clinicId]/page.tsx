@@ -158,13 +158,21 @@ export default async function ClinicDashboardPage({
               Patient directory
             </Link>
             {membership.role === "OWNER" && (
-              <Link
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
-                href={`/clinic/${membership.clinicId}/billing`}
-              >
-                <CreditCard aria-hidden="true" className="size-4" />
-                Billing
-              </Link>
+              <>
+                <Link
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  href={`/clinic/${membership.clinicId}/settings/team`}
+                >
+                  Manage team
+                </Link>
+                <Link
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+                  href={`/clinic/${membership.clinicId}/billing`}
+                >
+                  <CreditCard aria-hidden="true" className="size-4" />
+                  Billing
+                </Link>
+              </>
             )}
           </div>
         </header>
