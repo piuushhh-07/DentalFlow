@@ -60,6 +60,7 @@ export async function requireClinicMembership(
       userId: true,
       clinicId: true,
       role: true,
+      revokedAt: true,
     },
   });
 
