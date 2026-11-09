@@ -64,6 +64,7 @@ async function mutateMembership(
           },
           select: { role: true },
         });
+        });
 
         if (actorMembership?.role !== ClinicRole.OWNER) {
           return "unavailable";
