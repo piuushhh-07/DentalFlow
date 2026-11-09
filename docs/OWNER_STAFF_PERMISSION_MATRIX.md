@@ -10,7 +10,7 @@ This matrix defines the least-privilege baseline for clinic membership roles. Au
 ## Permission matrix
 
 | Capability                                                              | OWNER | STAFF | Enforcement notes                                                                                                                                                     |
-|-----------------------------------------------------------------------|----:|----:|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ----------------------------------------------------------------------- | ----- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Open clinic workspace and read clinic records                           | Allow | Allow | Require an active membership for the requested clinic on every server read.                                                                                           |
 | Create and update patient demographics / contact details                | Allow | Allow | Scope every query by the verified clinic ID.                                                                                                                          |
 | Delete a patient                                                        | Allow | Deny  | OWNER-only. This is now enforced in `deletePatient`; retain clinical-history safeguards. Prefer archival/retention workflows over deletion for real clinical records. |
