@@ -40,7 +40,7 @@ async function mutateMembership(
     redirect("/clinics");
   }
 
-  await requireClinicRole(clinicId, [ClinicRole.OWNER]);
+  const actor = await requireClinicRole(clinicId, [ClinicRole.OWNER]);
 
   if (
     kind === "change-role" &&
@@ -58,9 +58,7 @@ async function mutateMembership(
         const actorMembership = await transaction.clinicMembership.findUnique({
           where: {
             userId_clinicId: {
-              userId: (
-                await requireClinicRole(clinicId, [ClinicRole.OWNER])
-              ).userId,
+              userId: actor.userId,
               clinicId,
             },
           },
