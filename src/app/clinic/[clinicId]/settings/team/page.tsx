@@ -23,7 +23,7 @@ type ClinicTeamPageProps = Readonly<{
 
 const statusMessages: Record<string, string> = {
   updated: "Team member role updated.",
-  removed: "Clinic access removed.",
+  removed: "Clinic access revoked.",
   invalid: "Choose a valid clinic role.",
   "not-found": "That team membership could not be found.",
   "last-owner": "A clinic must always have at least one OWNER.",
@@ -187,7 +187,7 @@ export default async function ClinicTeamPage({
                       type="submit"
                       className="h-10 rounded-md border border-rose-200 px-3 text-sm font-semibold text-rose-700 hover:bg-rose-50"
                     >
-                      Remove access
+                      Revoke access
                     </button>
                   </form>
                 </div>
