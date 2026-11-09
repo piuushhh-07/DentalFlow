@@ -28,6 +28,19 @@ test("authorizes only the matching user and clinic membership", () => {
   });
 });
 
+test("denies a revoked clinic membership", () => {
+  assert.throws(
+    () =>
+      authorizeClinicMembership(userId, clinicId, {
+        userId,
+        clinicId,
+        role: ClinicRole.OWNER,
+        revokedAt: new Date("2026-11-09T00:00:00.000Z"),
+      }),
+    ClinicAccessDeniedError,
+  );
+});
+
 test("denies a missing membership", () => {
   assert.throws(
     () => authorizeClinicMembership(userId, clinicId, null),
