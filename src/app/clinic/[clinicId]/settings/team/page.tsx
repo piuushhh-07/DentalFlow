@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { ClinicRoleDeniedError } from "@/features/auth/lib/authorization";
+import {
+  ClinicAccessDeniedError,
+  ClinicRoleDeniedError,
+} from "@/features/auth/lib/authorization";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import {
   changeClinicMemberRole,
@@ -43,12 +46,17 @@ export default async function ClinicTeamPage({
   try {
     owner = await requireClinicRole(parsedClinicId.data, [ClinicRole.OWNER]);
   } catch (error) {
-    if (error instanceof ClinicRoleDeniedError) notFound();
+    if (
+      error instanceof ClinicRoleDeniedError ||
+      error instanceof ClinicAccessDeniedError
+    ) {
+      notFound();
+    }
     throw error;
   }
 
   const members = await prisma.clinicMembership.findMany({
-    where: { clinicId: owner.clinicId },
+    where: { clinicId: owner.clinicId, revokedAt: null },
     select: {
       id: true,
       userId: true,
