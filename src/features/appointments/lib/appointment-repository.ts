@@ -30,10 +30,14 @@ import {
   isPublicAppointmentRequestRateLimited,
 } from "@/features/appointments/lib/appointment-rate-limit";
 import {
+  createOrReusePublicBookingRequest,
   getPublicBookingPhoneLockKey,
-  isDuplicatePublicBookingRequest,
+  getPublicBookingPhoneLockQuery,
   PUBLIC_BOOKING_IDEMPOTENCY_WINDOW_MS,
+  PUBLIC_BOOKING_LOCK_TIMEOUT,
+  PUBLIC_BOOKING_TRANSACTION_TIMEOUT_MS,
 } from "@/features/appointments/lib/public-booking-idempotency";
+import { getClinicDateRangeBounds } from "@/features/appointments/lib/appointment-calendar";
 
 export class AppointmentPatientNotFoundError extends Error {}
 export class AppointmentVisitNotFoundError extends Error {}
@@ -491,122 +495,138 @@ export async function createPublicAppointmentRequest(
     try {
       return await prisma.$transaction(
         async (transaction) => {
-          await transaction.$queryRaw`
-            SELECT pg_advisory_xact_lock(hashtext(${phoneLockKey}))
-          `;
-
-          const recentRequests = await transaction.appointmentRequest.findMany({
-            where: {
-              clinicId,
-              phoneNumber: input.phoneNumber,
-              requestedAt: startAt,
-              status: AppointmentRequestStatus.PENDING,
-              createdAt: { gte: idempotencyCutoff, lte: now },
+          return createOrReusePublicBookingRequest(clinicId, input, now, {
+            withLock: async (operation) => {
+              await transaction.$queryRaw<{ lock_timeout: string }[]>`
+                SELECT set_config(
+                  'lock_timeout',
+                  ${PUBLIC_BOOKING_LOCK_TIMEOUT},
+                  true
+                ) AS lock_timeout
+              `;
+              await transaction.$queryRaw<{ locked: number }[]>(
+                getPublicBookingPhoneLockQuery(phoneLockKey),
+              );
+              return operation();
             },
-            select: {
-              id: true,
-              clinicId: true,
-              patientName: true,
-              phoneNumber: true,
-              requestedAt: true,
-              dentistId: true,
-              chairId: true,
-              notes: true,
-              createdAt: true,
-            },
-          });
-          const duplicate = recentRequests.find((request) =>
-            isDuplicatePublicBookingRequest(request, clinicId, input, now),
-          );
-          if (duplicate) return { id: duplicate.id };
-
-          const recentRequestCount = await transaction.appointmentRequest.count(
-            {
-              where: {
-                clinicId,
-                phoneNumber: input.phoneNumber,
-                createdAt: {
-                  gte: new Date(Date.now() - rateLimit.windowMinutes * 60_000),
+            findRecentRequests: () =>
+              transaction.appointmentRequest.findMany({
+                where: {
+                  clinicId,
+                  phoneNumber: input.phoneNumber,
+                  requestedAt: startAt,
+                  status: AppointmentRequestStatus.PENDING,
+                  createdAt: { gte: idempotencyCutoff, lte: now },
                 },
-              },
-            },
-          );
-          if (
-            isPublicAppointmentRequestRateLimited(
-              recentRequestCount,
-              rateLimit.maxRequests,
-            )
-          ) {
-            throw new AppointmentRequestRateLimitError();
-          }
+                select: {
+                  id: true,
+                  clinicId: true,
+                  patientName: true,
+                  phoneNumber: true,
+                  requestedAt: true,
+                  dentistId: true,
+                  chairId: true,
+                  notes: true,
+                  createdAt: true,
+                },
+              }),
+            createRequest: async () => {
+              const recentRequestCount =
+                await transaction.appointmentRequest.count({
+                  where: {
+                    clinicId,
+                    phoneNumber: input.phoneNumber,
+                    createdAt: {
+                      gte: new Date(
+                        Date.now() - rateLimit.windowMinutes * 60_000,
+                      ),
+                    },
+                  },
+                });
+              if (
+                isPublicAppointmentRequestRateLimited(
+                  recentRequestCount,
+                  rateLimit.maxRequests,
+                )
+              ) {
+                throw new AppointmentRequestRateLimitError();
+              }
 
-          const [appointments, requests] = await Promise.all([
-            transaction.appointment.findMany({
-              where: {
-                clinicId,
-                status: { notIn: [...INACTIVE_STATUSES] },
-                scheduledAt: { gte: overlapStart, lt: endAt },
-                OR: [{ dentistId: dentist.id }, { chairId: chair.id }],
-              },
-              select: {
-                id: true,
-                scheduledAt: true,
-                durationMinutes: true,
-                dentistId: true,
-                chairId: true,
-                dentistName: true,
-                chairLabel: true,
-                status: true,
-              },
-            }),
-            transaction.appointmentRequest.findMany({
-              where: {
-                clinicId,
-                status: AppointmentRequestStatus.PENDING,
-                requestedAt: { gte: overlapStart, lt: endAt },
-                OR: [{ dentistId: dentist.id }, { chairId: chair.id }],
-              },
-              select: {
-                requestedAt: true,
-                durationMinutes: true,
-                dentistId: true,
-                chairId: true,
-              },
-            }),
-          ]);
-          const overlaps = (otherStart: Date, otherDuration: number) =>
-            startAt.getTime() < otherStart.getTime() + otherDuration * 60_000 &&
-            otherStart.getTime() < endAt.getTime();
-          if (
-            appointments.some((appointment) =>
-              overlaps(appointment.scheduledAt, appointment.durationMinutes),
-            ) ||
-            requests.some(
-              (request) =>
-                (request.dentistId === dentist.id ||
-                  request.chairId === chair.id) &&
-                overlaps(request.requestedAt, request.durationMinutes),
-            )
-          ) {
-            throw new AppointmentRequestConflictError();
-          }
+              const appointments = await transaction.appointment.findMany({
+                where: {
+                  clinicId,
+                  status: { notIn: [...INACTIVE_STATUSES] },
+                  scheduledAt: { gte: overlapStart, lt: endAt },
+                  OR: [{ dentistId: dentist.id }, { chairId: chair.id }],
+                },
+                select: {
+                  id: true,
+                  scheduledAt: true,
+                  durationMinutes: true,
+                  dentistId: true,
+                  chairId: true,
+                  dentistName: true,
+                  chairLabel: true,
+                  status: true,
+                },
+              });
+              const requests = await transaction.appointmentRequest.findMany({
+                where: {
+                  clinicId,
+                  status: AppointmentRequestStatus.PENDING,
+                  requestedAt: { gte: overlapStart, lt: endAt },
+                  OR: [{ dentistId: dentist.id }, { chairId: chair.id }],
+                },
+                select: {
+                  requestedAt: true,
+                  durationMinutes: true,
+                  dentistId: true,
+                  chairId: true,
+                },
+              });
+              const overlaps = (otherStart: Date, otherDuration: number) =>
+                startAt.getTime() <
+                  otherStart.getTime() + otherDuration * 60_000 &&
+                otherStart.getTime() < endAt.getTime();
+              if (
+                appointments.some((appointment) =>
+                  overlaps(
+                    appointment.scheduledAt,
+                    appointment.durationMinutes,
+                  ),
+                ) ||
+                requests.some(
+                  (request) =>
+                    (request.dentistId === dentist.id ||
+                      request.chairId === chair.id) &&
+                    overlaps(request.requestedAt, request.durationMinutes),
+                )
+              ) {
+                throw new AppointmentRequestConflictError();
+              }
 
-          return transaction.appointmentRequest.create({
-            data: {
-              clinicId,
-              patientName: input.patientName,
-              phoneNumber: input.phoneNumber,
-              requestedAt: startAt,
-              durationMinutes: 30,
-              type: "Consultation",
-              dentistId: dentist.id,
-              chairId: chair.id,
-              notes: input.notes,
+              return transaction.appointmentRequest.create({
+                data: {
+                  clinicId,
+                  patientName: input.patientName,
+                  phoneNumber: input.phoneNumber,
+                  requestedAt: startAt,
+                  durationMinutes: 30,
+                  type: "Consultation",
+                  dentistId: dentist.id,
+                  chairId: chair.id,
+                  notes: input.notes,
+                },
+                select: { id: true },
+              });
             },
-            select: { id: true },
           });
         },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 5_000,
+          timeout: PUBLIC_BOOKING_TRANSACTION_TIMEOUT_MS,
+        },
       );
     } catch (error) {
       if (attempt === 0 && isSerializationFailure(error)) continue;
@@ -1035,12 +1055,13 @@ export async function listClinicAppointmentsInRange(
   startDate: string,
   endDate: string,
 ) {
+  const { startAt, endAt } = getClinicDateRangeBounds(startDate, endDate);
   return prisma.appointment.findMany({
     where: {
       clinicId,
       scheduledAt: {
-        gte: clinicDateStart(startDate),
-        lt: clinicDateEnd(endDate),
+        gte: startAt,
+        lt: endAt,
       },
     },
     orderBy: [{ scheduledAt: "asc" }, { createdAt: "asc" }],

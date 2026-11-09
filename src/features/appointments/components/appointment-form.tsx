@@ -25,6 +25,8 @@ type AppointmentFormProps = Readonly<{
   visits: readonly VisitOption[];
   dentists: readonly DentistOption[];
   chairs: readonly ChairOption[];
+  datePrefill?: string;
+  timePrefill?: string;
   prefill?: Readonly<{
     patientId: string;
     patientName: string;
@@ -56,6 +58,8 @@ export function AppointmentForm({
   visits,
   dentists,
   chairs,
+  datePrefill,
+  timePrefill,
   prefill,
   initial,
 }: AppointmentFormProps) {
@@ -142,7 +146,7 @@ export function AppointmentForm({
         Date
         <input
           className={`${inputClass} mt-1`}
-          defaultValue={prefill?.dueDate ?? initial?.date}
+          defaultValue={prefill?.dueDate ?? datePrefill ?? initial?.date}
           name="date"
           required
           type="date"
@@ -152,7 +156,7 @@ export function AppointmentForm({
         Time (Asia/Kolkata)
         <input
           className={`${inputClass} mt-1`}
-          defaultValue={initial?.time}
+          defaultValue={initial?.time ?? timePrefill}
           name="time"
           required
           type="time"

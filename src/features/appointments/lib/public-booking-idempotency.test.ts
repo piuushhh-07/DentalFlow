@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createOrReusePublicBookingRequest,
   getPublicBookingPhoneLockKey,
+  getPublicBookingPhoneLockQuery,
   isDuplicatePublicBookingRequest,
   PUBLIC_BOOKING_IDEMPOTENCY_WINDOW_MS,
   type ExistingPublicBookingRequest,
+  type PublicBookingIdempotencyOperations,
   type PublicBookingRequestDetails,
 } from "@/features/appointments/lib/public-booking-idempotency";
 
@@ -32,11 +35,107 @@ function existingRequest(
   };
 }
 
+function createRequestHarness() {
+  const requests: ExistingPublicBookingRequest[] = [];
+  let lockTail = Promise.resolve();
+  let nextId = 1;
+
+  function operations(
+    input: PublicBookingRequestDetails,
+  ): PublicBookingIdempotencyOperations {
+    return {
+      withLock: async <T>(operation: () => Promise<T>) => {
+        const previousLock = lockTail;
+        let releaseLock = () => {};
+        lockTail = new Promise<void>((resolve) => {
+          releaseLock = resolve;
+        });
+        await previousLock;
+        try {
+          return await operation();
+        } finally {
+          releaseLock();
+        }
+      },
+      findRecentRequests: async () =>
+        requests.filter(
+          (request) =>
+            request.clinicId === clinicId &&
+            request.phoneNumber === input.phoneNumber &&
+            request.requestedAt.getTime() === input.requestedAt.getTime(),
+        ),
+      createRequest: async () => {
+        const request = existingRequest({
+          id: `request-${nextId++}`,
+          ...input,
+          createdAt: now,
+        });
+        requests.push(request);
+        return { id: request.id };
+      },
+    };
+  }
+
+  return {
+    requests,
+    submit(input: PublicBookingRequestDetails = details) {
+      return createOrReusePublicBookingRequest(
+        clinicId,
+        input,
+        now,
+        operations(input),
+      );
+    },
+  };
+}
+
 test("matches a repeated pending request with identical details in the short window", () => {
   assert.equal(
     isDuplicatePublicBookingRequest(existingRequest(), clinicId, details, now),
     true,
   );
+});
+
+test("creates a booking request when no matching request exists", async () => {
+  const harness = createRequestHarness();
+
+  const result = await harness.submit();
+
+  assert.deepEqual(result, { id: "request-1" });
+  assert.equal(harness.requests.length, 1);
+});
+
+test("reuses a repeated identical booking request", async () => {
+  const harness = createRequestHarness();
+
+  const first = await harness.submit();
+  const second = await harness.submit();
+
+  assert.deepEqual(second, first);
+  assert.equal(harness.requests.length, 1);
+});
+
+test("serializes concurrent identical submissions and creates only one request", async () => {
+  const harness = createRequestHarness();
+
+  const results = await Promise.all([harness.submit(), harness.submit()]);
+
+  assert.deepEqual(results[0], results[1]);
+  assert.equal(harness.requests.length, 1);
+});
+
+test("creates a distinct request for different booking details", async () => {
+  const harness = createRequestHarness();
+  const differentBooking = {
+    ...details,
+    requestedAt: new Date(details.requestedAt.getTime() + 60 * 60_000),
+  };
+
+  const first = await harness.submit();
+  const second = await harness.submit(differentBooking);
+
+  assert.notDeepEqual(second, first);
+  assert.equal(harness.requests.length, 2);
 });
 
 test("does not deduplicate a different booking or another clinic's request", () => {
@@ -99,4 +198,14 @@ test("phone lock keys are stable and scoped by both clinic and phone", () => {
     getPublicBookingPhoneLockKey(clinicId, details.phoneNumber),
     getPublicBookingPhoneLockKey(clinicId, "+919876543211"),
   );
+});
+
+test("phone lock query returns an integer while retaining the transaction lock", () => {
+  const query = getPublicBookingPhoneLockQuery("clinic-phone-key");
+
+  assert.match(
+    query.sql,
+    /SELECT \(pg_advisory_xact_lock\(hashtext\(\?\)\) IS NULL\)::int AS locked/,
+  );
+  assert.deepEqual(query.values, ["clinic-phone-key"]);
 });
