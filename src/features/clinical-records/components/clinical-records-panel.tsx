@@ -10,6 +10,7 @@ import type { DentalClinicalRecord } from "@/features/clinical-records/lib/clini
 type ClinicalRecordsPanelProps = Readonly<{
   clinicId: string;
   patientId: string;
+  initialVisitId?: string;
   records: DentalClinicalRecord[];
   visits: Array<{
     id: string;
@@ -40,6 +41,7 @@ function formatDate(dateLike: string | Date) {
 export function ClinicalRecordsPanel({
   clinicId,
   patientId,
+  initialVisitId,
   records,
   visits,
   odontogramEntries,
@@ -73,7 +75,7 @@ export function ClinicalRecordsPanel({
             <select
               name="visitId"
               className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
-              defaultValue=""
+              defaultValue={initialVisitId ?? ""}
             >
               <option value="">General record</option>
               {visits.map((visit) => (
