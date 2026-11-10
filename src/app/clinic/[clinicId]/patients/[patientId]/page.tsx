@@ -46,6 +46,7 @@ type PatientDetailPageProps = Readonly<{
   params: { clinicId: string; patientId: string };
   searchParams?: {
     prescriptionVisitId?: string;
+    clinicalVisitId?: string;
     amendsPrescriptionId?: string;
   };
 }>;
@@ -144,6 +145,11 @@ export default async function PatientDetailPage({
       treatmentPlan: { id: plan.id, name: plan.name },
     })),
   );
+  const initialClinicalVisitId = treatmentVisitOptions.some(
+    (visit) => visit.id === searchParams?.clinicalVisitId,
+  )
+    ? searchParams?.clinicalVisitId
+    : undefined;
   const { allergies, medicalHistory } =
     getPatient360MedicalAlerts(clinicalRecords);
   const timeline = buildPatient360Timeline([
@@ -390,6 +396,7 @@ export default async function PatientDetailPage({
           <ClinicalRecordsPanel
             clinicId={membership.clinicId}
             patientId={patient.id}
+            initialVisitId={initialClinicalVisitId}
             records={clinicalRecords}
             visits={treatmentVisitOptions}
             odontogramEntries={chartEntries.map((entry) => ({
