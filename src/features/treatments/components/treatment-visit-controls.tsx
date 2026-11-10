@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { TreatmentVisitStatus } from "@prisma/client";
 import { useFormState } from "react-dom";
 
@@ -45,6 +46,12 @@ export function TreatmentVisitControls({
 
   return (
     <div className="mt-4 grid gap-4 border-t border-slate-100 pt-4 lg:grid-cols-2">
+      <Link
+        className="inline-flex min-h-9 items-center rounded-md border border-teal-700 px-3 text-sm font-medium text-teal-800 hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 lg:col-span-2"
+        href={`/clinic/${clinicId}/patients/${patientId}?clinicalVisitId=${encodeURIComponent(visitId)}#clinical-records`}
+      >
+        Record clinical notes for this visit
+      </Link>
       <form action={statusAction} className="flex flex-col gap-2 sm:flex-row">
         <input name="clinicId" type="hidden" value={clinicId} />
         <input name="patientId" type="hidden" value={patientId} />
