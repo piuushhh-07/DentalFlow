@@ -656,117 +656,127 @@ export async function approveAppointmentRequest(
   clinicId: string,
   requestId: string,
 ) {
-  return prisma.$transaction(
-    async (transaction) => {
-      const request = await transaction.appointmentRequest.findFirst({
-        where: {
-          id: requestId,
-          clinicId,
-          status: AppointmentRequestStatus.PENDING,
-        },
-      });
-      if (!request) throw new AppointmentRequestNotFoundError();
-      if (!request.dentistId || !request.chairId) {
-        throw new AppointmentResourceNotFoundError();
-      }
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (transaction) => {
+          const request = await transaction.appointmentRequest.findFirst({
+            where: {
+              id: requestId,
+              clinicId,
+              status: AppointmentRequestStatus.PENDING,
+            },
+          });
+          if (!request) throw new AppointmentRequestNotFoundError();
+          if (!request.dentistId || !request.chairId) {
+            throw new AppointmentResourceNotFoundError();
+          }
 
-      const startAt = request.requestedAt;
-      const resources = await getActiveScheduleResources(
-        transaction,
-        clinicId,
-        { dentistId: request.dentistId, chairId: request.chairId },
-      );
-      const appointmentInput = {
-        date: new Intl.DateTimeFormat("en-CA", {
-          timeZone: "Asia/Kolkata",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).format(startAt),
-        time: new Intl.DateTimeFormat("en-GB", {
-          timeZone: "Asia/Kolkata",
-          hour: "2-digit",
-          minute: "2-digit",
-          hourCycle: "h23",
-        }).format(startAt),
-        durationMinutes: request.durationMinutes,
-        dentistId: request.dentistId,
-        chairId: request.chairId,
-      };
-      const patient = await transaction.patient.findFirst({
-        where: { clinicId, normalizedPhone: request.phoneNumber },
-        select: { id: true },
-      });
-      let patientId = patient?.id;
-      if (!patientId) {
-        await assertPatientCapacity(transaction, clinicId);
-        const createdPatient = await transaction.patient.create({
-          data: {
+          const startAt = request.requestedAt;
+          const resources = await getActiveScheduleResources(
+            transaction,
             clinicId,
-            fullName: request.patientName,
-            phoneNumber: request.phoneNumber,
-            normalizedPhone: request.phoneNumber,
-          },
-          select: { id: true },
-        });
-        patientId = createdPatient.id;
-      }
+            { dentistId: request.dentistId, chairId: request.chairId },
+          );
+          const appointmentInput = {
+            date: new Intl.DateTimeFormat("en-CA", {
+              timeZone: "Asia/Kolkata",
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            }).format(startAt),
+            time: new Intl.DateTimeFormat("en-GB", {
+              timeZone: "Asia/Kolkata",
+              hour: "2-digit",
+              minute: "2-digit",
+              hourCycle: "h23",
+            }).format(startAt),
+            durationMinutes: request.durationMinutes,
+            dentistId: request.dentistId,
+            chairId: request.chairId,
+          };
+          const patient = await transaction.patient.findFirst({
+            where: { clinicId, normalizedPhone: request.phoneNumber },
+            select: { id: true },
+          });
+          let patientId = patient?.id;
+          if (!patientId) {
+            await assertPatientCapacity(transaction, clinicId);
+            const createdPatient = await transaction.patient.create({
+              data: {
+                clinicId,
+                fullName: request.patientName,
+                phoneNumber: request.phoneNumber,
+                normalizedPhone: request.phoneNumber,
+              },
+              select: { id: true },
+            });
+            patientId = createdPatient.id;
+          }
 
-      await assertMonthlyAppointmentCapacity(transaction, clinicId);
-      const conflictInput = {
-        date: appointmentInput.date,
-        time: appointmentInput.time,
-        durationMinutes: appointmentInput.durationMinutes,
-        dentistName: resources.dentistName,
-        chairLabel: resources.chairLabel,
-      };
-      const scheduledAt = await assertNoSchedulingConflict(
-        transaction,
-        clinicId,
+          await assertMonthlyAppointmentCapacity(transaction, clinicId);
+          const conflictInput = {
+            date: appointmentInput.date,
+            time: appointmentInput.time,
+            durationMinutes: appointmentInput.durationMinutes,
+            dentistName: resources.dentistName,
+            chairLabel: resources.chairLabel,
+          };
+          const scheduledAt = await assertNoSchedulingConflict(
+            transaction,
+            clinicId,
+            {
+              ...conflictInput,
+              patientId,
+              treatmentVisitId: null,
+              dentistId: request.dentistId,
+              chairId: request.chairId,
+              type: request.type,
+              notes: request.notes,
+            },
+            resources,
+          );
+          const appointment = await transaction.appointment.create({
+            data: {
+              clinicId,
+              patientId,
+              scheduledAt,
+              durationMinutes: request.durationMinutes,
+              dentistId: request.dentistId,
+              chairId: request.chairId,
+              dentistName: resources.dentistName,
+              chairLabel: resources.chairLabel,
+              type: request.type,
+              notes: request.notes,
+            },
+            select: { id: true },
+          });
+          const updatedRequest =
+            await transaction.appointmentRequest.updateMany({
+              where: {
+                id: request.id,
+                clinicId,
+                status: AppointmentRequestStatus.PENDING,
+              },
+              data: { status: AppointmentRequestStatus.APPROVED },
+            });
+          if (updatedRequest.count !== 1) {
+            throw new AppointmentRequestNotFoundError();
+          }
+          return appointment;
+        },
         {
-          ...conflictInput,
-          patientId,
-          treatmentVisitId: null,
-          dentistId: request.dentistId,
-          chairId: request.chairId,
-          type: request.type,
-          notes: request.notes,
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          timeout: 10_000,
         },
-        resources,
       );
-      const appointment = await transaction.appointment.create({
-        data: {
-          clinicId,
-          patientId,
-          scheduledAt,
-          durationMinutes: request.durationMinutes,
-          dentistId: request.dentistId,
-          chairId: request.chairId,
-          dentistName: resources.dentistName,
-          chairLabel: resources.chairLabel,
-          type: request.type,
-          notes: request.notes,
-        },
-        select: { id: true },
-      });
-      const updatedRequest = await transaction.appointmentRequest.updateMany({
-        where: {
-          id: request.id,
-          clinicId,
-          status: AppointmentRequestStatus.PENDING,
-        },
-        data: { status: AppointmentRequestStatus.APPROVED },
-      });
-      if (updatedRequest.count !== 1) {
-        throw new AppointmentRequestNotFoundError();
-      }
-      return appointment;
-    },
-    {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-      timeout: 10_000,
-    },
-  );
+    } catch (error) {
+      if (attempt === 0 && isSerializationFailure(error)) continue;
+      throw error;
+    }
+  }
+
+  throw new Error("Appointment request approval retry limit exceeded.");
 }
 
 export async function createScheduleResource(
@@ -933,95 +943,103 @@ export async function updateClinicAppointment(
   input: AppointmentInput,
 ) {
   const diagnostic = startTransactionDiagnostic("appointment.update");
-  try {
-    const result = await prisma.$transaction(
-      async (transaction) => {
-        recordTransactionPhase(diagnostic, "callback_entry");
-        try {
-          const existing = await measureTransactionQuery(
-            diagnostic,
-            "findAppointment",
-            () =>
-              transaction.appointment.findFirst({
-                where: { id: appointmentId, clinicId },
-                select: { id: true, status: true },
-              }),
-          );
-          if (!existing) throw new AppointmentNotFoundError();
-          if (
-            existing.status === AppointmentStatus.COMPLETED ||
-            existing.status === AppointmentStatus.CANCELLED
-          ) {
-            throw new AppointmentTransitionError(
-              "Completed or cancelled appointments cannot be edited.",
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const result = await prisma.$transaction(
+        async (transaction) => {
+          recordTransactionPhase(diagnostic, "callback_entry");
+          try {
+            const existing = await measureTransactionQuery(
+              diagnostic,
+              "findAppointment",
+              () =>
+                transaction.appointment.findFirst({
+                  where: { id: appointmentId, clinicId },
+                  select: { id: true, status: true },
+                }),
             );
+            if (!existing) throw new AppointmentNotFoundError();
+            if (
+              existing.status === AppointmentStatus.COMPLETED ||
+              existing.status === AppointmentStatus.CANCELLED
+            ) {
+              throw new AppointmentTransitionError(
+                "Completed or cancelled appointments cannot be edited.",
+              );
+            }
+            await validatePatientAndVisit(
+              transaction,
+              clinicId,
+              input,
+              diagnostic,
+            );
+            await validateVisitBookingAvailability(
+              transaction,
+              clinicId,
+              input.treatmentVisitId,
+              appointmentId,
+            );
+            const resources = await getActiveScheduleResources(
+              transaction,
+              clinicId,
+              input,
+            );
+            const scheduledAt = await assertNoSchedulingConflict(
+              transaction,
+              clinicId,
+              input,
+              resources,
+              appointmentId,
+              diagnostic,
+            );
+            await measureTransactionQuery(diagnostic, "updateAppointment", () =>
+              transaction.appointment.updateMany({
+                where: { id: appointmentId, clinicId },
+                data: {
+                  patientId: input.patientId,
+                  treatmentVisitId: input.treatmentVisitId,
+                  dentistId: input.dentistId,
+                  chairId: input.chairId,
+                  scheduledAt,
+                  durationMinutes: input.durationMinutes,
+                  dentistName: resources.dentistName,
+                  chairLabel: resources.chairLabel,
+                  type: input.type,
+                  notes: input.notes,
+                },
+              }),
+            );
+            recordTransactionPhase(diagnostic, "callback_completed");
+            return { id: appointmentId };
+          } catch (error) {
+            recordTransactionPhase(diagnostic, "callback_failed", error);
+            throw error;
           }
-          await validatePatientAndVisit(
-            transaction,
-            clinicId,
-            input,
-            diagnostic,
-          );
-          await validateVisitBookingAvailability(
-            transaction,
-            clinicId,
-            input.treatmentVisitId,
-            appointmentId,
-          );
-          const resources = await getActiveScheduleResources(
-            transaction,
-            clinicId,
-            input,
-          );
-          const scheduledAt = await assertNoSchedulingConflict(
-            transaction,
-            clinicId,
-            input,
-            resources,
-            appointmentId,
-            diagnostic,
-          );
-          await measureTransactionQuery(diagnostic, "updateAppointment", () =>
-            transaction.appointment.updateMany({
-              where: { id: appointmentId, clinicId },
-              data: {
-                patientId: input.patientId,
-                treatmentVisitId: input.treatmentVisitId,
-                dentistId: input.dentistId,
-                chairId: input.chairId,
-                scheduledAt,
-                durationMinutes: input.durationMinutes,
-                dentistName: resources.dentistName,
-                chairLabel: resources.chairLabel,
-                type: input.type,
-                notes: input.notes,
-              },
-            }),
-          );
-          recordTransactionPhase(diagnostic, "callback_completed");
-          return { id: appointmentId };
-        } catch (error) {
-          recordTransactionPhase(diagnostic, "callback_failed", error);
-          throw error;
-        }
-      },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        timeout: 10_000,
-      },
-    );
-    recordTransactionPhase(diagnostic, "outer_resolved");
-    return result;
-  } catch (error) {
-    recordTransactionPhase(diagnostic, "outer_rejected", error);
-    await rethrowVisitBookingConflict(
-      error,
-      clinicId,
-      input.treatmentVisitId,
-      appointmentId,
-    );
-    throw error;
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          timeout: 10_000,
+        },
+      );
+      recordTransactionPhase(diagnostic, "outer_resolved");
+      return result;
+    } catch (error) {
+      if (attempt === 0 && isSerializationFailure(error)) {
+        recordTransactionPhase(diagnostic, "serialization_retry", error);
+        continue;
+      }
+      recordTransactionPhase(diagnostic, "outer_rejected", error);
+      await rethrowVisitBookingConflict(
+        error,
+        clinicId,
+        input.treatmentVisitId,
+        appointmentId,
+      );
+      throw error;
+    }
   }
+
+  throw new Error("Appointment update retry limit exceeded.");
 }
 
 export async function updateClinicAppointmentStatus(
