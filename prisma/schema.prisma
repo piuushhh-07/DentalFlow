@@ -452,6 +452,7 @@ model ClinicMembership {
   role                            ClinicRole
   createdAt                       DateTime                  @default(now()) @db.Timestamptz(6)
   updatedAt                       DateTime                  @updatedAt @db.Timestamptz(6)
+  revokedAt                       DateTime?                 @db.Timestamptz(6)
   clinic                          Clinic                    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   user                            UserProfile               @relation(fields: [userId], references: [id], onDelete: Cascade)
   messageLogs                     MessageLog[]              @relation("MessageSender")
@@ -472,6 +473,7 @@ model ClinicMembership {
 
   @@unique([userId, clinicId])
   @@index([clinicId, role])
+  @@index([clinicId, revokedAt, role])
   @@map("clinic_memberships")
 }
 

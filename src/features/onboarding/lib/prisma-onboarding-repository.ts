@@ -27,7 +27,7 @@ async function listMemberships(
   userId: string,
 ): Promise<ExistingClinicMembership[]> {
   const memberships = await prisma.clinicMembership.findMany({
-    where: { userId },
+    where: { userId, revokedAt: null },
     select: {
       clinicId: true,
       clinic: { select: { name: true } },
@@ -58,7 +58,7 @@ async function ensureOwnerClinic(
       `;
 
       const memberships = await transaction.clinicMembership.findMany({
-        where: { userId },
+        where: { userId, revokedAt: null },
         select: {
           clinicId: true,
           clinic: { select: { name: true } },

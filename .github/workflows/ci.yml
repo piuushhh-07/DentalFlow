@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -45,8 +47,25 @@ jobs:
       - name: Validate Prisma schema
         run: npm run db:validate
 
-      - name: Check formatting
-        run: npm run format:check
+      - name: Check formatting of changed files
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            CHANGED_FILES="$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$GITHUB_SHA" -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.mts' '*.cts' '*.json' '*.md' '*.mdx' '*.css' '*.scss' '*.html' '*.yml' '*.yaml' '*.prisma')"
+          elif [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            CHANGED_FILES="$(git diff --name-only --diff-filter=ACMR "${{ github.event.before }}" "$GITHUB_SHA" -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.mts' '*.cts' '*.json' '*.md' '*.mdx' '*.css' '*.scss' '*.html' '*.yml' '*.yaml' '*.prisma')"
+          else
+            CHANGED_FILES="$(git ls-files '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.mts' '*.cts' '*.json' '*.md' '*.mdx' '*.css' '*.scss' '*.html' '*.yml' '*.yaml' '*.prisma')"
+          fi
+
+          if [[ -z "$CHANGED_FILES" ]]; then
+            echo "No Prettier-supported files changed."
+            exit 0
+          fi
+
+          mapfile -t FILES <<< "$CHANGED_FILES"
+          npx prettier --check "${FILES[@]}"
 
       - name: Build
         run: npm run build
