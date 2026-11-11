@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 const email = process.env.E2E_OWNER_EMAIL;
 const password = process.env.E2E_OWNER_PASSWORD;
 
-test("owner can sign in and open the clinic schedule (read-only)", async ({
+test("owner can see the clinic setup checklist and open the schedule (read-only)", async ({
   page,
 }) => {
   test.skip(
@@ -22,6 +22,14 @@ test("owner can sign in and open the clinic schedule (read-only)", async ({
   await expect(page).toHaveURL(/\/clinic\/[0-9a-f-]{36}(?:\?.*)?$/i, {
     timeout: 30_000,
   });
+
+  await expect(
+    page.getByRole("heading", { name: "Your clinic setup", exact: true }),
+  ).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Set up dentists and chairs")).toBeVisible();
+  await expect(page.getByText("Add your first patient")).toBeVisible();
+  await expect(page.getByText("Schedule your first appointment")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Manage team/ })).toBeVisible();
 
   const scheduleLink = page.locator('a[href$="/appointments"]').first();
   await expect(scheduleLink).toBeVisible({ timeout: 20_000 });
