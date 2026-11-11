@@ -47,11 +47,6 @@ jobs:
       - name: Validate Prisma schema
         run: npm run db:validate
 
-      - name: Print canonical Prettier output (temporary diagnostic)
-        run: |
-          npx prettier --write tests/e2e/schedule-resource-management.spec.ts
-          cat tests/e2e/schedule-resource-management.spec.ts
-
       - name: Check formatting of changed files
         shell: bash
         run: |
