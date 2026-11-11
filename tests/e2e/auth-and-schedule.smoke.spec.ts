@@ -63,7 +63,7 @@ test("staff can use clinic operations but cannot open owner administration (read
   await page.getByLabel("Password").fill(staffPassword!);
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page).toHaveURL(/\/clinic\/[0-9a-f-]{36}(?:\\?.*)?$/i, {
+  await expect(page).toHaveURL(/\/clinic\/[0-9a-f-]{36}(?:\?.*)?$/i, {
     timeout: 30_000,
   });
 
