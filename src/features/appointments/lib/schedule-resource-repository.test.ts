@@ -386,3 +386,56 @@ test("setScheduleResourceActive reports a chair from another clinic as not found
     data: { active: false },
   });
 });
+
+
+test("renameScheduleResource cannot rename a dentist owned by another clinic", async (t) => {
+  let updateArgs: unknown;
+  mockResourceModel(t, "clinicDentist", {
+    findFirst: async () => null,
+    create: async () => ({ id: dentistId }),
+    updateMany: async (args) => {
+      updateArgs = args;
+      return { count: 0 };
+    },
+  });
+
+  await assert.rejects(
+    repository.renameScheduleResource(
+      clinicAId,
+      "dentist",
+      dentistId,
+      "Dr. Mehta",
+    ),
+    repository.ScheduleResourceNotFoundError,
+  );
+  assert.deepEqual(updateArgs, {
+    where: { id: dentistId, clinicId: clinicAId },
+    data: { name: "Dr. Mehta" },
+  });
+});
+
+test("renameScheduleResource cannot rename a chair owned by another clinic", async (t) => {
+  let updateArgs: unknown;
+  mockResourceModel(t, "treatmentChair", {
+    findFirst: async () => null,
+    create: async () => ({ id: chairId }),
+    updateMany: async (args) => {
+      updateArgs = args;
+      return { count: 0 };
+    },
+  });
+
+  await assert.rejects(
+    repository.renameScheduleResource(
+      clinicAId,
+      "chair",
+      chairId,
+      "Surgery Chair",
+    ),
+    repository.ScheduleResourceNotFoundError,
+  );
+  assert.deepEqual(updateArgs, {
+    where: { id: chairId, clinicId: clinicAId },
+    data: { label: "Surgery Chair" },
+  });
+});
