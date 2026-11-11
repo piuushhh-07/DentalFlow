@@ -59,128 +59,121 @@ test.describe("OWNER schedule resource management (staging only)", () => {
     "Set OWNER credentials, E2E_RESOURCE_TEST_CLINIC_ID, E2E_RESOURCE_TEST_ALLOWED_HOST, and E2E_ALLOW_RESOURCE_MUTATIONS=1 to enable write tests.",
   );
 
-  test(
-    "creates, rejects duplicates, renames, and deactivates dentists and chairs",
-    async ({ page }) => {
-      const configuredBaseUrl = test.info().project.use.baseURL as string;
-      const host = new URL(configuredBaseUrl).hostname;
-      expect(host).toBe(allowedResourceTestHost);
-      expect(
-        host,
-        "Resource mutation tests must never run against the production DentalFlow host.",
-      ).not.toBe(productionHost);
+  test("creates, rejects duplicates, renames, and deactivates dentists and chairs", async ({
+    page,
+  }) => {
+    const configuredBaseUrl = test.info().project.use.baseURL as string;
+    const host = new URL(configuredBaseUrl).hostname;
+    expect(host).toBe(allowedResourceTestHost);
+    expect(
+      host,
+      "Resource mutation tests must never run against the production DentalFlow host.",
+    ).not.toBe(productionHost);
 
-      await signInAndOpenSchedule(page);
+    await signInAndOpenSchedule(page);
 
-      const suffix = Date.now().toString();
-      const dentistOne = `E2E Dentist One ${suffix}`;
-      const dentistTwo = `E2E Dentist Two ${suffix}`;
-      const renamedDentist = `E2E Dentist Renamed ${suffix}`;
-      const chairOne = `E2E Chair One ${suffix}`;
-      const chairTwo = `E2E Chair Two ${suffix}`;
-      const renamedChair = `E2E Chair Renamed ${suffix}`;
+    const suffix = Date.now().toString();
+    const dentistOne = `E2E Dentist One ${suffix}`;
+    const dentistTwo = `E2E Dentist Two ${suffix}`;
+    const renamedDentist = `E2E Dentist Renamed ${suffix}`;
+    const chairOne = `E2E Chair One ${suffix}`;
+    const chairTwo = `E2E Chair Two ${suffix}`;
+    const renamedChair = `E2E Chair Renamed ${suffix}`;
 
-      await submitCreate(
-        page,
-        "dentist-name",
-        dentistOne,
-        "Dentist added successfully.",
-      );
-      await expect(
-        page.locator("article").filter({ hasText: dentistOne }),
-      ).toBeVisible();
+    await submitCreate(
+      page,
+      "dentist-name",
+      dentistOne,
+      "Dentist added successfully.",
+    );
+    await expect(
+      page.locator("article").filter({ hasText: dentistOne }),
+    ).toBeVisible();
 
-      await submitCreate(
-        page,
-        "chair-name",
-        chairOne,
-        "Treatment chair added successfully.",
-      );
-      await expect(
-        page.locator("article").filter({ hasText: chairOne }),
-      ).toBeVisible();
+    await submitCreate(
+      page,
+      "chair-name",
+      chairOne,
+      "Treatment chair added successfully.",
+    );
+    await expect(
+      page.locator("article").filter({ hasText: chairOne }),
+    ).toBeVisible();
 
-      // Duplicate creation must be rejected without adding another resource.
-      await page.locator("#dentist-name").fill(dentistOne);
-      await page
-        .locator("#dentist-name")
-        .locator("xpath=ancestor::form")
-        .getByRole("button")
-        .click();
-      await expect(page.getByText(/already exists/i)).toBeVisible();
+    // Duplicate creation must be rejected without adding another resource.
+    await page.locator("#dentist-name").fill(dentistOne);
+    await page
+      .locator("#dentist-name")
+      .locator("xpath=ancestor::form")
+      .getByRole("button")
+      .click();
+    await expect(page.getByText(/already exists/i)).toBeVisible();
 
-      await page.locator("#chair-name").fill(chairOne);
-      await page
-        .locator("#chair-name")
-        .locator("xpath=ancestor::form")
-        .getByRole("button")
-        .click();
-      await expect(page.getByText(/already exists/i).last()).toBeVisible();
+    await page.locator("#chair-name").fill(chairOne);
+    await page
+      .locator("#chair-name")
+      .locator("xpath=ancestor::form")
+      .getByRole("button")
+      .click();
+    await expect(page.getByText(/already exists/i).last()).toBeVisible();
 
-      await submitCreate(
-        page,
-        "dentist-name",
-        dentistTwo,
-        "Dentist added successfully.",
-      );
-      await submitCreate(
-        page,
-        "chair-name",
-        chairTwo,
-        "Treatment chair added successfully.",
-      );
+    await submitCreate(
+      page,
+      "dentist-name",
+      dentistTwo,
+      "Dentist added successfully.",
+    );
+    await submitCreate(
+      page,
+      "chair-name",
+      chairTwo,
+      "Treatment chair added successfully.",
+    );
 
-      await renameResource(page, dentistOne, renamedDentist);
-      await expect(
-        page.locator("article").filter({ hasText: renamedDentist }),
-      ).toBeVisible();
-      await renameResource(page, chairOne, renamedChair);
-      await expect(
-        page.locator("article").filter({ hasText: renamedChair }),
-      ).toBeVisible();
+    await renameResource(page, dentistOne, renamedDentist);
+    await expect(
+      page.locator("article").filter({ hasText: renamedDentist }),
+    ).toBeVisible();
+    await renameResource(page, chairOne, renamedChair);
+    await expect(
+      page.locator("article").filter({ hasText: renamedChair }),
+    ).toBeVisible();
 
-      // Renaming a second resource to an existing name must be rejected.
-      await renameResource(page, dentistTwo, renamedDentist);
-      await expect(page.getByText(/already exists/i).last()).toBeVisible();
-      await renameResource(page, chairTwo, renamedChair);
-      await expect(page.getByText(/already exists/i).last()).toBeVisible();
+    // Renaming a second resource to an existing name must be rejected.
+    await renameResource(page, dentistTwo, renamedDentist);
+    await expect(page.getByText(/already exists/i).last()).toBeVisible();
+    await renameResource(page, chairTwo, renamedChair);
+    await expect(page.getByText(/already exists/i).last()).toBeVisible();
 
-      const dentistCard = page
-        .locator("article")
-        .filter({ hasText: renamedDentist });
-      await dentistCard.getByRole("button", { name: "Deactivate" }).click();
-      await expect(
-        dentistCard.getByText("Inactive", { exact: true }),
-      ).toBeVisible();
+    const dentistCard = page
+      .locator("article")
+      .filter({ hasText: renamedDentist });
+    await dentistCard.getByRole("button", { name: "Deactivate" }).click();
+    await expect(
+      dentistCard.getByText("Inactive", { exact: true }),
+    ).toBeVisible();
 
-      const chairCard = page
-        .locator("article")
-        .filter({ hasText: renamedChair });
-      await chairCard.getByRole("button", { name: "Deactivate" }).click();
-      await expect(
-        chairCard.getByText("Inactive", { exact: true }),
-      ).toBeVisible();
+    const chairCard = page.locator("article").filter({ hasText: renamedChair });
+    await chairCard.getByRole("button", { name: "Deactivate" }).click();
+    await expect(
+      chairCard.getByText("Inactive", { exact: true }),
+    ).toBeVisible();
 
-      // Deactivate the second resources too, so the disposable clinic is left tidy.
-      const secondDentistCard = page
-        .locator("article")
-        .filter({ hasText: dentistTwo });
-      await secondDentistCard
-        .getByRole("button", { name: "Deactivate" })
-        .click();
-      await expect(
-        secondDentistCard.getByText("Inactive", { exact: true }),
-      ).toBeVisible();
+    // Deactivate the second resources too, so the disposable clinic is left tidy.
+    const secondDentistCard = page
+      .locator("article")
+      .filter({ hasText: dentistTwo });
+    await secondDentistCard.getByRole("button", { name: "Deactivate" }).click();
+    await expect(
+      secondDentistCard.getByText("Inactive", { exact: true }),
+    ).toBeVisible();
 
-      const secondChairCard = page
-        .locator("article")
-        .filter({ hasText: chairTwo });
-      await secondChairCard
-        .getByRole("button", { name: "Deactivate" })
-        .click();
-      await expect(
-        secondChairCard.getByText("Inactive", { exact: true }),
-      ).toBeVisible();
-    },
-  );
+    const secondChairCard = page
+      .locator("article")
+      .filter({ hasText: chairTwo });
+    await secondChairCard.getByRole("button", { name: "Deactivate" }).click();
+    await expect(
+      secondChairCard.getByText("Inactive", { exact: true }),
+    ).toBeVisible();
+  });
 });
