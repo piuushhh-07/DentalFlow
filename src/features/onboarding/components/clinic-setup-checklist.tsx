@@ -1,13 +1,21 @@
 import "server-only";
 
 import Link from "next/link";
-import { ArrowRight, CalendarPlus, CheckCircle2, UserPlus, Users } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarPlus,
+  CheckCircle2,
+  UserPlus,
+  Users,
+} from "lucide-react";
 
 import { prisma } from "@/lib/db/prisma";
 
 type ClinicSetupChecklistProps = Readonly<{ clinicId: string }>;
 
-export async function ClinicSetupChecklist({ clinicId }: ClinicSetupChecklistProps) {
+export async function ClinicSetupChecklist({
+  clinicId,
+}: ClinicSetupChecklistProps) {
   const [dentists, chairs, patients, appointments, staff] = await Promise.all([
     prisma.clinicDentist.count({ where: { clinicId, active: true } }),
     prisma.treatmentChair.count({ where: { clinicId, active: true } }),
@@ -57,7 +65,10 @@ export async function ClinicSetupChecklist({ clinicId }: ClinicSetupChecklistPro
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700">
             Getting started
           </p>
-          <h2 id="clinic-setup-heading" className="mt-1 text-lg font-semibold text-slate-900">
+          <h2
+            id="clinic-setup-heading"
+            className="mt-1 text-lg font-semibold text-slate-900"
+          >
             Your clinic setup
           </h2>
           <p className="mt-1 text-sm text-slate-600">
@@ -102,7 +113,10 @@ export async function ClinicSetupChecklist({ clinicId }: ClinicSetupChecklistPro
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1 text-sm font-semibold text-slate-900">
                     {item.title}
-                    <ArrowRight aria-hidden="true" className="size-3.5 shrink-0 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+                    <ArrowRight
+                      aria-hidden="true"
+                      className="size-3.5 shrink-0 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100"
+                    />
                   </span>
                   <span className="mt-1 block text-xs leading-5 text-slate-500">
                     {item.done ? "Completed" : item.description}
@@ -116,9 +130,14 @@ export async function ClinicSetupChecklist({ clinicId }: ClinicSetupChecklistPro
 
       <div className="mt-4 flex flex-col gap-2 border-t border-teal-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2 text-sm text-slate-600">
-          <Users aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-teal-700" />
+          <Users
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-teal-700"
+          />
           <span>
-            <strong className="font-semibold text-slate-800">Team access:</strong>{" "}
+            <strong className="font-semibold text-slate-800">
+              Team access:
+            </strong>{" "}
             {staff > 0
               ? `${staff} active staff member${staff === 1 ? "" : "s"} added`
               : "Optional — invite reception or clinical staff when you are ready."}
