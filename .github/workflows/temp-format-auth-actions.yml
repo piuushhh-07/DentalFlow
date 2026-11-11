@@ -1,0 +1,34 @@
+name: Temporary format auth actions
+
+on:
+  push:
+    branches:
+      - fix/soft-revoke-legacy-staff-action
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/soft-revoke-legacy-staff-action
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write src/features/auth/actions.ts
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then
+            echo "Prettier produced no changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/features/auth/actions.ts
+          git commit -m "style: apply Prettier to auth actions"
+          git push origin HEAD:fix/soft-revoke-legacy-staff-action
