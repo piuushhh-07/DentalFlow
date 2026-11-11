@@ -2,7 +2,7 @@
 
 The suite has two levels:
 
-- A read-only OWNER smoke test that verifies the clinic setup checklist, opens the clinic schedule, and checks that schedule resources render.
+- Read-only OWNER and STAFF browser smoke tests. OWNER verifies the clinic setup checklist and schedule. STAFF verifies routine patient/scheduling access, absence of owner-only navigation, and server-side denial of the team settings route.
 - An opt-in schedule-resource management test that creates uniquely named dentists/chairs, checks duplicate rejection, renames resources, and deactivates them.
 
 ## 1. Install
@@ -28,7 +28,22 @@ $env:E2E_OWNER_PASSWORD = "your-test-password"
 
 For a local instance, use `http://localhost:3000` and start the app separately with `npm run dev`.
 
-## 3. Run the read-only smoke test
+## 3. Configure and run the read-only STAFF smoke test
+
+Use a dedicated staging STAFF account that belongs to the same staging clinic as the OWNER test account. Do not reuse a production account or commit credentials.
+
+PowerShell:
+
+```powershell
+$env:E2E_STAFF_EMAIL = "your-test-staff@example.com"
+$env:E2E_STAFF_PASSWORD = "your-test-password"
+```
+
+The STAFF browser test checks the clinic role label, confirms owner-only checklist/team/billing navigation is absent, directly requests the team settings URL and verifies the owner-only page is not rendered, then confirms patient-directory and appointment-schedule access.
+
+Run both configured read-only role tests:
+
+## 4. Run the read-only smoke tests
 
 ```bash
 npm run test:e2e
@@ -40,7 +55,7 @@ Optional interactive runner:
 npm run test:e2e:ui
 ```
 
-## 4. Enable schedule-resource write tests (disposable staging clinic only)
+## 5. Enable schedule-resource write tests (disposable staging clinic only)
 
 These tests create four uniquely named resources, exercise duplicate creation and duplicate rename rejection, rename two resources, and deactivate all four. They do not delete records. Use a disposable staging clinic that can be reset; never use production or a clinic containing real operational data.
 
