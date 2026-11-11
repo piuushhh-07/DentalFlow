@@ -49,7 +49,7 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet, headers) {
           for (const { name, value } of cookiesToSet) {
             request.cookies.set(name, value);
           }
@@ -58,6 +58,13 @@ export async function middleware(request: NextRequest) {
 
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
+          }
+
+          // @supabase/ssr supplies cache-control headers when it refreshes
+          // cookies. Preserve them to prevent authenticated responses from
+          // being cached and shared across users.
+          for (const [name, value] of Object.entries(headers)) {
+            response.headers.set(name, value);
           }
         },
       },
@@ -68,11 +75,10 @@ export async function middleware(request: NextRequest) {
   let error: unknown = null;
 
   try {
-    // Middleware uses the cookie-backed session only for redirect UX.
-    // Protected pages, route handlers, and server actions must still verify
-    // the user with auth.getUser() before accessing clinic data.
-    const result = await supabase.auth.getSession();
-    user = result.data.session?.user ?? null;
+    // getClaims verifies the JWT signature. Never use getSession() to make
+    // server-side access decisions because cookie contents can be spoofed.
+    const result = await supabase.auth.getClaims();
+    user = result.data?.claims ?? null;
     error = result.error;
   } catch (authError) {
     error = authError;
