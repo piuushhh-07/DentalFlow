@@ -146,7 +146,12 @@ export async function inviteClinicStaffAction(
   formData: FormData,
 ): Promise<ClinicTeamActionState> {
   const clinicId = z.string().uuid().safeParse(formData.get("clinicId"));
-  const email = z.string().trim().email().max(254).safeParse(formData.get("email"));
+  const email = z
+    .string()
+    .trim()
+    .email()
+    .max(254)
+    .safeParse(formData.get("email"));
   if (!clinicId.success || !email.success) {
     return { error: "Enter a valid staff email address." };
   }
@@ -264,7 +269,6 @@ export async function removeClinicStaffAction(
     return { error: "You cannot remove your own owner access." };
   }
   // Keep this update shape aligned with the shared membership-revocation action.
-  // prettier-ignore
   const revoked = await prisma.clinicMembership.updateMany({
     where: {
       clinicId: owner.clinicId,
