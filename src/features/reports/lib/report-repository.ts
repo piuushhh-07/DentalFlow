@@ -162,7 +162,6 @@ export async function getClinicReportMetrics(
   };
 }
 
-
 export type ClinicExpenseReportSummary = Readonly<{
   total: number;
   transactions: number;
@@ -179,8 +178,12 @@ export async function getClinicExpenseReportSummary(
     month: "2-digit",
   }).formatToParts(new Date());
   const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-  const monthStart = new Date(values.year + "-" + values.month + "-01T00:00:00.000Z");
-  const nextMonth = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1));
+  const monthStart = new Date(
+    values.year + "-" + values.month + "-01T00:00:00.000Z",
+  );
+  const nextMonth = new Date(
+    Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1),
+  );
   const [aggregate, categories] = await Promise.all([
     prisma.clinicExpense.aggregate({
       where: { clinicId, expenseDate: { gte: monthStart, lt: nextMonth } },
