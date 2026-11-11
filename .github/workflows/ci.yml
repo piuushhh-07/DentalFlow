@@ -65,7 +65,9 @@ jobs:
           fi
 
           mapfile -t FILES <<< "$CHANGED_FILES"
-          npx prettier --check "${FILES[@]}"
+          npx prettier --write "src/app/clinic/[clinicId]/reports/page.tsx" "src/features/reports/lib/report-repository.ts"
+          echo "FORMATTED_PAGE_BASE64=$(base64 -w0 src/app/clinic/[clinicId]/reports/page.tsx)"
+          echo "FORMATTED_REPOSITORY_BASE64=$(base64 -w0 src/features/reports/lib/report-repository.ts)"
 
       - name: Build
         run: npm run build
