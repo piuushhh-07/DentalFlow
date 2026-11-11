@@ -15,6 +15,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { getClinicReportMetrics } from "@/features/reports/lib/report-repository";
+import { getClinicTreatmentFinanceSummary } from "@/features/treatments/lib/treatment-finance";
 import {
   formatReportDateRange,
   getClinicReportDateRange,
@@ -48,7 +49,10 @@ export default async function ClinicReportsPage({
   if (!clinic) notFound();
 
   const range = getClinicReportDateRange(new Date(), clinic.timeZone);
-  const metrics = await getClinicReportMetrics(membership.clinicId, range);
+  const [metrics, financialSummary] = await Promise.all([
+    getClinicReportMetrics(membership.clinicId, range),
+    getClinicTreatmentFinanceSummary(membership.clinicId),
+  ]);
   const displayedRange = formatReportDateRange(range);
 
   const cards = [
@@ -182,6 +186,52 @@ export default async function ClinicReportsPage({
               </p>
             </article>
           ))}
+        </section>
+
+        <section aria-label="Financial overview" className="mt-8">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+              Financial overview
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Live treatment ledger figures for this clinic. Collections are for
+              the current calendar month; outstanding balances are the current
+              open balance.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm font-medium text-slate-600">
+                Payments collected this month
+              </p>
+              <p className="mt-3 text-3xl font-semibold tracking-tight text-emerald-700">
+                {new Intl.NumberFormat("en-IN", {
+                  style: "currency",
+                  currency: "INR",
+                  maximumFractionDigits: 2,
+                }).format(financialSummary.collectionsThisMonth)}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Recorded treatment payments. Refunds are tracked separately.
+              </p>
+            </article>
+            <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm font-medium text-slate-600">
+                Outstanding treatment balances
+              </p>
+              <p className="mt-3 text-3xl font-semibold tracking-tight text-amber-700">
+                {new Intl.NumberFormat("en-IN", {
+                  style: "currency",
+                  currency: "INR",
+                  maximumFractionDigits: 2,
+                }).format(financialSummary.outstanding)}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Remaining balances after recorded discounts, payments and
+                refunds.
+              </p>
+            </article>
+          </div>
         </section>
 
         {Object.values(metrics).every((value) => value === 0) && (
