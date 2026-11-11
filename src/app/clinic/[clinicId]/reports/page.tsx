@@ -14,7 +14,10 @@ import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
-import { getClinicExpenseReportSummary, getClinicReportMetrics } from "@/features/reports/lib/report-repository";
+import {
+  getClinicExpenseReportSummary,
+  getClinicReportMetrics,
+} from "@/features/reports/lib/report-repository";
 import { getClinicTreatmentFinanceSummary } from "@/features/treatments/lib/treatment-finance";
 import {
   formatReportDateRange,
@@ -211,24 +214,49 @@ export default async function ClinicReportsPage({
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm font-medium text-slate-600">Clinic expenses this month</p>
+              <p className="text-sm font-medium text-slate-600">
+                Clinic expenses this month
+              </p>
               <p className="mt-3 text-3xl font-semibold tracking-tight text-rose-700">
-                {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(expenseSummary.total)}
+                {new Intl.NumberFormat("en-IN", {
+                  style: "currency",
+                  currency: "INR",
+                  maximumFractionDigits: 2,
+                }).format(expenseSummary.total)}
               </p>
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                {expenseSummary.transactions.toLocaleString("en-IN")} recorded operating expenses
+                {expenseSummary.transactions.toLocaleString("en-IN")} recorded operating
+                expenses
               </p>
-              <Link className="mt-3 inline-flex text-sm font-semibold text-teal-800 hover:underline" href={"/clinic/" + membership.clinicId + "/expenses"}>
+              <Link
+                className="mt-3 inline-flex text-sm font-semibold text-teal-800 hover:underline"
+                href={`/clinic/${membership.clinicId}/expenses`}
+              >
                 Manage expenses →
               </Link>
             </article>
             <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm font-medium text-slate-600">Collections after recorded expenses</p>
-              <p className={"mt-3 text-3xl font-semibold tracking-tight " + (financialSummary.collectionsThisMonth - expenseSummary.total >= 0 ? "text-emerald-700" : "text-rose-700")}>
-                {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(financialSummary.collectionsThisMonth - expenseSummary.total)}
+              <p className="text-sm font-medium text-slate-600">
+                Collections after recorded expenses
+              </p>
+              <p
+                className={`mt-3 text-3xl font-semibold tracking-tight ${
+                  financialSummary.collectionsThisMonth - expenseSummary.total >= 0
+                    ? "text-emerald-700"
+                    : "text-rose-700"
+                }`}
+              >
+                {new Intl.NumberFormat("en-IN", {
+                  style: "currency",
+                  currency: "INR",
+                  maximumFractionDigits: 2,
+                }).format(
+                  financialSummary.collectionsThisMonth - expenseSummary.total,
+                )}
               </p>
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                Monthly treatment collections minus recorded clinic expenses; not accounting profit.
+                Monthly treatment collections minus recorded clinic expenses; not
+                accounting profit.
               </p>
             </article>
             <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -265,13 +293,22 @@ export default async function ClinicReportsPage({
           </div>
           {expenseSummary.byCategory.length > 0 ? (
             <div className="mt-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="font-semibold text-slate-900">Expense breakdown · this month</h3>
+              <h3 className="font-semibold text-slate-900">
+                Expense breakdown · this month
+              </h3>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {expenseSummary.byCategory.map((item) => (
-                  <div className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm" key={item.category}>
+                  <div
+                    className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm"
+                    key={item.category}
+                  >
                     <span className="text-slate-600">{item.category}</span>
                     <span className="font-semibold tabular-nums text-slate-900">
-                      {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(item.amount)}
+                      {new Intl.NumberFormat("en-IN", {
+                        style: "currency",
+                        currency: "INR",
+                        maximumFractionDigits: 2,
+                      }).format(item.amount)}
                     </span>
                   </div>
                 ))}
