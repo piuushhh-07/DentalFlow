@@ -1642,7 +1642,14 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
 
       const range = getClinicReportDateRange(new Date(), "Asia/Kolkata");
       const metrics = await getClinicReportMetrics(clinicAId, range);
+      const otherClinicMetrics = await getClinicReportMetrics(clinicBId, range);
+
       assert.ok(metrics.appointments >= 1);
+      assert.equal(
+        otherClinicMetrics.appointments,
+        0,
+        "Raw SQL report metrics must not expose appointments from another clinic.",
+      );
     },
   );
 
@@ -2898,6 +2905,32 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.throws(
         () => authorizeClinicRole(verifiedStaffMembership, [ClinicRole.OWNER]),
         ClinicRoleDeniedError,
+      );
+
+      const revokedAt = new Date();
+      const revokeResult = await prisma.clinicMembership.updateMany({
+        where: {
+          userId: userBId,
+          clinicId: clinicAId,
+          role: ClinicRole.STAFF,
+          revokedAt: null,
+        },
+        data: { revokedAt },
+      });
+      assert.equal(revokeResult.count, 1);
+
+      const revokedMembership =
+        await freshReader.clinicMembership.findUniqueOrThrow({
+          where: {
+            userId_clinicId: { userId: userBId, clinicId: clinicAId },
+          },
+          select: { userId: true, clinicId: true, role: true, revokedAt: true },
+        });
+      assert.ok(revokedMembership.revokedAt);
+      assert.throws(
+        () => authorizeClinicMembership(userBId, clinicAId, revokedMembership),
+        ClinicAccessDeniedError,
+        "A revoked membership must remain auditable but lose access immediately.",
       );
     },
   );

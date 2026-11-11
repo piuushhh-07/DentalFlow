@@ -15,6 +15,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { getClinicReportMetrics } from "@/features/reports/lib/report-repository";
+import { getClinicTreatmentFinanceSummary } from "@/features/treatments/lib/treatment-finance";
 import {
   formatReportDateRange,
   getClinicReportDateRange,
@@ -48,7 +49,10 @@ export default async function ClinicReportsPage({
   if (!clinic) notFound();
 
   const range = getClinicReportDateRange(new Date(), clinic.timeZone);
-  const metrics = await getClinicReportMetrics(membership.clinicId, range);
+  const [metrics, financialSummary] = await Promise.all([
+    getClinicReportMetrics(membership.clinicId, range),
+    getClinicTreatmentFinanceSummary(membership.clinicId),
+  ]);
   const displayedRange = formatReportDateRange(range);
 
   const cards = [
@@ -147,11 +151,20 @@ export default async function ClinicReportsPage({
               Current workload and clinic activity at a glance.
             </p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
-            <p className="font-medium text-slate-800">{displayedRange}</p>
-            <p className="mt-1 text-xs text-slate-500">
-              Activity range · {range.timeZone}
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+              <p className="font-medium text-slate-800">{displayedRange}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Activity range · {range.timeZone}
+              </p>
+            </div>
+            <a
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+              download
+              href={`/clinic/${membership.clinicId}/reports/export`}
+            >
+              Download CSV
+            </a>
           </div>
         </header>
 
@@ -182,6 +195,52 @@ export default async function ClinicReportsPage({
               </p>
             </article>
           ))}
+        </section>
+
+        <section aria-label="Financial overview" className="mt-8">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+              Financial overview
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Live treatment ledger figures for this clinic. Collections are for
+              the current calendar month; outstanding balances are the current
+              open balance.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm font-medium text-slate-600">
+                Payments collected this month
+              </p>
+              <p className="mt-3 text-3xl font-semibold tracking-tight text-emerald-700">
+                {new Intl.NumberFormat("en-IN", {
+                  style: "currency",
+                  currency: "INR",
+                  maximumFractionDigits: 2,
+                }).format(financialSummary.collectionsThisMonth)}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Recorded treatment payments. Refunds are tracked separately.
+              </p>
+            </article>
+            <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm font-medium text-slate-600">
+                Outstanding treatment balances
+              </p>
+              <p className="mt-3 text-3xl font-semibold tracking-tight text-amber-700">
+                {new Intl.NumberFormat("en-IN", {
+                  style: "currency",
+                  currency: "INR",
+                  maximumFractionDigits: 2,
+                }).format(financialSummary.outstanding)}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Remaining balances after recorded discounts, payments and
+                refunds.
+              </p>
+            </article>
+          </div>
         </section>
 
         {Object.values(metrics).every((value) => value === 0) && (

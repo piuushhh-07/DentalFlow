@@ -10,7 +10,11 @@ import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { DeletePatientButton } from "@/features/patients/components/delete-patient-button";
 import { getClinicPatient } from "@/features/patients/lib/patient-repository";
 import { formatIndianPhoneNumber } from "@/features/patients/lib/patient-validation";
-import { listInsurancePolicies } from "@/features/insurance/lib/insurance-repository";
+import {
+  listInsuranceClaims,
+  listInsurancePolicies,
+  listInsurancePreAuthorizations,
+} from "@/features/insurance/lib/insurance-repository";
 import { maskPolicyIdentifier } from "@/features/insurance/lib/insurance-validation";
 import { ClinicalRecordsPanel } from "@/features/clinical-records/components/clinical-records-panel";
 import { listPatientDentalClinicalRecords } from "@/features/clinical-records/lib/clinical-record-repository";
@@ -20,6 +24,7 @@ import {
   listPatientOdontogramTreatmentPlans,
 } from "@/features/odontogram/lib/odontogram-repository";
 import { listPatientTreatmentPlans } from "@/features/treatments/lib/treatment-repository";
+import { listPatientTreatmentFinancialEntries } from "@/features/treatments/lib/treatment-finance";
 import { PrescriptionsPanel } from "@/features/prescriptions/components/prescriptions-panel";
 import {
   listClinicPrescriptionMedicineCatalogue,
@@ -27,6 +32,15 @@ import {
 } from "@/features/prescriptions/lib/prescription-repository";
 import { PatientEstimatesPanel } from "@/features/estimates/components/patient-estimates-panel";
 import { listPatientTreatmentEstimates } from "@/features/estimates/lib/estimate-repository";
+import { listPatientAppointments } from "@/features/appointments/lib/appointment-repository";
+import { listPatientRecalls } from "@/features/recalls/lib/recall-repository";
+import { listPatientMessageHistory } from "@/features/messages/lib/message-repository";
+import { Patient360Overview } from "@/features/patients/components/patient-360-overview";
+import {
+  buildPatient360Timeline,
+  getPatient360FinancialEntryLabel,
+  getPatient360MedicalAlerts,
+} from "@/features/patients/lib/patient-360";
 
 type PatientDetailPageProps = Readonly<{
   params: { clinicId: string; patientId: string };
@@ -80,6 +94,12 @@ export default async function PatientDetailPage({
     prescriptions,
     medicineCatalogue,
     treatmentEstimates,
+    patientAppointments,
+    recalls,
+    financialEntries,
+    insuranceClaimsResult,
+    preAuthorizations,
+    messageHistory,
   ] = await Promise.all([
     listInsurancePolicies(membership.clinicId, "", patient.id),
     listPatientOdontogramEntries(membership.clinicId, patient.id),
@@ -89,6 +109,16 @@ export default async function PatientDetailPage({
     listPatientPrescriptions(membership.clinicId, patient.id),
     listClinicPrescriptionMedicineCatalogue(membership.clinicId),
     listPatientTreatmentEstimates(membership.clinicId, patient.id),
+    listPatientAppointments(membership.clinicId, patient.id),
+    listPatientRecalls(membership.clinicId, patient.id),
+    listPatientTreatmentFinancialEntries(membership.clinicId, patient.id),
+    listInsuranceClaims(membership.clinicId, {
+      query: "",
+      patientId: patient.id,
+      page: 1,
+    }),
+    listInsurancePreAuthorizations(membership.clinicId, "", patient.id),
+    listPatientMessageHistory(membership.clinicId, patient.id),
   ]);
   const correctionSource = prescriptions.find(
     (prescription) => prescription.id === searchParams?.amendsPrescriptionId,
@@ -97,6 +127,10 @@ export default async function PatientDetailPage({
     timeZone: "Asia/Kolkata",
   }).format(new Date());
   const patientPath = `/clinic/${membership.clinicId}/patients/${patient.id}`;
+  const appointmentPath = `/clinic/${membership.clinicId}/appointments`;
+  const treatmentPath = `${patientPath}/treatments`;
+  const recallPath = `/clinic/${membership.clinicId}/recalls/new?patientId=${patient.id}`;
+  const claimsPath = `/clinic/${membership.clinicId}/insurance/claims?patientId=${patient.id}`;
   const chartEntries = odontogramEntries.map((entry) => ({
     ...entry,
     createdAt: entry.createdAt.toISOString(),
@@ -110,10 +144,128 @@ export default async function PatientDetailPage({
       treatmentPlan: { id: plan.id, name: plan.name },
     })),
   );
+  const { allergies, medicalHistory } =
+    getPatient360MedicalAlerts(clinicalRecords);
+  const timeline = buildPatient360Timeline([
+    {
+      id: `patient-${patient.id}`,
+      occurredAt: patient.createdAt,
+      kind: "patient",
+      title: "Patient record created",
+      href: patientPath,
+    },
+    ...patientAppointments.upcoming.map((appointment) => ({
+      id: `appointment-${appointment.id}`,
+      occurredAt: appointment.scheduledAt,
+      kind: "appointment",
+      title: `Appointment: ${appointment.type}`,
+      description: `${appointment.dentistName} · ${appointment.chairLabel}`,
+      href: `${appointmentPath}?date=${new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+      }).format(appointment.scheduledAt)}&view=day`,
+    })),
+    ...patientAppointments.past.map((appointment) => ({
+      id: `appointment-${appointment.id}`,
+      occurredAt: appointment.scheduledAt,
+      kind: "appointment",
+      title: `Appointment: ${appointment.type}`,
+      description: `${appointment.dentistName} · ${appointment.chairLabel} · ${appointment.status}`,
+      href: `${appointmentPath}?date=${new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+      }).format(appointment.scheduledAt)}&view=day`,
+    })),
+    ...recalls.map((recall) => ({
+      id: `recall-${recall.id}`,
+      occurredAt: recall.createdAt,
+      kind: "recall",
+      title: `Recall: ${recall.customName || recall.type.replaceAll("_", " ")}`,
+      description: `Due ${new Intl.DateTimeFormat("en-IN", {
+        dateStyle: "medium",
+        timeZone: "Asia/Kolkata",
+      }).format(recall.dueDate)} · ${recall.status}`,
+      href: recallPath,
+    })),
+    ...treatmentPlans.map((plan) => ({
+      id: `treatment-plan-${plan.id}`,
+      occurredAt: plan.createdAt,
+      kind: "treatment-plan",
+      title: `Treatment plan: ${plan.name}`,
+      description: plan.status.replaceAll("_", " "),
+      href: treatmentPath,
+    })),
+    ...clinicalRecords.map((record) => ({
+      id: `clinical-record-${record.id}`,
+      occurredAt: record.createdAt,
+      kind: "clinical-record",
+      title: "Clinical record",
+      description: record.diagnosis || record.chiefComplaints || undefined,
+      href: "#clinical-records",
+    })),
+    ...odontogramEntries.map((entry) => ({
+      id: `odontogram-${entry.id}`,
+      occurredAt: entry.createdAt,
+      kind: "odontogram",
+      title: `Odontogram entry · tooth ${entry.toothNumber}`,
+      description: entry.treatmentName || entry.finding || entry.entryType,
+      href: "#odontogram",
+    })),
+    ...prescriptions.map((prescription) => ({
+      id: `prescription-${prescription.id}`,
+      occurredAt: prescription.finalizedAt ?? prescription.createdAt,
+      kind: "prescription",
+      title: "Prescription finalized",
+      description: prescription.medicines
+        .map((medicine) => medicine.medicineName)
+        .join(", "),
+      href: "#prescriptions",
+    })),
+    ...treatmentEstimates.map((estimate) => ({
+      id: `estimate-${estimate.id}`,
+      occurredAt: estimate.finalizedAt ?? estimate.createdAt,
+      kind: "estimate",
+      title: `Treatment estimate · v${estimate.version}`,
+      description: estimate.treatmentPlan.name,
+      href: "#estimates",
+    })),
+    ...financialEntries.map((entry) => ({
+      id: `financial-${entry.id}`,
+      occurredAt: entry.paidAt,
+      kind: entry.entryType.toLowerCase(),
+      title: `${getPatient360FinancialEntryLabel(entry.entryType)} · ${entry.treatmentPlan.name}`,
+      description: entry.receiptNumber
+        ? `Receipt ${entry.receiptNumber}`
+        : undefined,
+      href: "#patient-financial-history",
+    })),
+    ...insuranceClaimsResult.claims.map((claim) => ({
+      id: `insurance-claim-${claim.id}`,
+      occurredAt: claim.createdAt,
+      kind: "insurance-claim",
+      title: "Insurance claim",
+      description: `${claim.policy.provider.name} · ${claim.status.replaceAll("_", " ")}`,
+      href: claimsPath,
+    })),
+    ...preAuthorizations.map((authorization) => ({
+      id: `insurance-preauth-${authorization.id}`,
+      occurredAt: authorization.createdAt,
+      kind: "insurance",
+      title: "Insurance pre-authorization",
+      description: `${authorization.policy.provider.name} · ${authorization.status.replaceAll("_", " ")}`,
+      href: claimsPath,
+    })),
+    ...messageHistory.map((message) => ({
+      id: `message-${message.id}`,
+      occurredAt: message.createdAt,
+      kind: "message",
+      title: message.templateNameSnapshot || "Patient message",
+      description: message.status.replaceAll("_", " "),
+      href: "#patient-activity",
+    })),
+  ]);
 
   return (
     <AppShell activeSection="patients" clinicId={membership.clinicId}>
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-6xl">
         <Link
           className="inline-flex min-h-9 items-center gap-2 rounded-md text-sm font-medium text-slate-600 hover:text-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           href={`/clinic/${membership.clinicId}/patients`}
@@ -167,12 +319,18 @@ export default async function PatientDetailPage({
         </header>
 
         <nav
-          aria-label="Patient care plans"
+          aria-label="Patient profile navigation"
           className="mt-6 flex flex-wrap gap-2"
         >
           <Link
             className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            href={`${patientPath}/treatments`}
+            href={appointmentPath}
+          >
+            Appointments
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            href={treatmentPath}
           >
             Treatment plans
           </Link>
@@ -182,48 +340,94 @@ export default async function PatientDetailPage({
           >
             Create preventive recall
           </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            href={`/clinic/${membership.clinicId}/insurance/policies/new?patientId=${patient.id}`}
+          >
+            Add insurance policy
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            href="#patient-activity"
+          >
+            Activity
+          </Link>
         </nav>
 
-        <OdontogramBoard
-          clinicId={membership.clinicId}
-          entries={chartEntries}
-          patientId={patient.id}
-          treatmentPlans={odontogramTreatmentPlans}
-        />
-
-        <ClinicalRecordsPanel
-          clinicId={membership.clinicId}
-          patientId={patient.id}
-          records={clinicalRecords}
-          visits={treatmentVisitOptions}
-          odontogramEntries={chartEntries.map((entry) => ({
-            id: entry.id,
-            toothNumber: entry.toothNumber,
-            dentition: entry.dentition,
-            entryType: entry.entryType,
-            finding: entry.finding,
+        <Patient360Overview
+          allergies={allergies}
+          claims={insuranceClaimsResult.claims.map((claim) => ({
+            ...claim,
+            amountClaimed: Number(claim.amountClaimed),
           }))}
-        />
-
-        <PrescriptionsPanel
-          catalogue={medicineCatalogue}
           clinicId={membership.clinicId}
-          correctionSource={correctionSource}
-          initialVisitId={searchParams?.prescriptionVisitId}
+          financialEntries={financialEntries.map((entry) => ({
+            ...entry,
+            amount: Number(entry.amount),
+          }))}
+          medicalHistory={medicalHistory}
+          messages={messageHistory}
+          pastAppointments={patientAppointments.past}
           patientId={patient.id}
-          patientName={patient.fullName}
-          prescriptions={prescriptions}
-          today={today}
-          visits={treatmentVisitOptions}
+          preAuthorizations={preAuthorizations}
+          recalls={recalls}
+          timeline={timeline}
+          treatmentPlans={treatmentPlans}
+          upcomingAppointmentCount={patientAppointments.upcomingCount}
+          upcomingAppointments={patientAppointments.upcoming}
         />
 
-        <PatientEstimatesPanel
-          clinicId={membership.clinicId}
-          estimates={treatmentEstimates}
-          patientId={patient.id}
-        />
+        <section className="mt-7" id="odontogram">
+          <OdontogramBoard
+            clinicId={membership.clinicId}
+            entries={chartEntries}
+            patientId={patient.id}
+            treatmentPlans={odontogramTreatmentPlans}
+          />
+        </section>
 
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <section className="mt-7" id="clinical-records">
+          <ClinicalRecordsPanel
+            clinicId={membership.clinicId}
+            patientId={patient.id}
+            records={clinicalRecords}
+            visits={treatmentVisitOptions}
+            odontogramEntries={chartEntries.map((entry) => ({
+              id: entry.id,
+              toothNumber: entry.toothNumber,
+              dentition: entry.dentition,
+              entryType: entry.entryType,
+              finding: entry.finding,
+            }))}
+          />
+        </section>
+
+        <section className="mt-7" id="prescriptions">
+          <PrescriptionsPanel
+            catalogue={medicineCatalogue}
+            clinicId={membership.clinicId}
+            correctionSource={correctionSource}
+            initialVisitId={searchParams?.prescriptionVisitId}
+            patientId={patient.id}
+            patientName={patient.fullName}
+            prescriptions={prescriptions}
+            today={today}
+            visits={treatmentVisitOptions}
+          />
+        </section>
+
+        <section className="mt-7" id="estimates">
+          <PatientEstimatesPanel
+            clinicId={membership.clinicId}
+            estimates={treatmentEstimates}
+            patientId={patient.id}
+          />
+        </section>
+
+        <section
+          className="mt-7 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+          id="patient-policies"
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-slate-900">

@@ -1,10 +1,6 @@
 "use server";
 
-import {
-  ClinicInvitationStatus,
-  ClinicRole,
-  Prisma,
-} from "@prisma/client";
+import { ClinicInvitationStatus, ClinicRole, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { redirect } from "next/navigation";
 
@@ -146,7 +142,12 @@ export async function inviteClinicStaffAction(
   formData: FormData,
 ): Promise<ClinicTeamActionState> {
   const clinicId = z.string().uuid().safeParse(formData.get("clinicId"));
-  const email = z.string().trim().email().max(254).safeParse(formData.get("email"));
+  const email = z
+    .string()
+    .trim()
+    .email()
+    .max(254)
+    .safeParse(formData.get("email"));
   if (!clinicId.success || !email.success) {
     return { error: "Enter a valid staff email address." };
   }
@@ -215,10 +216,9 @@ export async function inviteClinicStaffAction(
 
   try {
     const supabase = createSupabaseAdminClient();
-    const { error } = await supabase.auth.admin.inviteUserByEmail(
-      email.data,
-      { redirectTo },
-    );
+    const { error } = await supabase.auth.admin.inviteUserByEmail(email.data, {
+      redirectTo,
+    });
     if (error) {
       await prisma.clinicInvitation.updateMany({
         where: { id: invitationId, status: ClinicInvitationStatus.PENDING },
@@ -229,7 +229,8 @@ export async function inviteClinicStaffAction(
         code: error.code,
       });
       return {
-        error: "The invitation email could not be sent. Check the email and try again.",
+        error:
+          "The invitation email could not be sent. Check the email and try again.",
       };
     }
   } catch (error) {
@@ -263,14 +264,17 @@ export async function removeClinicStaffAction(
   if (userId.data === owner.userId) {
     return { error: "You cannot remove your own owner access." };
   }
-  const removed = await prisma.clinicMembership.deleteMany({
+  // Preserve the membership revocation audit trail.
+  const revoked = await prisma.clinicMembership.updateMany({
     where: {
       clinicId: owner.clinicId,
       userId: userId.data,
       role: ClinicRole.STAFF,
+      revokedAt: null,
     },
+    data: { revokedAt: new Date() },
   });
-  if (removed.count === 0) {
+  if (revoked.count === 0) {
     return { error: "This staff membership is no longer available." };
   }
   revalidatePath(`/clinic/${owner.clinicId}/settings/staff`);
@@ -282,7 +286,10 @@ export async function revokeClinicInvitationAction(
   formData: FormData,
 ): Promise<ClinicTeamActionState> {
   const clinicId = z.string().uuid().safeParse(formData.get("clinicId"));
-  const invitationId = z.string().uuid().safeParse(formData.get("invitationId"));
+  const invitationId = z
+    .string()
+    .uuid()
+    .safeParse(formData.get("invitationId"));
   if (!clinicId.success || !invitationId.success) {
     return { error: "Choose a valid pending invitation." };
   }

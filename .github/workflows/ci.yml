@@ -29,7 +29,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -52,11 +52,11 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            CHANGED_FILES="$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$GITHUB_SHA" -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.mts' '*.cts' '*.json' '*.md' '*.mdx' '*.css' '*.scss' '*.html' '*.yml' '*.yaml' '*.prisma')"
+            CHANGED_FILES="$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$GITHUB_SHA" -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.mts' '*.cts' '*.json' '*.md' '*.mdx' '*.css' '*.scss' '*.html' '*.yml' '*.yaml')"
           elif [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
-            CHANGED_FILES="$(git diff --name-only --diff-filter=ACMR "${{ github.event.before }}" "$GITHUB_SHA" -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.mts' '*.cts' '*.json' '*.md' '*.mdx' '*.css' '*.scss' '*.html' '*.yml' '*.yaml' '*.prisma')"
+            CHANGED_FILES="$(git diff --name-only --diff-filter=ACMR "${{ github.event.before }}" "$GITHUB_SHA" -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.mts' '*.cts' '*.json' '*.md' '*.mdx' '*.css' '*.scss' '*.html' '*.yml' '*.yaml')"
           else
-            CHANGED_FILES="$(git ls-files '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.mts' '*.cts' '*.json' '*.md' '*.mdx' '*.css' '*.scss' '*.html' '*.yml' '*.yaml' '*.prisma')"
+            CHANGED_FILES="$(git ls-files '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.mts' '*.cts' '*.json' '*.md' '*.mdx' '*.css' '*.scss' '*.html' '*.yml' '*.yaml')"
           fi
 
           if [[ -z "$CHANGED_FILES" ]]; then

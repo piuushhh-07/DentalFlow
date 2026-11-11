@@ -30,6 +30,7 @@ import {
 } from "@/features/treatments/lib/treatment-finance-validation";
 
 export {
+  financialEntryTypeLabels,
   treatmentCatalogueItemSchema,
   treatmentCatalogueStatusSchema,
   treatmentFinancialEntrySchema,
@@ -42,12 +43,6 @@ export const paymentMethodLabels: Record<PaymentMethod, string> = {
   CARD: "Card",
   BANK_TRANSFER: "Bank transfer",
   OTHER: "Other",
-};
-
-export const financialEntryTypeLabels: Record<FinancialEntryType, string> = {
-  PAYMENT: "Payment",
-  DISCOUNT: "Discount",
-  REFUND: "Refund",
 };
 
 export type TreatmentFinancialSummary = Readonly<{
@@ -311,6 +306,26 @@ export async function getTreatmentPlanFinancialSummary(
       receiptNumber: entry.receiptNumber,
     })),
   };
+}
+
+export async function listPatientTreatmentFinancialEntries(
+  clinicId: string,
+  patientId: string,
+) {
+  return prisma.treatmentFinancialEntry.findMany({
+    where: { clinicId, patientId },
+    orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
+    take: 20,
+    select: {
+      id: true,
+      entryType: true,
+      paymentMethod: true,
+      amount: true,
+      paidAt: true,
+      receiptNumber: true,
+      treatmentPlan: { select: { id: true, name: true } },
+    },
+  });
 }
 
 type TreatmentFinancialEntryResult = {

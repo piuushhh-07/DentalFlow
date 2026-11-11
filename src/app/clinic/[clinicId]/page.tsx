@@ -16,6 +16,7 @@ import {
 import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { ClinicSetupChecklist } from "@/features/onboarding/components/clinic-setup-checklist";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { prisma } from "@/lib/db/prisma";
@@ -176,6 +177,10 @@ export default async function ClinicDashboardPage({
             )}
           </div>
         </header>
+
+        {membership.role === "OWNER" && (
+          <ClinicSetupChecklist clinicId={membership.clinicId} />
+        )}
 
         <section
           aria-label="Follow-up summary"
