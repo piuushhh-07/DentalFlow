@@ -188,16 +188,15 @@ export default async function ClinicReportsPage({
           ))}
         </section>
 
-        <section
-          aria-label="Financial overview"
-          className="mt-8"
-        >
+        <section aria-label="Financial overview" className="mt-8">
           <div className="mb-4">
             <h2 className="text-xl font-semibold tracking-tight text-slate-900">
               Financial overview
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Live treatment ledger figures for this clinic. Collections are for the current calendar month; outstanding balances are the current open balance.
+              Live treatment ledger figures for this clinic. Collections are for the
+              current calendar month; outstanding balances are the current open
+              balance.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
