@@ -151,11 +151,20 @@ export default async function ClinicReportsPage({
               Current workload and clinic activity at a glance.
             </p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
-            <p className="font-medium text-slate-800">{displayedRange}</p>
-            <p className="mt-1 text-xs text-slate-500">
-              Activity range · {range.timeZone}
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+              <p className="font-medium text-slate-800">{displayedRange}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Activity range · {range.timeZone}
+              </p>
+            </div>
+            <a
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+              download
+              href={`/clinic/${membership.clinicId}/reports/export`}
+            >
+              Download CSV
+            </a>
           </div>
         </header>
 
