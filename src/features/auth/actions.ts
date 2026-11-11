@@ -264,6 +264,7 @@ export async function removeClinicStaffAction(
     return { error: "You cannot remove your own owner access." };
   }
   // Keep this update shape aligned with the shared membership-revocation action.
+  // prettier-ignore
   const revoked = await prisma.clinicMembership.updateMany({
     where: {
       clinicId: owner.clinicId,
