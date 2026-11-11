@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 const email = process.env.E2E_OWNER_EMAIL;
 const password = process.env.E2E_OWNER_PASSWORD;
 const resourceClinicId = process.env.E2E_RESOURCE_TEST_CLINIC_ID;
+const allowedResourceTestHost = process.env.E2E_RESOURCE_TEST_ALLOWED_HOST;
 const mutationsEnabled = process.env.E2E_ALLOW_RESOURCE_MUTATIONS === "1";
 const productionHost = "dental-flow-brown.vercel.app";
 
@@ -50,8 +51,8 @@ async function renameResource(
 
 test.describe("OWNER schedule resource management (staging only)", () => {
   test.skip(
-    !email || !password || !resourceClinicId || !mutationsEnabled,
-    "Set OWNER credentials, E2E_RESOURCE_TEST_CLINIC_ID, and E2E_ALLOW_RESOURCE_MUTATIONS=1 to enable write tests.",
+    !email || !password || !resourceClinicId || !allowedResourceTestHost || !mutationsEnabled,
+    "Set OWNER credentials, E2E_RESOURCE_TEST_CLINIC_ID, E2E_RESOURCE_TEST_ALLOWED_HOST, and E2E_ALLOW_RESOURCE_MUTATIONS=1 to enable write tests.",
   );
 
   test("creates, rejects duplicates, renames, and deactivates dentists and chairs", async ({
@@ -59,6 +60,7 @@ test.describe("OWNER schedule resource management (staging only)", () => {
   }) => {
     const configuredBaseUrl = test.info().project.use.baseURL as string;
     const host = new URL(configuredBaseUrl).hostname;
+    expect(host).toBe(allowedResourceTestHost);
     expect(
       host,
       "Resource mutation tests must never run against the production DentalFlow host.",
