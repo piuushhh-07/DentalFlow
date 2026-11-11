@@ -432,6 +432,7 @@ model ClinicSubscription {
 
   @@unique([id, clinicId])
   @@index([clinicId, status, createdAt])
+  @@index([planVersionId], map: "cs_plan_version_idx")
   @@map("clinic_subscriptions")
 }
 
@@ -453,6 +454,7 @@ model BillingPayment {
   @@unique([providerPaymentId, clinicId])
   @@index([clinicId, createdAt])
   @@index([subscriptionId, createdAt])
+  @@index([clinicId, subscriptionId], map: "bp_subscription_clinic_idx")
   @@map("billing_payments")
 }
 
@@ -530,6 +532,7 @@ model ClinicInvitation {
 
   @@index([clinicId, status, expiresAt])
   @@index([normalizedEmail, status, expiresAt])
+  @@index([clinicId, invitedByUserId], map: "ci_inviter_clinic_idx")
   @@map("clinic_invitations")
 }
 
@@ -601,6 +604,7 @@ model TreatmentPlan {
   @@unique([id, clinicId, patientId])
   @@index([clinicId, status, completedAt])
   @@index([clinicId, patientId])
+  @@index([clinicId, catalogItemId], map: "tp_catalog_clinic_idx")
   @@map("treatment_plans")
 }
 
@@ -650,6 +654,7 @@ model TreatmentFinancialEntry {
   @@unique([clinicId, receiptNumber])
   @@index([clinicId, treatmentPlanId, paidAt])
   @@index([clinicId, patientId, paidAt])
+  @@index([clinicId, createdByUserId], map: "tfe_creator_clinic_idx")
   @@map("treatment_financial_entries")
 }
 
@@ -698,6 +703,7 @@ model TreatmentEstimate {
   @@unique([revisionOfEstimateId, clinicId, patientId])
   @@index([clinicId, patientId, createdAt])
   @@index([clinicId, treatmentPlanId, status])
+  @@index([clinicId, createdByUserId], map: "te_creator_clinic_idx")
   @@map("treatment_estimates")
 }
 
@@ -717,6 +723,7 @@ model TreatmentEstimateLine {
 
   @@unique([estimateId, position])
   @@index([clinicId, patientId, estimateId])
+  @@index([clinicId, catalogueItemId], map: "tel_catalog_clinic_idx")
   @@map("treatment_estimate_lines")
 }
 
@@ -736,6 +743,7 @@ model TreatmentEstimateAudit {
   actor             ClinicMembership         @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
 
   @@index([clinicId, patientId, estimateId, createdAt])
+  @@index([clinicId, actorUserId], map: "tea_actor_clinic_idx")
   @@map("treatment_estimate_audits")
 }
 
@@ -763,6 +771,7 @@ model TreatmentVisit {
   @@unique([treatmentPlanId, visitNumber])
   @@index([clinicId, status, dueDate])
   @@index([clinicId, dueDate])
+  @@index([clinicId, treatmentPlanId, patientId], map: "tv_plan_clinic_patient_idx")
   @@map("treatment_visits")
 }
 
@@ -795,6 +804,8 @@ model OdontogramEntry {
   @@index([clinicId, patientId, createdAt])
   @@index([clinicId, patientId, toothNumber, createdAt])
   @@index([clinicId, treatmentPlanId])
+  @@index([clinicId, createdByUserId], map: "oe_creator_clinic_idx")
+  @@index([clinicId, treatmentPlanId, patientId], map: "oe_plan_clinic_patient_idx")
   @@map("odontogram_entries")
 }
 
@@ -824,6 +835,8 @@ model DentalClinicalRecord {
   @@unique([id, clinicId, patientId])
   @@index([clinicId, patientId, createdAt])
   @@index([clinicId, visitId])
+  @@index([clinicId, createdByUserId], map: "dcr_creator_clinic_idx")
+  @@index([clinicId, visitId, patientId], map: "dcr_visit_clinic_patient_idx")
   @@map("dental_clinical_records")
 }
 
@@ -845,6 +858,8 @@ model DentalClinicalRecordFinding {
 
   @@unique([id, clinicId, patientId])
   @@index([clinicId, patientId, toothNumber])
+  @@index([clinicId, recordId, patientId], map: "dcrf_record_clinic_patient_idx")
+  @@index([clinicId, relatedOdontogramEntryId, patientId], map: "dcrf_odontogram_clinic_patient_idx")
   @@map("dental_clinical_record_findings")
 }
 
@@ -861,6 +876,8 @@ model DentalClinicalRecordAudit {
   changedBy       ClinicMembership          @relation(fields: [changedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
 
   @@index([clinicId, patientId, createdAt])
+  @@index([clinicId, changedByUserId], map: "dcra_actor_clinic_idx")
+  @@index([clinicId, recordId, patientId], map: "dcra_record_clinic_patient_idx")
   @@map("dental_clinical_record_audits")
 }
 
@@ -880,6 +897,7 @@ model PrescriptionMedicineCatalogueItem {
   @@unique([id, clinicId])
   @@unique([clinicId, normalizedName])
   @@index([clinicId, name])
+  @@index([clinicId, createdByUserId], map: "pmci_creator_clinic_idx")
   @@map("prescription_medicine_catalogue_items")
 }
 
@@ -917,6 +935,8 @@ model DigitalPrescription {
   @@unique([amendsPrescriptionId, clinicId, patientId])
   @@index([clinicId, patientId, createdAt])
   @@index([clinicId, visitId])
+  @@index([clinicId, authorUserId], map: "dp_author_clinic_idx")
+  @@index([clinicId, visitId, patientId], map: "dp_visit_clinic_patient_idx")
   @@map("digital_prescriptions")
 }
 
@@ -939,6 +959,7 @@ model DigitalPrescriptionMedicine {
 
   @@unique([prescriptionId, position])
   @@index([clinicId, patientId, prescriptionId])
+  @@index([clinicId, catalogueItemId], map: "dpm_catalog_clinic_idx")
   @@map("digital_prescription_medicines")
 }
 
@@ -955,6 +976,8 @@ model DigitalPrescriptionAudit {
   actor          ClinicMembership    @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
 
   @@index([clinicId, patientId, createdAt])
+  @@index([clinicId, actorUserId], map: "dpa_actor_clinic_idx")
+  @@index([clinicId, prescriptionId, patientId], map: "dpa_prescription_clinic_patient_idx")
   @@map("digital_prescription_audits")
 }
 
@@ -988,6 +1011,7 @@ model Appointment {
   @@index([clinicId, treatmentVisitId])
   @@index([clinicId, dentistId, scheduledAt])
   @@index([clinicId, chairId, scheduledAt])
+  @@index([clinicId, treatmentVisitId, patientId], map: "ap_visit_clinic_patient_idx")
   @@map("appointments")
 }
 
@@ -1103,6 +1127,8 @@ model AppointmentRequest {
 
   @@unique([id, clinicId])
   @@index([clinicId, status, requestedAt])
+  @@index([clinicId, chairId], map: "ar_chair_clinic_idx")
+  @@index([clinicId, dentistId], map: "ar_dentist_clinic_idx")
   @@map("appointment_requests")
 }
 
@@ -1186,6 +1212,10 @@ model MessageLog {
   @@index([clinicId, preventiveRecallId])
   @@index([clinicId, status, manuallyConfirmedSentAt])
   @@index([clinicId, appointmentId])
+  @@index([clinicId, appointmentId, patientId], map: "ml_appointment_clinic_patient_idx")
+  @@index([clinicId, messageTemplateId], map: "ml_template_clinic_idx")
+  @@index([clinicId, preventiveRecallId, patientId], map: "ml_recall_clinic_patient_idx")
+  @@index([clinicId, treatmentVisitId, patientId], map: "ml_visit_clinic_patient_idx")
   @@map("message_logs")
 }
 
@@ -1287,6 +1317,9 @@ model InsuranceClaim {
   @@index([clinicId, type, status])
   @@index([clinicId, followUpAt])
   @@index([clinicId, patientId, createdAt])
+  @@index([clinicId, policyId, patientId], map: "ic_policy_clinic_patient_idx")
+  @@index([clinicId, summaryReviewedById], map: "ic_reviewer_clinic_idx")
+  @@index([clinicId, treatmentPlanId, patientId], map: "ic_plan_clinic_patient_idx")
   @@map("insurance_claims")
 }
 
@@ -1319,6 +1352,8 @@ model InsurancePreAuthorization {
   @@unique([id, clinicId])
   @@index([clinicId, status, createdAt])
   @@index([clinicId, expiresAt])
+  @@index([clinicId, policyId, patientId], map: "ipa_policy_clinic_patient_idx")
+  @@index([clinicId, treatmentPlanId, patientId], map: "ipa_plan_clinic_patient_idx")
   @@map("insurance_pre_authorizations")
 }
 
@@ -1338,6 +1373,7 @@ model InsurancePayment {
   recordedBy   ClinicMembership     @relation(fields: [recordedById, clinicId], references: [userId, clinicId], onDelete: Restrict)
 
   @@index([clinicId, claimId, kind, paidAt])
+  @@index([clinicId, recordedById], map: "ip_recordedby_clinic_idx")
   @@map("insurance_payments")
 }
 
@@ -1391,5 +1427,6 @@ model InsuranceActivity {
   @@index([clinicId, preAuthorizationId, createdAt])
   @@index([clinicId, policyId, createdAt])
   @@index([clinicId, providerId, createdAt])
+  @@index([clinicId, actorUserId], map: "ia_actor_clinic_idx")
   @@map("insurance_activities")
 }
