@@ -6,7 +6,6 @@ import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import {
   getAppointmentCalendarRange,
-  getClinicDateRangeBounds,
   type AppointmentCalendarView,
 } from "@/features/appointments/lib/appointment-calendar";
 import { listClinicAppointmentsInRange } from "@/features/appointments/lib/appointment-repository";
