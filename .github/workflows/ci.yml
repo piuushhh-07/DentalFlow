@@ -65,6 +65,8 @@ jobs:
           fi
 
           mapfile -t FILES <<< "$CHANGED_FILES"
+          npx prettier tests/e2e/auth-and-schedule.smoke.spec.ts > /tmp/formatted-smoke.ts
+          diff -u tests/e2e/auth-and-schedule.smoke.spec.ts /tmp/formatted-smoke.ts || true
           npx prettier --check "${FILES[@]}"
 
       - name: Build
