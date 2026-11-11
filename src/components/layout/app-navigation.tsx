@@ -4,6 +4,7 @@ import {
   CreditCard,
   ClipboardList,
   LayoutDashboard,
+  Package,
   MessageCircle,
   ShieldCheck,
   Stethoscope,
@@ -29,6 +30,7 @@ const navigationGroups = [
       { label: "Templates", icon: MessageCircle, href: "messages/templates" },
       { label: "Reports", icon: ClipboardList, href: "reports" },
       { label: "Insurance", icon: ShieldCheck, href: "insurance" },
+      { label: "Inventory", icon: Package, href: "inventory" },
       { label: "Team", icon: UserRoundPlus, href: "settings/staff" },
     ],
   },
@@ -47,6 +49,7 @@ type AppNavigationProps = Readonly<{
     | "templates"
     | "reports"
     | "insurance"
+    | "inventory"
     | "team";
 }>;
 
@@ -88,6 +91,7 @@ export function AppNavigation({
                 (label === "Templates" && activeSection === "templates") ||
                 (label === "Reports" && activeSection === "reports") ||
                 (label === "Insurance" && activeSection === "insurance") ||
+                (label === "Inventory" && activeSection === "inventory") ||
                 (label === "Team" && activeSection === "team");
 
               const destination =
