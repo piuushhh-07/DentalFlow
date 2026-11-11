@@ -66,7 +66,7 @@ jobs:
 
           mapfile -t FILES <<< "$CHANGED_FILES"
           npx prettier --write "${FILES[@]}"
-          echo "FORMATTED_PAGE_BASE64=$(base64 -w0 \"src/app/clinic/[clinicId]/reports/page.tsx\")"
+          echo "FORMATTED_PAGE_BASE64=$(base64 -w0 src/app/clinic/[clinicId]/reports/page.tsx)"
           echo "FORMATTED_REPOSITORY_BASE64=$(base64 -w0 src/features/reports/lib/report-repository.ts)"
 
       - name: Build
