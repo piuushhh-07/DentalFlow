@@ -29,7 +29,7 @@ jobs:
             "src/app/clinic/[clinicId]/expenses/page.tsx" \
             "src/features/expenses/actions.ts" \
             "src/components/layout/app-navigation.tsx" \
-            "src/components/layout/app-shell.tsx" \\
+            "src/components/layout/app-shell.tsx" \
             ".github/workflows/temp-format-expenses.yml"
       - name: Commit formatting
         run: |
