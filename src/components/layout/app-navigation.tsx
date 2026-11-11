@@ -116,8 +116,8 @@ export function AppNavigation({
                               : label === "Expenses"
                                 ? "/expenses"
                                 : label === "Team"
-                                ? "/settings/staff"
-                                : "";
+                                  ? "/settings/staff"
+                                  : "";
 
               return (
                 <li key={label}>
