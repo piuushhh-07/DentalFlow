@@ -194,9 +194,9 @@ export default async function ClinicReportsPage({
               Financial overview
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Live treatment ledger figures for this clinic. Collections are
-              for the current calendar month; outstanding balances are the
-              current open balance.
+              Live treatment ledger figures for this clinic. Collections are for
+              the current calendar month; outstanding balances are the current
+              open balance.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -227,7 +227,8 @@ export default async function ClinicReportsPage({
                 }).format(financialSummary.outstanding)}
               </p>
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                Remaining balances after recorded discounts, payments and refunds.
+                Remaining balances after recorded discounts, payments and
+                refunds.
               </p>
             </article>
           </div>
