@@ -93,7 +93,6 @@ export async function GET(
       );
       const summary = `Appointment · ${appointment.patient.fullName}`;
       const description = [
-        `Clinic: ${appointment.clinicId}`,
         `Type: ${appointment.type}`,
         `Dentist: ${appointment.dentistName}`,
         `Chair: ${appointment.chairLabel}`,
