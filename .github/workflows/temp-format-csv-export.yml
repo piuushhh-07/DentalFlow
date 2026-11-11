@@ -1,0 +1,34 @@
+name: Temporary CSV export formatter
+
+on:
+  push:
+    branches:
+      - feat/reports-csv-export
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/reports-csv-export
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write 'src/app/clinic/[clinicId]/reports/export/route.ts'
+      - name: Commit formatted file
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'src/app/clinic/[clinicId]/reports/export/route.ts'
+          git commit -m "style(reports): format CSV export route"
+          git push
