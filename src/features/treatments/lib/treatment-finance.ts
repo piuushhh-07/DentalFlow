@@ -702,7 +702,6 @@ export async function getClinicTreatmentFinanceSummary(clinicId: string) {
   };
 }
 
-
 export async function getClinicBillingWorkspace(clinicId: string) {
   const [plans, recentPayments] = await prisma.$transaction(
     async (transaction) =>

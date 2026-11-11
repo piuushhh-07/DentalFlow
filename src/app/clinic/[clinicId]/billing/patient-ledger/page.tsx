@@ -59,8 +59,8 @@ export default async function PatientBillingWorkspacePage({
             Patient billing
           </h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Track treatment balances and review payments recorded by your clinic.
-            Subscription billing remains under Settings.
+            Track treatment balances and review payments recorded by your
+            clinic. Subscription billing remains under Settings.
           </p>
         </header>
 
@@ -77,8 +77,8 @@ export default async function PatientBillingWorkspacePage({
               {inr.format(billing.totalOutstanding)}
             </p>
             <p className="mt-2 text-xs text-slate-500">
-              Across {billing.outstandingPlanCount.toLocaleString("en-IN")} treatment plans
-              with an amount due.
+              Across {billing.outstandingPlanCount.toLocaleString("en-IN")}{" "}
+              treatment plans with an amount due.
             </p>
           </article>
           <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -102,7 +102,8 @@ export default async function PatientBillingWorkspacePage({
               Outstanding balances
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Open a treatment plan to review its full ledger or record a payment.
+              Open a treatment plan to review its full ledger or record a
+              payment.
             </p>
           </div>
           {billing.outstandingPlans.length ? (
@@ -120,7 +121,9 @@ export default async function PatientBillingWorkspacePage({
                       {plan.patientName}
                     </Link>
                     <p className="mt-1 text-sm text-slate-600">{plan.name}</p>
-                    <p className="mt-1 text-xs text-slate-500">{plan.patientPhone}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {plan.patientPhone}
+                    </p>
                   </div>
                   <div className="flex items-center justify-between gap-4 sm:justify-end">
                     <div className="text-left sm:text-right">
@@ -155,7 +158,10 @@ export default async function PatientBillingWorkspacePage({
         <section className="mt-8 rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
             <div className="flex items-center gap-2">
-              <ReceiptText aria-hidden="true" className="size-4 text-teal-700" />
+              <ReceiptText
+                aria-hidden="true"
+                className="size-4 text-teal-700"
+              />
               <h2 className="text-base font-semibold text-slate-900">
                 Recent payments
               </h2>
