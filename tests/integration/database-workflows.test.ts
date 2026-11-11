@@ -1642,7 +1642,14 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
 
       const range = getClinicReportDateRange(new Date(), "Asia/Kolkata");
       const metrics = await getClinicReportMetrics(clinicAId, range);
+      const otherClinicMetrics = await getClinicReportMetrics(clinicBId, range);
+
       assert.ok(metrics.appointments >= 1);
+      assert.equal(
+        otherClinicMetrics.appointments,
+        0,
+        "Raw SQL report metrics must not expose appointments from another clinic.",
+      );
     },
   );
 
