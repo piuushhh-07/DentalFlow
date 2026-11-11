@@ -19,7 +19,7 @@ test("owner can see the clinic setup checklist and open the schedule (read-only)
   await page.getByLabel("Password").fill(password!);
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page).toHaveURL(/\/clinic\/[0-9a-f-]{36}(?:\?.*)?$/i, {
+  await expect(page).toHaveURL(/\\/clinic\\/[0-9a-f-]{36}(?:\\?.*)?$/i, {
     timeout: 30_000,
   });
 
@@ -28,12 +28,8 @@ test("owner can see the clinic setup checklist and open the schedule (read-only)
   ).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText("Set up dentists and chairs")).toBeVisible();
   await expect(page.getByText("Add your first patient")).toBeVisible();
-  await expect(
-    page.getByText("Schedule your first appointment"),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: /Manage team/ }),
-  ).toBeVisible();
+  await expect(page.getByText("Schedule your first appointment")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Manage team/ })).toBeVisible();
 
   const scheduleLink = page.locator('a[href$="/appointments"]').first();
   await expect(scheduleLink).toBeVisible({ timeout: 20_000 });
