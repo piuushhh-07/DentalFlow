@@ -375,20 +375,15 @@ test("only OWNER membership can authorize schedule resource mutations", () => {
     ClinicRoleDeniedError,
   );
   assert.throws(
-    () =>
-      authorizeClinicRole(null, [ClinicRole.OWNER]),
+    () => authorizeClinicRole(null, [ClinicRole.OWNER]),
     ClinicRoleDeniedError,
   );
   assert.throws(
     () =>
-      authorizeClinicMembership(
-        userId,
-        clinicId,
-        {
-          ...owner,
-          clinicId: "20000000-0000-4000-8000-000000000099",
-        },
-      ),
+      authorizeClinicMembership(userId, clinicId, {
+        ...owner,
+        clinicId: "20000000-0000-4000-8000-000000000099",
+      }),
     ClinicAccessDeniedError,
   );
 });

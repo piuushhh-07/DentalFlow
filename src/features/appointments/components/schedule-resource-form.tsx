@@ -41,7 +41,8 @@ function ResourceRow({
     setScheduleResourceActiveAction,
     initialState,
   );
-  const state = renameState.error || renameState.success ? renameState : statusState;
+  const state =
+    renameState.error || renameState.success ? renameState : statusState;
 
   return (
     <article className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -60,10 +61,12 @@ function ResourceRow({
           <input name="clinicId" type="hidden" value={clinicId} />
           <input name="kind" type="hidden" value={kind} />
           <input name="resourceId" type="hidden" value={resourceId} />
-          <input name="active" type="hidden" value={active ? "false" : "true"} />
-          <AppointmentSubmitButton
-            label={active ? "Deactivate" : "Activate"}
+          <input
+            name="active"
+            type="hidden"
+            value={active ? "false" : "true"}
           />
+          <AppointmentSubmitButton label={active ? "Deactivate" : "Activate"} />
         </form>
       </div>
       <form action={renameAction} className="mt-3 flex items-center gap-2">
@@ -133,8 +136,14 @@ export function ScheduleResourceForm({
           />
           <AppointmentSubmitButton label="Add dentist" />
         </form>
-        {dentistState.error && <p className="mb-2 text-sm text-red-700">{dentistState.error}</p>}
-        {dentistState.success && <p className="mb-2 text-sm text-emerald-700">{dentistState.success}</p>}
+        {dentistState.error && (
+          <p className="mb-2 text-sm text-red-700">{dentistState.error}</p>
+        )}
+        {dentistState.success && (
+          <p className="mb-2 text-sm text-emerald-700">
+            {dentistState.success}
+          </p>
+        )}
         {dentists.length === 0 ? (
           <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">
             No dentists configured.
@@ -155,7 +164,9 @@ export function ScheduleResourceForm({
         )}
       </section>
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-slate-800">Treatment chairs</h3>
+        <h3 className="mb-2 text-sm font-semibold text-slate-800">
+          Treatment chairs
+        </h3>
         <form action={chairAction} className="mb-3 flex items-center gap-2">
           <input name="clinicId" type="hidden" value={clinicId} />
           <input name="kind" type="hidden" value="chair" />
@@ -173,8 +184,12 @@ export function ScheduleResourceForm({
           />
           <AppointmentSubmitButton label="Add chair" />
         </form>
-        {chairState.error && <p className="mb-2 text-sm text-red-700">{chairState.error}</p>}
-        {chairState.success && <p className="mb-2 text-sm text-emerald-700">{chairState.success}</p>}
+        {chairState.error && (
+          <p className="mb-2 text-sm text-red-700">{chairState.error}</p>
+        )}
+        {chairState.success && (
+          <p className="mb-2 text-sm text-emerald-700">{chairState.success}</p>
+        )}
         {chairs.length === 0 ? (
           <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">
             No treatment chairs configured.
