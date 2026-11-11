@@ -161,3 +161,45 @@ export async function getClinicReportMetrics(
     completedTreatmentPlans: toSafeCount(counts.completedTreatmentPlans),
   };
 }
+
+
+export type ClinicExpenseReportSummary = Readonly<{
+  total: number;
+  transactions: number;
+  byCategory: Array<{ category: string; amount: number }>;
+}>;
+
+export async function getClinicExpenseReportSummary(
+  clinicId: string,
+  timeZone: string,
+): Promise<ClinicExpenseReportSummary> {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const monthStart = new Date(values.year + "-" + values.month + "-01T00:00:00.000Z");
+  const nextMonth = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1));
+  const [aggregate, categories] = await Promise.all([
+    prisma.clinicExpense.aggregate({
+      where: { clinicId, expenseDate: { gte: monthStart, lt: nextMonth } },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+    prisma.clinicExpense.groupBy({
+      by: ["category"],
+      where: { clinicId, expenseDate: { gte: monthStart, lt: nextMonth } },
+      _sum: { amount: true },
+      orderBy: { _sum: { amount: "desc" } },
+    }),
+  ]);
+  return {
+    total: Number(aggregate._sum.amount ?? 0),
+    transactions: aggregate._count._all,
+    byCategory: categories.map((item) => ({
+      category: item.category,
+      amount: Number(item._sum.amount ?? 0),
+    })),
+  };
+}
