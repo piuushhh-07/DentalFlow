@@ -2,7 +2,7 @@
 
 The suite has two levels:
 
-- A read-only OWNER smoke test that signs in, opens the clinic schedule, and checks that schedule resources render.
+- A read-only OWNER smoke test that verifies the clinic setup checklist, opens the clinic schedule, and checks that schedule resources render.
 - An opt-in schedule-resource management test that creates uniquely named dentists/chairs, checks duplicate rejection, renames resources, and deactivates them.
 
 ## 1. Install
