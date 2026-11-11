@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   CalendarClock,
+  CreditCard,
   ClipboardList,
   LayoutDashboard,
   MessageCircle,
@@ -18,6 +19,11 @@ const navigationGroups = [
       { label: "Appointments", icon: CalendarClock, href: "appointments" },
       { label: "Patients", icon: UsersRound, href: "patients" },
       { label: "Treatments", icon: Stethoscope, href: "treatments/catalogue" },
+      {
+        label: "Patient billing",
+        icon: CreditCard,
+        href: "billing/patient-ledger",
+      },
       { label: "Follow-ups", icon: ClipboardList, href: "#follow-up-queue" },
       { label: "Recalls", icon: CalendarClock },
       { label: "Templates", icon: MessageCircle, href: "messages/templates" },
@@ -36,6 +42,7 @@ type AppNavigationProps = Readonly<{
     | "appointments"
     | "patients"
     | "treatments"
+    | "billing"
     | "recalls"
     | "templates"
     | "reports"
@@ -76,6 +83,7 @@ export function AppNavigation({
                   activeSection === "appointments") ||
                 (label === "Patients" && activeSection === "patients") ||
                 (label === "Treatments" && activeSection === "treatments") ||
+                (label === "Patient billing" && activeSection === "billing") ||
                 (label === "Recalls" && activeSection === "recalls") ||
                 (label === "Templates" && activeSection === "templates") ||
                 (label === "Reports" && activeSection === "reports") ||
@@ -95,9 +103,11 @@ export function AppNavigation({
                           ? "/appointments"
                           : label === "Treatments"
                             ? "/treatments/catalogue"
+                            : label === "Patient billing"
+                              ? "/billing/patient-ledger"
                               : label === "Team"
                                 ? "/settings/staff"
-                              : "";
+                                : "";
 
               return (
                 <li key={label}>

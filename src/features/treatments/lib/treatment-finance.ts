@@ -701,3 +701,111 @@ export async function getClinicTreatmentFinanceSummary(clinicId: string) {
     outstanding: decimalNumber(outstanding),
   };
 }
+
+export async function getClinicBillingWorkspace(clinicId: string) {
+  const [plans, recentPayments] = await prisma.$transaction(
+    async (transaction) =>
+      Promise.all([
+        transaction.treatmentPlan.findMany({
+          where: {
+            clinicId,
+            status: { not: TreatmentPlanStatus.CANCELLED },
+          },
+          orderBy: [{ updatedAt: "desc" }],
+          select: {
+            id: true,
+            name: true,
+            patientId: true,
+            finalAmount: true,
+            estimatedAmount: true,
+            patient: {
+              select: { id: true, fullName: true, phoneNumber: true },
+            },
+            financialEntries: {
+              select: { entryType: true, amount: true },
+            },
+          },
+        }),
+        transaction.treatmentFinancialEntry.findMany({
+          where: {
+            clinicId,
+            entryType: FinancialEntryType.PAYMENT,
+          },
+          orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
+          take: 20,
+          select: {
+            id: true,
+            patientId: true,
+            treatmentPlanId: true,
+            amount: true,
+            paymentMethod: true,
+            paidAt: true,
+            receiptNumber: true,
+            patient: { select: { fullName: true } },
+            treatmentPlan: { select: { name: true } },
+          },
+        }),
+      ]),
+    { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+  );
+
+  const outstandingPlans = plans
+    .map((plan) => {
+      const totals = plan.financialEntries.reduce(
+        (result, entry) => {
+          if (entry.entryType === FinancialEntryType.PAYMENT) {
+            result.payments = result.payments.plus(entry.amount);
+          }
+          if (entry.entryType === FinancialEntryType.REFUND) {
+            result.refunds = result.refunds.plus(entry.amount);
+          }
+          if (entry.entryType === FinancialEntryType.DISCOUNT) {
+            result.discounts = result.discounts.plus(entry.amount);
+          }
+          return result;
+        },
+        {
+          payments: new Prisma.Decimal(0),
+          refunds: new Prisma.Decimal(0),
+          discounts: new Prisma.Decimal(0),
+        },
+      );
+      const finalAmount =
+        plan.finalAmount ?? plan.estimatedAmount ?? new Prisma.Decimal(0);
+      const balance = calculateTreatmentLedgerBalance(finalAmount, totals);
+
+      return {
+        id: plan.id,
+        name: plan.name,
+        patientId: plan.patient.id,
+        patientName: plan.patient.fullName,
+        patientPhone: plan.patient.phoneNumber,
+        finalAmount: decimalNumber(finalAmount),
+        outstanding: balance.isPositive() ? decimalNumber(balance) : 0,
+      };
+    })
+    .filter((plan) => plan.outstanding > 0)
+    .sort((left, right) => right.outstanding - left.outstanding);
+
+  const totalOutstanding = outstandingPlans.reduce(
+    (sum, plan) => sum.plus(plan.outstanding),
+    new Prisma.Decimal(0),
+  );
+
+  return {
+    totalOutstanding: decimalNumber(totalOutstanding),
+    outstandingPlanCount: outstandingPlans.length,
+    outstandingPlans: outstandingPlans.slice(0, 50),
+    recentPayments: recentPayments.map((entry) => ({
+      id: entry.id,
+      patientId: entry.patientId,
+      treatmentPlanId: entry.treatmentPlanId,
+      patientName: entry.patient.fullName,
+      treatmentName: entry.treatmentPlan.name,
+      amount: decimalNumber(entry.amount),
+      paymentMethod: entry.paymentMethod,
+      paidAt: entry.paidAt,
+      receiptNumber: entry.receiptNumber,
+    })),
+  };
+}
