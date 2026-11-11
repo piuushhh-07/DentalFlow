@@ -225,8 +225,8 @@ export default async function ClinicReportsPage({
                 }).format(expenseSummary.total)}
               </p>
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                {expenseSummary.transactions.toLocaleString("en-IN")} recorded operating
-                expenses
+                {expenseSummary.transactions.toLocaleString("en-IN")} recorded
+                operating expenses
               </p>
               <Link
                 className="mt-3 inline-flex text-sm font-semibold text-teal-800 hover:underline"
@@ -241,7 +241,9 @@ export default async function ClinicReportsPage({
               </p>
               <p
                 className={`mt-3 text-3xl font-semibold tracking-tight ${
-                  financialSummary.collectionsThisMonth - expenseSummary.total >= 0
+                  financialSummary.collectionsThisMonth -
+                    expenseSummary.total >=
+                  0
                     ? "text-emerald-700"
                     : "text-rose-700"
                 }`}
@@ -255,8 +257,8 @@ export default async function ClinicReportsPage({
                 )}
               </p>
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                Monthly treatment collections minus recorded clinic expenses; not
-                accounting profit.
+                Monthly treatment collections minus recorded clinic expenses;
+                not accounting profit.
               </p>
             </article>
             <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
