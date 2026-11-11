@@ -20,6 +20,8 @@ model PatientDataExportAudit {
 
   @@index([clinicId, patientId, createdAt])
   @@index([clinicId, actorUserId, createdAt])
+  @@index([actorUserId, clinicId], map: "fk_e008c_actor_user_id_2c")
+  @@index([patientId, clinicId], map: "fk_e008c_patient_id_2c")
   @@map("patient_data_export_audits")
 }
 
@@ -455,6 +457,7 @@ model BillingPayment {
   @@index([clinicId, createdAt])
   @@index([subscriptionId, createdAt])
   @@index([clinicId, subscriptionId], map: "bp_subscription_clinic_idx")
+  @@index([subscriptionId, clinicId], map: "fk_11vrt_subscription_id_2c")
   @@map("billing_payments")
 }
 
@@ -533,6 +536,7 @@ model ClinicInvitation {
   @@index([clinicId, status, expiresAt])
   @@index([normalizedEmail, status, expiresAt])
   @@index([clinicId, invitedByUserId], map: "ci_inviter_clinic_idx")
+  @@index([invitedByUserId, clinicId], map: "fk_1adgo_invited_by_user_id_2c")
   @@map("clinic_invitations")
 }
 
@@ -605,6 +609,8 @@ model TreatmentPlan {
   @@index([clinicId, status, completedAt])
   @@index([clinicId, patientId])
   @@index([clinicId, catalogItemId], map: "tp_catalog_clinic_idx")
+  @@index([catalogItemId, clinicId], map: "fk_bm4b1_catalog_item_id_2c")
+  @@index([patientId, clinicId], map: "fk_bm4b1_patient_id_2c")
   @@map("treatment_plans")
 }
 
@@ -655,6 +661,9 @@ model TreatmentFinancialEntry {
   @@index([clinicId, treatmentPlanId, paidAt])
   @@index([clinicId, patientId, paidAt])
   @@index([clinicId, createdByUserId], map: "tfe_creator_clinic_idx")
+  @@index([createdByUserId, clinicId], map: "fk_1gdvi_created_by_user_id_2c")
+  @@index([patientId, clinicId], map: "fk_1gdvi_patient_id_2c")
+  @@index([treatmentPlanId, clinicId], map: "fk_1gdvi_treatment_plan_id_2c")
   @@map("treatment_financial_entries")
 }
 
@@ -704,6 +713,10 @@ model TreatmentEstimate {
   @@index([clinicId, patientId, createdAt])
   @@index([clinicId, treatmentPlanId, status])
   @@index([clinicId, createdByUserId], map: "te_creator_clinic_idx")
+  @@index([createdByUserId, clinicId], map: "fk_896yo_created_by_user_id_2c")
+  @@index([patientId, clinicId], map: "fk_896yo_patient_id_2c")
+  @@index([revisionOfEstimateId, clinicId, patientId, treatmentPlanId], map: "fk_896yo_revision_of_estimate_id_4c")
+  @@index([treatmentPlanId, clinicId, patientId], map: "fk_896yo_treatment_plan_id_3c")
   @@map("treatment_estimates")
 }
 
@@ -724,6 +737,8 @@ model TreatmentEstimateLine {
   @@unique([estimateId, position])
   @@index([clinicId, patientId, estimateId])
   @@index([clinicId, catalogueItemId], map: "tel_catalog_clinic_idx")
+  @@index([catalogueItemId, clinicId], map: "fk_yf3l3_catalogue_item_id_2c")
+  @@index([estimateId, clinicId, patientId], map: "fk_yf3l3_estimate_id_3c")
   @@map("treatment_estimate_lines")
 }
 
@@ -744,6 +759,8 @@ model TreatmentEstimateAudit {
 
   @@index([clinicId, patientId, estimateId, createdAt])
   @@index([clinicId, actorUserId], map: "tea_actor_clinic_idx")
+  @@index([actorUserId, clinicId], map: "fk_1awps_actor_user_id_2c")
+  @@index([estimateId, clinicId, patientId], map: "fk_1awps_estimate_id_3c")
   @@map("treatment_estimate_audits")
 }
 
@@ -772,6 +789,7 @@ model TreatmentVisit {
   @@index([clinicId, status, dueDate])
   @@index([clinicId, dueDate])
   @@index([clinicId, treatmentPlanId, patientId], map: "tv_plan_clinic_patient_idx")
+  @@index([treatmentPlanId, clinicId, patientId], map: "fk_1vbji_treatment_plan_id_3c")
   @@map("treatment_visits")
 }
 
@@ -806,6 +824,9 @@ model OdontogramEntry {
   @@index([clinicId, treatmentPlanId])
   @@index([clinicId, createdByUserId], map: "oe_creator_clinic_idx")
   @@index([clinicId, treatmentPlanId, patientId], map: "oe_plan_clinic_patient_idx")
+  @@index([createdByUserId, clinicId], map: "fk_1hs9v_created_by_user_id_2c")
+  @@index([patientId, clinicId], map: "fk_1hs9v_patient_id_2c")
+  @@index([treatmentPlanId, clinicId, patientId], map: "fk_1hs9v_treatment_plan_id_3c")
   @@map("odontogram_entries")
 }
 
@@ -837,6 +858,9 @@ model DentalClinicalRecord {
   @@index([clinicId, visitId])
   @@index([clinicId, createdByUserId], map: "dcr_creator_clinic_idx")
   @@index([clinicId, visitId, patientId], map: "dcr_visit_clinic_patient_idx")
+  @@index([createdByUserId, clinicId], map: "fk_pn75x_created_by_user_id_2c")
+  @@index([patientId, clinicId], map: "fk_pn75x_patient_id_2c")
+  @@index([visitId, clinicId, patientId], map: "fk_pn75x_visit_id_3c")
   @@map("dental_clinical_records")
 }
 
@@ -860,6 +884,8 @@ model DentalClinicalRecordFinding {
   @@index([clinicId, patientId, toothNumber])
   @@index([clinicId, recordId, patientId], map: "dcrf_record_clinic_patient_idx")
   @@index([clinicId, relatedOdontogramEntryId, patientId], map: "dcrf_odontogram_clinic_patient_idx")
+  @@index([recordId, clinicId, patientId], map: "fk_1hacj_record_id_3c")
+  @@index([relatedOdontogramEntryId, clinicId, patientId], map: "fk_1hacj_related_odontogram_entry_id_3c")
   @@map("dental_clinical_record_findings")
 }
 
@@ -878,6 +904,8 @@ model DentalClinicalRecordAudit {
   @@index([clinicId, patientId, createdAt])
   @@index([clinicId, changedByUserId], map: "dcra_actor_clinic_idx")
   @@index([clinicId, recordId, patientId], map: "dcra_record_clinic_patient_idx")
+  @@index([changedByUserId, clinicId], map: "fk_1wk01_changed_by_user_id_2c")
+  @@index([recordId, clinicId, patientId], map: "fk_1wk01_record_id_3c")
   @@map("dental_clinical_record_audits")
 }
 
@@ -898,6 +926,7 @@ model PrescriptionMedicineCatalogueItem {
   @@unique([clinicId, normalizedName])
   @@index([clinicId, name])
   @@index([clinicId, createdByUserId], map: "pmci_creator_clinic_idx")
+  @@index([createdByUserId, clinicId], map: "fk_1jnij_created_by_user_id_2c")
   @@map("prescription_medicine_catalogue_items")
 }
 
@@ -937,6 +966,9 @@ model DigitalPrescription {
   @@index([clinicId, visitId])
   @@index([clinicId, authorUserId], map: "dp_author_clinic_idx")
   @@index([clinicId, visitId, patientId], map: "dp_visit_clinic_patient_idx")
+  @@index([authorUserId, clinicId], map: "fk_1dlwu_author_user_id_2c")
+  @@index([patientId, clinicId], map: "fk_1dlwu_patient_id_2c")
+  @@index([visitId, clinicId, patientId], map: "fk_1dlwu_visit_id_3c")
   @@map("digital_prescriptions")
 }
 
@@ -960,6 +992,8 @@ model DigitalPrescriptionMedicine {
   @@unique([prescriptionId, position])
   @@index([clinicId, patientId, prescriptionId])
   @@index([clinicId, catalogueItemId], map: "dpm_catalog_clinic_idx")
+  @@index([catalogueItemId, clinicId], map: "fk_1t775_catalogue_item_id_2c")
+  @@index([prescriptionId, clinicId, patientId], map: "fk_1t775_prescription_id_3c")
   @@map("digital_prescription_medicines")
 }
 
@@ -978,6 +1012,8 @@ model DigitalPrescriptionAudit {
   @@index([clinicId, patientId, createdAt])
   @@index([clinicId, actorUserId], map: "dpa_actor_clinic_idx")
   @@index([clinicId, prescriptionId, patientId], map: "dpa_prescription_clinic_patient_idx")
+  @@index([actorUserId, clinicId], map: "fk_g1ldt_actor_user_id_2c")
+  @@index([prescriptionId, clinicId, patientId], map: "fk_g1ldt_prescription_id_3c")
   @@map("digital_prescription_audits")
 }
 
@@ -1012,6 +1048,10 @@ model Appointment {
   @@index([clinicId, dentistId, scheduledAt])
   @@index([clinicId, chairId, scheduledAt])
   @@index([clinicId, treatmentVisitId, patientId], map: "ap_visit_clinic_patient_idx")
+  @@index([chairId, clinicId], map: "fk_r6ypy_chair_id_2c")
+  @@index([dentistId, clinicId], map: "fk_r6ypy_dentist_id_2c")
+  @@index([patientId, clinicId], map: "fk_r6ypy_patient_id_2c")
+  @@index([treatmentVisitId, clinicId, patientId], map: "fk_r6ypy_treatment_visit_id_3c")
   @@map("appointments")
 }
 
@@ -1087,6 +1127,8 @@ model ClinicStaffAudit {
 
   @@index([clinicId, targetUserId, createdAt])
   @@index([clinicId, actorUserId, createdAt])
+  @@index([actorUserId, clinicId], map: "fk_1dcaa_actor_user_id_2c")
+  @@index([targetUserId, clinicId], map: "fk_1dcaa_target_user_id_2c")
   @@map("clinic_staff_audits")
 }
 
@@ -1129,6 +1171,8 @@ model AppointmentRequest {
   @@index([clinicId, status, requestedAt])
   @@index([clinicId, chairId], map: "ar_chair_clinic_idx")
   @@index([clinicId, dentistId], map: "ar_dentist_clinic_idx")
+  @@index([chairId, clinicId], map: "fk_1v4rg_chair_id_2c")
+  @@index([dentistId, clinicId], map: "fk_1v4rg_dentist_id_2c")
   @@map("appointment_requests")
 }
 
@@ -1153,6 +1197,7 @@ model PreventiveRecall {
   @@unique([id, clinicId, patientId])
   @@index([clinicId, status, dueDate])
   @@index([clinicId, patientId])
+  @@index([patientId, clinicId], map: "fk_word7_patient_id_2c")
   @@map("preventive_recalls")
 }
 
@@ -1216,6 +1261,12 @@ model MessageLog {
   @@index([clinicId, messageTemplateId], map: "ml_template_clinic_idx")
   @@index([clinicId, preventiveRecallId, patientId], map: "ml_recall_clinic_patient_idx")
   @@index([clinicId, treatmentVisitId, patientId], map: "ml_visit_clinic_patient_idx")
+  @@index([appointmentId, clinicId, patientId], map: "fk_lh3im_appointment_id_3c")
+  @@index([messageTemplateId, clinicId], map: "fk_lh3im_message_template_id_2c")
+  @@index([patientId, clinicId], map: "fk_lh3im_patient_id_2c")
+  @@index([preventiveRecallId, clinicId, patientId], map: "fk_lh3im_preventive_recall_id_3c")
+  @@index([senderUserId, clinicId], map: "fk_lh3im_sender_user_id_2c")
+  @@index([treatmentVisitId, clinicId, patientId], map: "fk_lh3im_treatment_visit_id_3c")
   @@map("message_logs")
 }
 
@@ -1269,6 +1320,8 @@ model InsurancePolicy {
   @@unique([id, clinicId, patientId])
   @@index([clinicId, patientId, validUntil])
   @@index([clinicId, providerId])
+  @@index([patientId, clinicId], map: "fk_2za5l_patient_id_2c")
+  @@index([providerId, clinicId], map: "fk_2za5l_provider_id_2c")
   @@map("insurance_policies")
 }
 
@@ -1320,6 +1373,10 @@ model InsuranceClaim {
   @@index([clinicId, policyId, patientId], map: "ic_policy_clinic_patient_idx")
   @@index([clinicId, summaryReviewedById], map: "ic_reviewer_clinic_idx")
   @@index([clinicId, treatmentPlanId, patientId], map: "ic_plan_clinic_patient_idx")
+  @@index([patientId, clinicId], map: "fk_jjidf_patient_id_2c")
+  @@index([policyId, clinicId, patientId], map: "fk_jjidf_policy_id_3c")
+  @@index([summaryReviewedById, clinicId], map: "fk_jjidf_summary_reviewed_by_id_2c")
+  @@index([treatmentPlanId, clinicId, patientId], map: "fk_jjidf_treatment_plan_id_3c")
   @@map("insurance_claims")
 }
 
@@ -1354,6 +1411,9 @@ model InsurancePreAuthorization {
   @@index([clinicId, expiresAt])
   @@index([clinicId, policyId, patientId], map: "ipa_policy_clinic_patient_idx")
   @@index([clinicId, treatmentPlanId, patientId], map: "ipa_plan_clinic_patient_idx")
+  @@index([patientId, clinicId], map: "fk_17xjs_patient_id_2c")
+  @@index([policyId, clinicId, patientId], map: "fk_17xjs_policy_id_3c")
+  @@index([treatmentPlanId, clinicId, patientId], map: "fk_17xjs_treatment_plan_id_3c")
   @@map("insurance_pre_authorizations")
 }
 
@@ -1374,6 +1434,8 @@ model InsurancePayment {
 
   @@index([clinicId, claimId, kind, paidAt])
   @@index([clinicId, recordedById], map: "ip_recordedby_clinic_idx")
+  @@index([claimId, clinicId], map: "fk_impzl_claim_id_2c")
+  @@index([recordedById, clinicId], map: "fk_impzl_recorded_by_id_2c")
   @@map("insurance_payments")
 }
 
@@ -1401,6 +1463,7 @@ model InsuranceDocument {
   @@unique([id, clinicId, claimId])
   @@index([clinicId, claimId, status])
   @@index([clinicId, extractionStatus])
+  @@index([claimId, clinicId], map: "fk_1cydg_claim_id_2c")
   @@map("insurance_documents")
 }
 
@@ -1428,5 +1491,10 @@ model InsuranceActivity {
   @@index([clinicId, policyId, createdAt])
   @@index([clinicId, providerId, createdAt])
   @@index([clinicId, actorUserId], map: "ia_actor_clinic_idx")
+  @@index([actorUserId, clinicId], map: "fk_1p0fr_actor_user_id_2c")
+  @@index([claimId, clinicId], map: "fk_1p0fr_claim_id_2c")
+  @@index([policyId, clinicId], map: "fk_1p0fr_policy_id_2c")
+  @@index([preAuthorizationId, clinicId], map: "fk_1p0fr_pre_authorization_id_2c")
+  @@index([providerId, clinicId], map: "fk_1p0fr_provider_id_2c")
   @@map("insurance_activities")
 }
