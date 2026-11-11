@@ -13,11 +13,6 @@ import { prisma } from "@/lib/db/prisma";
 export const dynamic = "force-dynamic";
 
 const quantity = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 3 });
-const money = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 2,
-});
 
 const statusMessages: Record<string, string> = {
   created: "Inventory item added.",
