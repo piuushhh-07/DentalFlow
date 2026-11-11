@@ -507,6 +507,7 @@ model ClinicMembership {
   authoredTreatmentEstimates        TreatmentEstimate[]                 @relation("TreatmentEstimateAuthor")
   treatmentEstimateAudits           TreatmentEstimateAudit[]
   patientDataExportAudits           PatientDataExportAudit[]
+  inventoryTransactions             InventoryTransaction[]
   sentClinicInvitations             ClinicInvitation[]                  @relation("ClinicInvitationSender")
   staffProfile                      ClinicStaffProfile?
   permissionGrants                  ClinicPermissionGrant[]
