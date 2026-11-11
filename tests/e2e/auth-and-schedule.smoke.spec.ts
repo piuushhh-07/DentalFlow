@@ -47,9 +47,9 @@ test("owner can see the clinic setup checklist and open the schedule (read-only)
 const staffEmail = process.env.E2E_STAFF_EMAIL;
 const staffPassword = process.env.E2E_STAFF_PASSWORD;
 
-test(
-  "staff can use clinic operations but cannot open owner administration (read-only)",
-  async ({ page }) => {
+test("staff can use clinic operations but cannot open owner administration (read-only)", async ({
+  page,
+}) => {
     test.skip(
       !staffEmail || !staffPassword,
       "Set E2E_STAFF_EMAIL and E2E_STAFF_PASSWORD for a dedicated STAFF test account.",
@@ -74,9 +74,7 @@ test(
     await expect(
       page.getByRole("heading", { name: "Your clinic setup", exact: true }),
     ).toHaveCount(0);
-    await expect(
-      page.getByRole("link", { name: /Manage team/ }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Manage team/ })).toHaveCount(0);
     await expect(
       page.getByRole("link", { name: "Billing", exact: true }),
     ).toHaveCount(0);
@@ -101,5 +99,4 @@ test(
     await expect(
       page.getByRole("heading", { name: "Schedule resources" }),
     ).toBeVisible();
-  },
-);
+});
