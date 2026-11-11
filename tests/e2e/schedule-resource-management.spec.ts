@@ -39,7 +39,11 @@ async function submitCreate(
   await expect(page.getByText(successMessage, { exact: true })).toBeVisible();
 }
 
-async function renameResource(page: Page, originalName: string, nextName: string) {
+async function renameResource(
+  page: Page,
+  originalName: string,
+  nextName: string,
+) {
   const resource = page.locator("article").filter({ hasText: originalName });
   await resource.getByLabel(`Rename ${originalName}`).fill(nextName);
   await resource.getByRole("button", { name: "Rename" }).click();
@@ -141,23 +145,39 @@ test.describe("OWNER schedule resource management (staging only)", () => {
       await renameResource(page, chairTwo, renamedChair);
       await expect(page.getByText(/already exists/i).last()).toBeVisible();
 
-      const dentistCard = page.locator("article").filter({ hasText: renamedDentist });
+      const dentistCard = page
+        .locator("article")
+        .filter({ hasText: renamedDentist });
       await dentistCard.getByRole("button", { name: "Deactivate" }).click();
-      await expect(dentistCard.getByText("Inactive", { exact: true })).toBeVisible();
+      await expect(
+        dentistCard.getByText("Inactive", { exact: true }),
+      ).toBeVisible();
 
-      const chairCard = page.locator("article").filter({ hasText: renamedChair });
+      const chairCard = page
+        .locator("article")
+        .filter({ hasText: renamedChair });
       await chairCard.getByRole("button", { name: "Deactivate" }).click();
-      await expect(chairCard.getByText("Inactive", { exact: true })).toBeVisible();
+      await expect(
+        chairCard.getByText("Inactive", { exact: true }),
+      ).toBeVisible();
 
       // Deactivate the second resources too, so the disposable clinic is left tidy.
-      const secondDentistCard = page.locator("article").filter({ hasText: dentistTwo });
-      await secondDentistCard.getByRole("button", { name: "Deactivate" }).click();
+      const secondDentistCard = page
+        .locator("article")
+        .filter({ hasText: dentistTwo });
+      await secondDentistCard
+        .getByRole("button", { name: "Deactivate" })
+        .click();
       await expect(
         secondDentistCard.getByText("Inactive", { exact: true }),
       ).toBeVisible();
 
-      const secondChairCard = page.locator("article").filter({ hasText: chairTwo });
-      await secondChairCard.getByRole("button", { name: "Deactivate" }).click();
+      const secondChairCard = page
+        .locator("article")
+        .filter({ hasText: chairTwo });
+      await secondChairCard
+        .getByRole("button", { name: "Deactivate" })
+        .click();
       await expect(
         secondChairCard.getByText("Inactive", { exact: true }),
       ).toBeVisible();
