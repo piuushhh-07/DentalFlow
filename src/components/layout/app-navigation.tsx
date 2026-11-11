@@ -5,6 +5,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   Package,
+  ReceiptText,
   MessageCircle,
   ShieldCheck,
   Stethoscope,
@@ -31,6 +32,7 @@ const navigationGroups = [
       { label: "Reports", icon: ClipboardList, href: "reports" },
       { label: "Insurance", icon: ShieldCheck, href: "insurance" },
       { label: "Inventory", icon: Package, href: "inventory" },
+      { label: "Expenses", icon: ReceiptText, href: "expenses" },
       { label: "Team", icon: UserRoundPlus, href: "settings/staff" },
     ],
   },
@@ -50,6 +52,7 @@ type AppNavigationProps = Readonly<{
     | "reports"
     | "insurance"
     | "inventory"
+    | "expenses"
     | "team";
 }>;
 
@@ -92,6 +95,7 @@ export function AppNavigation({
                 (label === "Reports" && activeSection === "reports") ||
                 (label === "Insurance" && activeSection === "insurance") ||
                 (label === "Inventory" && activeSection === "inventory") ||
+                (label === "Expenses" && activeSection === "expenses") ||
                 (label === "Team" && activeSection === "team");
 
               const destination =
@@ -109,7 +113,9 @@ export function AppNavigation({
                             ? "/treatments/catalogue"
                             : label === "Patient billing"
                               ? "/billing/patient-ledger"
-                              : label === "Team"
+                              : label === "Expenses"
+                                ? "/expenses"
+                                : label === "Team"
                                 ? "/settings/staff"
                                 : "";
 
