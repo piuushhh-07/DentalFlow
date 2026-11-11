@@ -19,7 +19,11 @@ const navigationGroups = [
       { label: "Appointments", icon: CalendarClock, href: "appointments" },
       { label: "Patients", icon: UsersRound, href: "patients" },
       { label: "Treatments", icon: Stethoscope, href: "treatments/catalogue" },
-      { label: "Patient billing", icon: CreditCard, href: "billing/patient-ledger" },
+      {
+        label: "Patient billing",
+        icon: CreditCard,
+        href: "billing/patient-ledger",
+      },
       { label: "Follow-ups", icon: ClipboardList, href: "#follow-up-queue" },
       { label: "Recalls", icon: CalendarClock },
       { label: "Templates", icon: MessageCircle, href: "messages/templates" },
@@ -99,11 +103,11 @@ export function AppNavigation({
                           ? "/appointments"
                           : label === "Treatments"
                             ? "/treatments/catalogue"
-                               : label === "Patient billing"
-                            ? "/billing/patient-ledger"
-                            : label === "Team"
+                            : label === "Patient billing"
+                              ? "/billing/patient-ledger"
+                              : label === "Team"
                                 ? "/settings/staff"
-                              : "";
+                                : "";
 
               return (
                 <li key={label}>
