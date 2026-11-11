@@ -19,7 +19,7 @@ test("owner can see the clinic setup checklist and open the schedule (read-only)
   await page.getByLabel("Password").fill(password!);
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page).toHaveURL(/\\/clinic\\/[0-9a-f-]{36}(?:\\?.*)?$/i, {
+  await expect(page).toHaveURL(/\/clinic\/[0-9a-f-]{36}(?:\\?.*)?$/i, {
     timeout: 30_000,
   });
 
@@ -63,11 +63,11 @@ test(
     await page.getByLabel("Password").fill(staffPassword!);
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(page).toHaveURL(/\\/clinic\\/[0-9a-f-]{36}(?:\\?.*)?$/i, {
+    await expect(page).toHaveURL(/\/clinic\/[0-9a-f-]{36}(?:\\?.*)?$/i, {
       timeout: 30_000,
     });
 
-    const clinicId = page.url().match(/\\/clinic\\/([0-9a-f-]{36})/i)?.[1];
+    const clinicId = page.url().match(/\/clinic\/([0-9a-f-]{36})/i)?.[1];
     expect(clinicId).toBeTruthy();
 
     await expect(page.getByText("Clinic staff", { exact: true })).toBeVisible();
