@@ -1,7 +1,7 @@
 import "server-only";
 
 import Link from "next/link";
-import { ArrowRight, CalendarPlus, CheckCircle2, Circle, ClipboardList, UserPlus, Users } from "lucide-react";
+import { ArrowRight, CalendarPlus, CheckCircle2, UserPlus, Users } from "lucide-react";
 
 import { prisma } from "@/lib/db/prisma";
 
