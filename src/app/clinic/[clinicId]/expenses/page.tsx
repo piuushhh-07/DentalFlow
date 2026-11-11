@@ -252,7 +252,7 @@ export default async function ClinicExpensesPage({
               ))}
             </div>
           ) : (
-            <p className="px-5 py-10 text-center text-sm text-slate-500">No expenses recorded yet. Add the clinic's first expense above.</p>
+            <p className="px-5 py-10 text-center text-sm text-slate-500">No expenses recorded yet. Add the clinic&apos;s first expense above.</p>
           )}
         </section>
       </div>
