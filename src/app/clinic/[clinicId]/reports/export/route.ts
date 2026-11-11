@@ -2,7 +2,10 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
-import { getClinicExpenseReportSummary, getClinicReportMetrics } from "@/features/reports/lib/report-repository";
+import {
+  getClinicExpenseReportSummary,
+  getClinicReportMetrics,
+} from "@/features/reports/lib/report-repository";
 import {
   formatReportDateRange,
   getClinicReportDateRange,
@@ -62,8 +65,17 @@ export async function GET(
     ["Outstanding treatment balances (INR)", financialSummary.outstanding],
     ["Clinic expenses this month (INR)", expenseSummary.total],
     ["Expense transactions this month", expenseSummary.transactions],
-    ["Collections after recorded expenses (INR; not accounting profit)", financialSummary.collectionsThisMonth - expenseSummary.total],
-    ...expenseSummary.byCategory.map((item) => ["Expense category: " + item.category + " (INR)", item.amount] as [string, number]),
+    [
+      "Collections after recorded expenses (INR; not accounting profit)",
+      financialSummary.collectionsThisMonth - expenseSummary.total,
+    ],
+    ...expenseSummary.byCategory.map(
+      (item) =>
+        ["Expense category: " + item.category + " (INR)", item.amount] as [
+          string,
+          number,
+        ],
+    ),
   ];
 
   const csv = [
