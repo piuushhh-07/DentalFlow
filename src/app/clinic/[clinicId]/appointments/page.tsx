@@ -133,7 +133,7 @@ export default async function ClinicAppointmentsPage({
         >
           ← Back to dashboard
         </Link>
-        <header className="mt-4">
+        <header className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-medium text-teal-700">Clinic schedule</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
@@ -144,6 +144,12 @@ export default async function ClinicAppointmentsPage({
               in Asia/Kolkata time.
             </p>
           </div>
+          <a
+            className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            href={`/clinic/${membership.clinicId}/appointments/export?date=${encodeURIComponent(selectedDate)}&view=${selectedView}`}
+          >
+            Download calendar (.ics)
+          </a>
         </header>
 
         <div className="mt-6">
