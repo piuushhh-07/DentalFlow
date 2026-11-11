@@ -48,10 +48,16 @@ export async function GET(
     ["Overdue treatment visits", metrics.overdueTreatmentVisits],
     ["Pending preventive recalls", metrics.pendingPreventiveRecalls],
     ["Overdue preventive recalls", metrics.overduePreventiveRecalls],
-    ["Manually recorded WhatsApp messages", metrics.manuallyRecordedWhatsAppMessages],
+    [
+      "Manually recorded WhatsApp messages",
+      metrics.manuallyRecordedWhatsAppMessages,
+    ],
     ["Confirmed follow-ups", metrics.confirmedFollowUps],
     ["Completed treatment plans", metrics.completedTreatmentPlans],
-    ["Payments collected this month (INR)", financialSummary.collectionsThisMonth],
+    [
+      "Payments collected this month (INR)",
+      financialSummary.collectionsThisMonth,
+    ],
     ["Outstanding treatment balances (INR)", financialSummary.outstanding],
   ];
 
