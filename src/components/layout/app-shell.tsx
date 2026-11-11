@@ -12,6 +12,7 @@ type AppShellProps = Readonly<{
     | "appointments"
     | "patients"
     | "treatments"
+    | "billing"
     | "recalls"
     | "templates"
     | "reports"
