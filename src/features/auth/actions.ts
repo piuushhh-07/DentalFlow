@@ -263,14 +263,16 @@ export async function removeClinicStaffAction(
   if (userId.data === owner.userId) {
     return { error: "You cannot remove your own owner access." };
   }
-  const removed = await prisma.clinicMembership.deleteMany({
+  const revoked = await prisma.clinicMembership.updateMany({
     where: {
       clinicId: owner.clinicId,
       userId: userId.data,
       role: ClinicRole.STAFF,
+      revokedAt: null,
     },
+    data: { revokedAt: new Date() },
   });
-  if (removed.count === 0) {
+  if (revoked.count === 0) {
     return { error: "This staff membership is no longer available." };
   }
   revalidatePath(`/clinic/${owner.clinicId}/settings/staff`);
