@@ -18,7 +18,9 @@ import { createSupabaseServerActionClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/features/auth/lib/supabase-admin";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { revalidatePath } from "next/cache";
-import { activatePendingClinicInvitations } from "@/features/auth/lib/invitation-repository";
+import {
+  activatePendingClinicInvitations,
+} from "@/features/auth/lib/invitation-repository";
 
 const signInSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -268,7 +270,7 @@ export async function removeClinicStaffAction(
   if (userId.data === owner.userId) {
     return { error: "You cannot remove your own owner access." };
   }
-  // Keep this update shape aligned with the shared membership-revocation action.
+  // Preserve the membership revocation audit trail.
   const revoked = await prisma.clinicMembership.updateMany({
     where: {
       clinicId: owner.clinicId,
@@ -290,7 +292,10 @@ export async function revokeClinicInvitationAction(
   formData: FormData,
 ): Promise<ClinicTeamActionState> {
   const clinicId = z.string().uuid().safeParse(formData.get("clinicId"));
-  const invitationId = z.string().uuid().safeParse(formData.get("invitationId"));
+  const invitationId = z
+    .string()
+    .uuid()
+    .safeParse(formData.get("invitationId"));
   if (!clinicId.success || !invitationId.success) {
     return { error: "Choose a valid pending invitation." };
   }
