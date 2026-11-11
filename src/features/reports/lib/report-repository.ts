@@ -177,7 +177,9 @@ export async function getClinicExpenseReportSummary(
     year: "numeric",
     month: "2-digit",
   }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const values = Object.fromEntries(
+    parts.map(({ type, value }) => [type, value]),
+  );
   const monthStart = new Date(
     values.year + "-" + values.month + "-01T00:00:00.000Z",
   );
