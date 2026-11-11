@@ -9,14 +9,14 @@ enum ClinicInvitationStatus {
 }
 
 model PatientDataExportAudit {
-  id            String            @id @default(uuid()) @db.Uuid
-  clinicId      String            @db.Uuid
-  patientId     String            @db.Uuid
-  actorUserId   String            @db.Uuid
-  createdAt     DateTime          @default(now()) @db.Timestamptz(6)
-  clinic        Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  patient       Patient           @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
-  actor         ClinicMembership  @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  id          String           @id @default(uuid()) @db.Uuid
+  clinicId    String           @db.Uuid
+  patientId   String           @db.Uuid
+  actorUserId String           @db.Uuid
+  createdAt   DateTime         @default(now()) @db.Timestamptz(6)
+  clinic      Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient     Patient          @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  actor       ClinicMembership @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
 
   @@index([clinicId, patientId, createdAt])
   @@index([clinicId, actorUserId, createdAt])
@@ -32,6 +32,35 @@ datasource db {
 enum ClinicRole {
   OWNER
   STAFF
+}
+
+enum DentistWorkingStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+}
+
+enum StaffJobTitle {
+  DENTIST
+  RECEPTIONIST
+  DENTAL_ASSISTANT
+  CLINIC_MANAGER
+  BILLING_STAFF
+}
+
+enum ClinicPermission {
+  PATIENT_VIEW
+  PATIENT_EDIT
+  APPOINTMENT_MANAGE
+  CLINICAL_RECORDS
+  PRESCRIPTIONS
+  TREATMENT_PLANS
+  FINANCIAL_RECORDS
+  INSURANCE
+  INVENTORY
+  REPORTS
+  STAFF_MANAGE
+  CLINIC_SETTINGS
 }
 
 enum TreatmentType {
@@ -306,46 +335,46 @@ model UserProfile {
 }
 
 model Clinic {
-  id                         String                      @id @default(uuid()) @db.Uuid
-  name                       String                      @db.VarChar(160)
-  publicBookingSlug          String                      @unique @db.VarChar(180)
-  publicBookingEnabled       Boolean                     @default(false)
-  automatedWhatsAppEnabled  Boolean                     @default(false)
-  phoneNumber                String?                     @db.VarChar(20)
-  contactEmail               String?                     @db.VarChar(254)
-  address                    String?                     @db.VarChar(400)
-  timeZone                   String                      @default("Asia/Kolkata") @db.VarChar(64)
-  onboardingUserId           String?                     @unique @db.Uuid
-  createdAt                  DateTime                    @default(now()) @db.Timestamptz(6)
-  updatedAt                  DateTime                    @updatedAt @db.Timestamptz(6)
-  onboardingUser             UserProfile?                @relation("ClinicOnboarding", fields: [onboardingUserId], references: [id], onDelete: SetNull)
-  memberships                ClinicMembership[]
-  patients                   Patient[]
-  treatmentPlans             TreatmentPlan[]
-  treatmentCatalogueItems    TreatmentCatalogueItem[]
-  treatmentFinancialEntries  TreatmentFinancialEntry[]
-  treatmentEstimates         TreatmentEstimate[]
-  treatmentVisits            TreatmentVisit[]
-  appointments               Appointment[]
-  dentists                    ClinicDentist[]
-  treatmentChairs             TreatmentChair[]
-  appointmentRequests         AppointmentRequest[]
-  invitations                 ClinicInvitation[]
-  preventiveRecalls          PreventiveRecall[]
-  messageTemplates           MessageTemplate[]
-  messageLogs                MessageLog[]
-  insuranceProviders         InsuranceProvider[]
-  insurancePolicies          InsurancePolicy[]
-  insuranceClaims            InsuranceClaim[]
-  insurancePreAuthorizations InsurancePreAuthorization[]
-  insuranceDocuments         InsuranceDocument[]
-  insurancePayments          InsurancePayment[]
-  insuranceActivities        InsuranceActivity[]
-  billingSubscriptions       ClinicSubscription[]
-  billingPayments            BillingPayment[]
-  odontogramEntries          OdontogramEntry[]
-  dentalClinicalRecords      DentalClinicalRecord[]
-  digitalPrescriptions       DigitalPrescription[]
+  id                                 String                              @id @default(uuid()) @db.Uuid
+  name                               String                              @db.VarChar(160)
+  publicBookingSlug                  String                              @unique @db.VarChar(180)
+  publicBookingEnabled               Boolean                             @default(false)
+  automatedWhatsAppEnabled           Boolean                             @default(false)
+  phoneNumber                        String?                             @db.VarChar(20)
+  contactEmail                       String?                             @db.VarChar(254)
+  address                            String?                             @db.VarChar(400)
+  timeZone                           String                              @default("Asia/Kolkata") @db.VarChar(64)
+  onboardingUserId                   String?                             @unique @db.Uuid
+  createdAt                          DateTime                            @default(now()) @db.Timestamptz(6)
+  updatedAt                          DateTime                            @updatedAt @db.Timestamptz(6)
+  onboardingUser                     UserProfile?                        @relation("ClinicOnboarding", fields: [onboardingUserId], references: [id], onDelete: SetNull)
+  memberships                        ClinicMembership[]
+  patients                           Patient[]
+  treatmentPlans                     TreatmentPlan[]
+  treatmentCatalogueItems            TreatmentCatalogueItem[]
+  treatmentFinancialEntries          TreatmentFinancialEntry[]
+  treatmentEstimates                 TreatmentEstimate[]
+  treatmentVisits                    TreatmentVisit[]
+  appointments                       Appointment[]
+  dentists                           ClinicDentist[]
+  treatmentChairs                    TreatmentChair[]
+  appointmentRequests                AppointmentRequest[]
+  invitations                        ClinicInvitation[]
+  preventiveRecalls                  PreventiveRecall[]
+  messageTemplates                   MessageTemplate[]
+  messageLogs                        MessageLog[]
+  insuranceProviders                 InsuranceProvider[]
+  insurancePolicies                  InsurancePolicy[]
+  insuranceClaims                    InsuranceClaim[]
+  insurancePreAuthorizations         InsurancePreAuthorization[]
+  insuranceDocuments                 InsuranceDocument[]
+  insurancePayments                  InsurancePayment[]
+  insuranceActivities                InsuranceActivity[]
+  billingSubscriptions               ClinicSubscription[]
+  billingPayments                    BillingPayment[]
+  odontogramEntries                  OdontogramEntry[]
+  dentalClinicalRecords              DentalClinicalRecord[]
+  digitalPrescriptions               DigitalPrescription[]
   prescriptionMedicineCatalogueItems PrescriptionMedicineCatalogueItem[]
   patientDataExportAudits            PatientDataExportAudit[]
 
@@ -446,30 +475,36 @@ model BillingWebhookEvent {
 }
 
 model ClinicMembership {
-  id                              String                    @id @default(uuid()) @db.Uuid
-  clinicId                        String                    @db.Uuid
-  userId                          String                    @db.Uuid
-  role                            ClinicRole
-  createdAt                       DateTime                  @default(now()) @db.Timestamptz(6)
-  updatedAt                       DateTime                  @updatedAt @db.Timestamptz(6)
-  revokedAt                       DateTime?                 @db.Timestamptz(6)
-  clinic                          Clinic                    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  user                            UserProfile               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messageLogs                     MessageLog[]              @relation("MessageSender")
-  financialEntries                TreatmentFinancialEntry[] @relation("TreatmentFinancialEntryActor")
-  insurancePayments               InsurancePayment[]
-  insuranceActivities             InsuranceActivity[]
-  reviewedInsuranceClaimSummaries InsuranceClaim[]          @relation("InsuranceClaimSummaryReviewer")
-  recordedOdontogramEntries       OdontogramEntry[]
-  dentalClinicalRecords            DentalClinicalRecord[]
-  dentalClinicalRecordAudits       DentalClinicalRecordAudit[]
-  authoredPrescriptions            DigitalPrescription[]             @relation("PrescriptionAuthor")
+  id                                String                              @id @default(uuid()) @db.Uuid
+  clinicId                          String                              @db.Uuid
+  userId                            String                              @db.Uuid
+  role                              ClinicRole
+  active                            Boolean                             @default(true)
+  permissionsConfigured             Boolean                             @default(false)
+  createdAt                         DateTime                            @default(now()) @db.Timestamptz(6)
+  updatedAt                         DateTime                            @updatedAt @db.Timestamptz(6)
+  revokedAt                         DateTime?                           @db.Timestamptz(6)
+  clinic                            Clinic                              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  user                              UserProfile                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messageLogs                       MessageLog[]                        @relation("MessageSender")
+  financialEntries                  TreatmentFinancialEntry[]           @relation("TreatmentFinancialEntryActor")
+  insurancePayments                 InsurancePayment[]
+  insuranceActivities               InsuranceActivity[]
+  reviewedInsuranceClaimSummaries   InsuranceClaim[]                    @relation("InsuranceClaimSummaryReviewer")
+  recordedOdontogramEntries         OdontogramEntry[]
+  dentalClinicalRecords             DentalClinicalRecord[]
+  dentalClinicalRecordAudits        DentalClinicalRecordAudit[]
+  authoredPrescriptions             DigitalPrescription[]               @relation("PrescriptionAuthor")
   createdPrescriptionCatalogueItems PrescriptionMedicineCatalogueItem[]
-  prescriptionAudits               DigitalPrescriptionAudit[]
-  authoredTreatmentEstimates        TreatmentEstimate[]                @relation("TreatmentEstimateAuthor")
+  prescriptionAudits                DigitalPrescriptionAudit[]
+  authoredTreatmentEstimates        TreatmentEstimate[]                 @relation("TreatmentEstimateAuthor")
   treatmentEstimateAudits           TreatmentEstimateAudit[]
   patientDataExportAudits           PatientDataExportAudit[]
-  sentClinicInvitations             ClinicInvitation[]               @relation("ClinicInvitationSender")
+  sentClinicInvitations             ClinicInvitation[]                  @relation("ClinicInvitationSender")
+  staffProfile                      ClinicStaffProfile?
+  permissionGrants                  ClinicPermissionGrant[]
+  permissionChangesAuthored         ClinicStaffAudit[]                  @relation("ClinicStaffAuditActor")
+  permissionChangesTargeted         ClinicStaffAudit[]                  @relation("ClinicStaffAuditTarget")
 
   @@unique([userId, clinicId])
   @@index([clinicId, role])
@@ -483,6 +518,7 @@ model ClinicInvitation {
   email           String                 @db.VarChar(254)
   normalizedEmail String                 @db.VarChar(254)
   role            ClinicRole             @default(STAFF)
+  jobTitle        StaffJobTitle          @default(RECEPTIONIST)
   status          ClinicInvitationStatus @default(PENDING)
   invitedByUserId String                 @db.Uuid
   expiresAt       DateTime               @db.Timestamptz(6)
@@ -569,15 +605,15 @@ model TreatmentPlan {
 }
 
 model TreatmentCatalogueItem {
-  id             String                 @id @default(uuid()) @db.Uuid
-  clinicId       String                 @db.Uuid
-  name           String                 @db.VarChar(160)
-  description    String?                @db.Text
-  defaultPrice   Decimal?               @db.Decimal(12, 2)
-  status         TreatmentCatalogStatus @default(ACTIVE)
-  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime               @updatedAt @db.Timestamptz(6)
-  clinic         Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  id             String                  @id @default(uuid()) @db.Uuid
+  clinicId       String                  @db.Uuid
+  name           String                  @db.VarChar(160)
+  description    String?                 @db.Text
+  defaultPrice   Decimal?                @db.Decimal(12, 2)
+  status         TreatmentCatalogStatus  @default(ACTIVE)
+  createdAt      DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime                @updatedAt @db.Timestamptz(6)
+  clinic         Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   treatmentPlans TreatmentPlan[]
   estimateLines  TreatmentEstimateLine[]
 
@@ -618,43 +654,43 @@ model TreatmentFinancialEntry {
 }
 
 model TreatmentEstimate {
-  id                         String                   @id @default(uuid()) @db.Uuid
-  clinicId                   String                   @db.Uuid
-  patientId                  String                   @db.Uuid
-  treatmentPlanId            String                   @db.Uuid
-  createdByUserId            String                   @db.Uuid
-  revisionOfEstimateId       String?                  @db.Uuid
-  revisionReason             String?                  @db.VarChar(1000)
-  version                    Int                      @default(1)
-  status                     TreatmentEstimateStatus  @default(DRAFT)
-  estimateDate               DateTime                 @db.Date
-  validityDate               DateTime                 @db.Date
-  currency                   String                   @default("INR") @db.VarChar(3)
-  subtotal                   Decimal                  @db.Decimal(12, 2)
-  discountAmount             Decimal                  @db.Decimal(12, 2)
-  taxRate                    Decimal                  @db.Decimal(5, 2)
-  taxAmount                  Decimal                  @db.Decimal(12, 2)
-  totalAmount                Decimal                  @db.Decimal(12, 2)
-  notes                      String?                  @db.VarChar(4000)
-  terms                      String?                  @db.VarChar(4000)
-  clinicNameSnapshot         String                   @db.VarChar(160)
-  clinicPhoneSnapshot        String?                  @db.VarChar(20)
-  clinicEmailSnapshot        String?                  @db.VarChar(254)
-  clinicAddressSnapshot      String?                  @db.VarChar(400)
-  patientNameSnapshot        String                   @db.VarChar(160)
-  patientPhoneSnapshot       String                   @db.VarChar(20)
-  dentistNameSnapshot        String                   @db.VarChar(120)
-  dentistRegistrationSnapshot String?                 @db.VarChar(100)
-  finalizedAt                DateTime?                @db.Timestamptz(6)
-  createdAt                  DateTime                 @default(now()) @db.Timestamptz(6)
-  clinic                     Clinic                   @relation(fields: [clinicId], references: [id], onDelete: Restrict)
-  patient                    Patient                  @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
-  treatmentPlan              TreatmentPlan            @relation(fields: [treatmentPlanId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
-  createdBy                  ClinicMembership         @relation("TreatmentEstimateAuthor", fields: [createdByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
-  revisionOf                 TreatmentEstimate?        @relation("TreatmentEstimateRevisions", fields: [revisionOfEstimateId, clinicId, patientId, treatmentPlanId], references: [id, clinicId, patientId, treatmentPlanId], onDelete: Restrict)
-  revisions                  TreatmentEstimate[]       @relation("TreatmentEstimateRevisions")
-  lines                      TreatmentEstimateLine[]
-  audits                     TreatmentEstimateAudit[]
+  id                          String                   @id @default(uuid()) @db.Uuid
+  clinicId                    String                   @db.Uuid
+  patientId                   String                   @db.Uuid
+  treatmentPlanId             String                   @db.Uuid
+  createdByUserId             String                   @db.Uuid
+  revisionOfEstimateId        String?                  @db.Uuid
+  revisionReason              String?                  @db.VarChar(1000)
+  version                     Int                      @default(1)
+  status                      TreatmentEstimateStatus  @default(DRAFT)
+  estimateDate                DateTime                 @db.Date
+  validityDate                DateTime                 @db.Date
+  currency                    String                   @default("INR") @db.VarChar(3)
+  subtotal                    Decimal                  @db.Decimal(12, 2)
+  discountAmount              Decimal                  @db.Decimal(12, 2)
+  taxRate                     Decimal                  @db.Decimal(5, 2)
+  taxAmount                   Decimal                  @db.Decimal(12, 2)
+  totalAmount                 Decimal                  @db.Decimal(12, 2)
+  notes                       String?                  @db.VarChar(4000)
+  terms                       String?                  @db.VarChar(4000)
+  clinicNameSnapshot          String                   @db.VarChar(160)
+  clinicPhoneSnapshot         String?                  @db.VarChar(20)
+  clinicEmailSnapshot         String?                  @db.VarChar(254)
+  clinicAddressSnapshot       String?                  @db.VarChar(400)
+  patientNameSnapshot         String                   @db.VarChar(160)
+  patientPhoneSnapshot        String                   @db.VarChar(20)
+  dentistNameSnapshot         String                   @db.VarChar(120)
+  dentistRegistrationSnapshot String?                  @db.VarChar(100)
+  finalizedAt                 DateTime?                @db.Timestamptz(6)
+  createdAt                   DateTime                 @default(now()) @db.Timestamptz(6)
+  clinic                      Clinic                   @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  patient                     Patient                  @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  treatmentPlan               TreatmentPlan            @relation(fields: [treatmentPlanId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  createdBy                   ClinicMembership         @relation("TreatmentEstimateAuthor", fields: [createdByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  revisionOf                  TreatmentEstimate?       @relation("TreatmentEstimateRevisions", fields: [revisionOfEstimateId, clinicId, patientId, treatmentPlanId], references: [id, clinicId, patientId, treatmentPlanId], onDelete: Restrict)
+  revisions                   TreatmentEstimate[]      @relation("TreatmentEstimateRevisions")
+  lines                       TreatmentEstimateLine[]
+  audits                      TreatmentEstimateAudit[]
 
   @@unique([id, clinicId, patientId])
   @@unique([id, clinicId, patientId, treatmentPlanId])
@@ -666,18 +702,18 @@ model TreatmentEstimate {
 }
 
 model TreatmentEstimateLine {
-  id                String           @id @default(uuid()) @db.Uuid
-  clinicId          String           @db.Uuid
-  patientId         String           @db.Uuid
-  estimateId        String           @db.Uuid
-  catalogueItemId   String?          @db.Uuid
-  position          Int
-  description       String           @db.VarChar(300)
-  quantity          Int
-  unitPrice         Decimal          @db.Decimal(12, 2)
-  lineTotal         Decimal          @db.Decimal(12, 2)
-  estimate          TreatmentEstimate @relation(fields: [estimateId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
-  catalogueItem     TreatmentCatalogueItem? @relation(fields: [catalogueItemId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  id              String                  @id @default(uuid()) @db.Uuid
+  clinicId        String                  @db.Uuid
+  patientId       String                  @db.Uuid
+  estimateId      String                  @db.Uuid
+  catalogueItemId String?                 @db.Uuid
+  position        Int
+  description     String                  @db.VarChar(300)
+  quantity        Int
+  unitPrice       Decimal                 @db.Decimal(12, 2)
+  lineTotal       Decimal                 @db.Decimal(12, 2)
+  estimate        TreatmentEstimate       @relation(fields: [estimateId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  catalogueItem   TreatmentCatalogueItem? @relation(fields: [catalogueItemId, clinicId], references: [id, clinicId], onDelete: Restrict)
 
   @@unique([estimateId, position])
   @@index([clinicId, patientId, estimateId])
@@ -685,42 +721,42 @@ model TreatmentEstimateLine {
 }
 
 model TreatmentEstimateAudit {
-  id             String                   @id @default(uuid()) @db.Uuid
-  clinicId       String                   @db.Uuid
-  patientId      String                   @db.Uuid
-  estimateId     String                   @db.Uuid
-  actorUserId    String                   @db.Uuid
-  actorNameSnapshot String?               @db.VarChar(120)
-  action         String                   @db.VarChar(40)
-  fromStatus     TreatmentEstimateStatus?
-  toStatus       TreatmentEstimateStatus?
-  note           String?                  @db.VarChar(1000)
-  createdAt      DateTime                 @default(now()) @db.Timestamptz(6)
-  estimate       TreatmentEstimate        @relation(fields: [estimateId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
-  actor          ClinicMembership         @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  id                String                   @id @default(uuid()) @db.Uuid
+  clinicId          String                   @db.Uuid
+  patientId         String                   @db.Uuid
+  estimateId        String                   @db.Uuid
+  actorUserId       String                   @db.Uuid
+  actorNameSnapshot String?                  @db.VarChar(120)
+  action            String                   @db.VarChar(40)
+  fromStatus        TreatmentEstimateStatus?
+  toStatus          TreatmentEstimateStatus?
+  note              String?                  @db.VarChar(1000)
+  createdAt         DateTime                 @default(now()) @db.Timestamptz(6)
+  estimate          TreatmentEstimate        @relation(fields: [estimateId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  actor             ClinicMembership         @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
 
   @@index([clinicId, patientId, estimateId, createdAt])
   @@map("treatment_estimate_audits")
 }
 
 model TreatmentVisit {
-  id              String               @id @default(uuid()) @db.Uuid
-  clinicId        String               @db.Uuid
-  treatmentPlanId String               @db.Uuid
-  patientId       String               @db.Uuid
-  visitNumber     Int
-  dueDate         DateTime             @db.Date
-  status          TreatmentVisitStatus @default(PENDING)
-  completedAt     DateTime?            @db.Timestamptz(6)
-  notes           String?              @db.Text
-  createdAt       DateTime             @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime             @updatedAt @db.Timestamptz(6)
-  clinic          Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  treatmentPlan   TreatmentPlan        @relation(fields: [treatmentPlanId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Cascade)
-  messageLogs     MessageLog[]
-  appointments    Appointment[]
+  id                    String                 @id @default(uuid()) @db.Uuid
+  clinicId              String                 @db.Uuid
+  treatmentPlanId       String                 @db.Uuid
+  patientId             String                 @db.Uuid
+  visitNumber           Int
+  dueDate               DateTime               @db.Date
+  status                TreatmentVisitStatus   @default(PENDING)
+  completedAt           DateTime?              @db.Timestamptz(6)
+  notes                 String?                @db.Text
+  createdAt             DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime               @updatedAt @db.Timestamptz(6)
+  clinic                Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  treatmentPlan         TreatmentPlan          @relation(fields: [treatmentPlanId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Cascade)
+  messageLogs           MessageLog[]
+  appointments          Appointment[]
   dentalClinicalRecords DentalClinicalRecord[]
-  digitalPrescriptions DigitalPrescription[]
+  digitalPrescriptions  DigitalPrescription[]
 
   @@unique([id, clinicId])
   @@unique([id, clinicId, patientId])
@@ -763,25 +799,25 @@ model OdontogramEntry {
 }
 
 model DentalClinicalRecord {
-  id                       String                          @id @default(uuid()) @db.Uuid
-  clinicId                 String                          @db.Uuid
-  patientId                String                          @db.Uuid
-  visitId                  String?                         @db.Uuid
-  createdByUserId         String                          @db.Uuid
-  medicalHistory           String?                         @db.Text
-  dentalHistory            String?                         @db.Text
-  allergies                String?                         @db.Text
-  chiefComplaints          String?                         @db.Text
-  clinicalExamination      String?                         @db.Text
-  diagnosis                String?                         @db.Text
-  treatmentRecommendations String?                         @db.Text
-  clinicalNotes            String?                         @db.Text
-  createdAt                DateTime                        @default(now()) @db.Timestamptz(6)
-  updatedAt                DateTime                        @updatedAt @db.Timestamptz(6)
-  clinic                   Clinic                          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  patient                  Patient                         @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
-  visit                    TreatmentVisit?                 @relation(fields: [visitId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
-  createdBy                ClinicMembership                @relation(fields: [createdByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  id                       String                        @id @default(uuid()) @db.Uuid
+  clinicId                 String                        @db.Uuid
+  patientId                String                        @db.Uuid
+  visitId                  String?                       @db.Uuid
+  createdByUserId          String                        @db.Uuid
+  medicalHistory           String?                       @db.Text
+  dentalHistory            String?                       @db.Text
+  allergies                String?                       @db.Text
+  chiefComplaints          String?                       @db.Text
+  clinicalExamination      String?                       @db.Text
+  diagnosis                String?                       @db.Text
+  treatmentRecommendations String?                       @db.Text
+  clinicalNotes            String?                       @db.Text
+  createdAt                DateTime                      @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime                      @updatedAt @db.Timestamptz(6)
+  clinic                   Clinic                        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient                  Patient                       @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  visit                    TreatmentVisit?               @relation(fields: [visitId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  createdBy                ClinicMembership              @relation(fields: [createdByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
   findings                 DentalClinicalRecordFinding[]
   audits                   DentalClinicalRecordAudit[]
 
@@ -792,20 +828,20 @@ model DentalClinicalRecord {
 }
 
 model DentalClinicalRecordFinding {
-  id                  String                 @id @default(uuid()) @db.Uuid
-  clinicId            String                 @db.Uuid
-  patientId           String                 @db.Uuid
-  recordId            String                 @db.Uuid
-  toothNumber         Int?
-  dentition           OdontogramDentition?
-  toothFindingLabel   String?                @db.VarChar(160)
-  summary             String?                @db.Text
-  surfaces            OdontogramSurface[]    @default([])
-  notes               String?                @db.Text
-  relatedOdontogramEntryId String?             @db.Uuid
-  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
-  record              DentalClinicalRecord   @relation(fields: [recordId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Cascade)
-  relatedOdontogramEntry OdontogramEntry?     @relation(fields: [relatedOdontogramEntryId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  id                       String               @id @default(uuid()) @db.Uuid
+  clinicId                 String               @db.Uuid
+  patientId                String               @db.Uuid
+  recordId                 String               @db.Uuid
+  toothNumber              Int?
+  dentition                OdontogramDentition?
+  toothFindingLabel        String?              @db.VarChar(160)
+  summary                  String?              @db.Text
+  surfaces                 OdontogramSurface[]  @default([])
+  notes                    String?              @db.Text
+  relatedOdontogramEntryId String?              @db.Uuid
+  createdAt                DateTime             @default(now()) @db.Timestamptz(6)
+  record                   DentalClinicalRecord @relation(fields: [recordId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Cascade)
+  relatedOdontogramEntry   OdontogramEntry?     @relation(fields: [relatedOdontogramEntryId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
 
   @@unique([id, clinicId, patientId])
   @@index([clinicId, patientId, toothNumber])
@@ -813,32 +849,32 @@ model DentalClinicalRecordFinding {
 }
 
 model DentalClinicalRecordAudit {
-  id              String                     @id @default(uuid()) @db.Uuid
-  clinicId        String                     @db.Uuid
-  patientId       String                     @db.Uuid
-  recordId        String                     @db.Uuid
+  id              String                    @id @default(uuid()) @db.Uuid
+  clinicId        String                    @db.Uuid
+  patientId       String                    @db.Uuid
+  recordId        String                    @db.Uuid
   action          ClinicalRecordAuditAction
-  changedByUserId String                     @db.Uuid
-  note            String?                    @db.Text
-  createdAt       DateTime                   @default(now()) @db.Timestamptz(6)
-  record          DentalClinicalRecord       @relation(fields: [recordId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Cascade)
-  changedBy       ClinicMembership           @relation(fields: [changedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  changedByUserId String                    @db.Uuid
+  note            String?                   @db.Text
+  createdAt       DateTime                  @default(now()) @db.Timestamptz(6)
+  record          DentalClinicalRecord      @relation(fields: [recordId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Cascade)
+  changedBy       ClinicMembership          @relation(fields: [changedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
 
   @@index([clinicId, patientId, createdAt])
   @@map("dental_clinical_record_audits")
 }
 
 model PrescriptionMedicineCatalogueItem {
-  id              String               @id @default(uuid()) @db.Uuid
-  clinicId        String               @db.Uuid
-  createdByUserId String               @db.Uuid
-  name            String               @db.VarChar(200)
-  normalizedName  String               @db.VarChar(200)
-  strength        String?              @db.VarChar(120)
-  form            String?              @db.VarChar(80)
-  createdAt       DateTime             @default(now()) @db.Timestamptz(6)
-  clinic          Clinic               @relation(fields: [clinicId], references: [id], onDelete: Restrict)
-  createdBy       ClinicMembership     @relation(fields: [createdByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  id                String                        @id @default(uuid()) @db.Uuid
+  clinicId          String                        @db.Uuid
+  createdByUserId   String                        @db.Uuid
+  name              String                        @db.VarChar(200)
+  normalizedName    String                        @db.VarChar(200)
+  strength          String?                       @db.VarChar(120)
+  form              String?                       @db.VarChar(80)
+  createdAt         DateTime                      @default(now()) @db.Timestamptz(6)
+  clinic            Clinic                        @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  createdBy         ClinicMembership              @relation(fields: [createdByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
   prescriptionLines DigitalPrescriptionMedicine[]
 
   @@unique([id, clinicId])
@@ -848,34 +884,34 @@ model PrescriptionMedicineCatalogueItem {
 }
 
 model DigitalPrescription {
-  id                       String                        @id @default(uuid()) @db.Uuid
-  clinicId                 String                        @db.Uuid
-  patientId                String                        @db.Uuid
-  visitId                  String?                       @db.Uuid
-  authorUserId             String                        @db.Uuid
-  amendsPrescriptionId     String?                       @db.Uuid
-  amendmentReason          String?                       @db.VarChar(1000)
-  prescriptionDate         DateTime                      @db.Date
-  diagnosisNotes           String?                       @db.VarChar(4000)
-  additionalAdvice         String?                       @db.VarChar(4000)
-  followUpDate             DateTime?                     @db.Date
-  clinicNameSnapshot       String                        @db.VarChar(160)
-  clinicPhoneSnapshot      String?                       @db.VarChar(20)
-  clinicEmailSnapshot      String?                       @db.VarChar(254)
-  clinicAddressSnapshot    String?                       @db.VarChar(400)
-  authorNameSnapshot       String                        @db.VarChar(120)
-  authorRegistrationSnapshot String?                     @db.VarChar(100)
-  authorConfirmedAt        DateTime                      @db.Timestamptz(6)
-  finalizedAt              DateTime?                     @db.Timestamptz(6)
-  createdAt                DateTime                      @default(now()) @db.Timestamptz(6)
-  clinic                   Clinic                        @relation(fields: [clinicId], references: [id], onDelete: Restrict)
-  patient                  Patient                       @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
-  visit                    TreatmentVisit?               @relation(fields: [visitId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
-  author                   ClinicMembership              @relation("PrescriptionAuthor", fields: [authorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
-  amendsPrescription       DigitalPrescription?          @relation("PrescriptionAmendments", fields: [amendsPrescriptionId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
-  amendments               DigitalPrescription[]         @relation("PrescriptionAmendments")
-  medicines                DigitalPrescriptionMedicine[]
-  audits                   DigitalPrescriptionAudit[]
+  id                         String                        @id @default(uuid()) @db.Uuid
+  clinicId                   String                        @db.Uuid
+  patientId                  String                        @db.Uuid
+  visitId                    String?                       @db.Uuid
+  authorUserId               String                        @db.Uuid
+  amendsPrescriptionId       String?                       @db.Uuid
+  amendmentReason            String?                       @db.VarChar(1000)
+  prescriptionDate           DateTime                      @db.Date
+  diagnosisNotes             String?                       @db.VarChar(4000)
+  additionalAdvice           String?                       @db.VarChar(4000)
+  followUpDate               DateTime?                     @db.Date
+  clinicNameSnapshot         String                        @db.VarChar(160)
+  clinicPhoneSnapshot        String?                       @db.VarChar(20)
+  clinicEmailSnapshot        String?                       @db.VarChar(254)
+  clinicAddressSnapshot      String?                       @db.VarChar(400)
+  authorNameSnapshot         String                        @db.VarChar(120)
+  authorRegistrationSnapshot String?                       @db.VarChar(100)
+  authorConfirmedAt          DateTime                      @db.Timestamptz(6)
+  finalizedAt                DateTime?                     @db.Timestamptz(6)
+  createdAt                  DateTime                      @default(now()) @db.Timestamptz(6)
+  clinic                     Clinic                        @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  patient                    Patient                       @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  visit                      TreatmentVisit?               @relation(fields: [visitId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  author                     ClinicMembership              @relation("PrescriptionAuthor", fields: [authorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  amendsPrescription         DigitalPrescription?          @relation("PrescriptionAmendments", fields: [amendsPrescriptionId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  amendments                 DigitalPrescription[]         @relation("PrescriptionAmendments")
+  medicines                  DigitalPrescriptionMedicine[]
+  audits                     DigitalPrescriptionAudit[]
 
   @@unique([id, clinicId, patientId])
   @@unique([amendsPrescriptionId, clinicId, patientId])
@@ -885,21 +921,21 @@ model DigitalPrescription {
 }
 
 model DigitalPrescriptionMedicine {
-  id                  String                          @id @default(uuid()) @db.Uuid
-  clinicId            String                          @db.Uuid
-  patientId           String                          @db.Uuid
-  prescriptionId      String                          @db.Uuid
-  catalogueItemId     String?                         @db.Uuid
-  position            Int
-  medicineName        String                          @db.VarChar(200)
-  dosage              String                          @db.VarChar(160)
-  route               String                          @db.VarChar(100)
-  frequency           String                          @db.VarChar(160)
-  duration            String                          @db.VarChar(120)
-  quantity            String                          @db.VarChar(100)
-  instructions        String?                         @db.VarChar(1000)
-  prescription        DigitalPrescription             @relation(fields: [prescriptionId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
-  catalogueItem       PrescriptionMedicineCatalogueItem? @relation(fields: [catalogueItemId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  id              String                             @id @default(uuid()) @db.Uuid
+  clinicId        String                             @db.Uuid
+  patientId       String                             @db.Uuid
+  prescriptionId  String                             @db.Uuid
+  catalogueItemId String?                            @db.Uuid
+  position        Int
+  medicineName    String                             @db.VarChar(200)
+  dosage          String                             @db.VarChar(160)
+  route           String                             @db.VarChar(100)
+  frequency       String                             @db.VarChar(160)
+  duration        String                             @db.VarChar(120)
+  quantity        String                             @db.VarChar(100)
+  instructions    String?                            @db.VarChar(1000)
+  prescription    DigitalPrescription                @relation(fields: [prescriptionId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  catalogueItem   PrescriptionMedicineCatalogueItem? @relation(fields: [catalogueItemId, clinicId], references: [id, clinicId], onDelete: Restrict)
 
   @@unique([prescriptionId, position])
   @@index([clinicId, patientId, prescriptionId])
@@ -907,16 +943,16 @@ model DigitalPrescriptionMedicine {
 }
 
 model DigitalPrescriptionAudit {
-  id              String                    @id @default(uuid()) @db.Uuid
-  clinicId        String                    @db.Uuid
-  patientId       String                    @db.Uuid
-  prescriptionId  String                    @db.Uuid
-  actorUserId     String                    @db.Uuid
-  action          String                    @db.VarChar(40)
-  note            String?                   @db.VarChar(1000)
-  createdAt       DateTime                  @default(now()) @db.Timestamptz(6)
-  prescription    DigitalPrescription       @relation(fields: [prescriptionId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
-  actor           ClinicMembership          @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  id             String              @id @default(uuid()) @db.Uuid
+  clinicId       String              @db.Uuid
+  patientId      String              @db.Uuid
+  prescriptionId String              @db.Uuid
+  actorUserId    String              @db.Uuid
+  action         String              @db.VarChar(40)
+  note           String?             @db.VarChar(1000)
+  createdAt      DateTime            @default(now()) @db.Timestamptz(6)
+  prescription   DigitalPrescription @relation(fields: [prescriptionId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
+  actor          ClinicMembership    @relation(fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
 
   @@index([clinicId, patientId, createdAt])
   @@map("digital_prescription_audits")
@@ -956,30 +992,88 @@ model Appointment {
 }
 
 model ClinicDentist {
-  id          String        @id @default(uuid()) @db.Uuid
-  clinicId    String        @db.Uuid
-  name        String        @db.VarChar(120)
-  active      Boolean       @default(true)
-  createdAt   DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime      @updatedAt @db.Timestamptz(6)
-  clinic      Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
-  requests    AppointmentRequest[]
+  id                  String               @id @default(uuid()) @db.Uuid
+  clinicId            String               @db.Uuid
+  name                String               @db.VarChar(120)
+  profilePhotoUrl     String?              @db.VarChar(500)
+  email               String?              @db.VarChar(254)
+  phoneNumber         String?              @db.VarChar(20)
+  qualifications      String?              @db.VarChar(500)
+  specialization      String?              @db.VarChar(160)
+  registrationNumber  String?              @db.VarChar(120)
+  registrationCouncil String?              @db.VarChar(160)
+  yearsExperience     Int?
+  biography           String?              @db.VarChar(3000)
+  consultationFee     Decimal?             @db.Decimal(10, 2)
+  workingStatus       DentistWorkingStatus @default(ACTIVE)
+  weeklyAvailability  Json?                @db.JsonB
+  active              Boolean              @default(true)
+  createdAt           DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime             @updatedAt @db.Timestamptz(6)
+  clinic              Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  appointments        Appointment[]
+  requests            AppointmentRequest[]
 
   @@unique([id, clinicId])
   @@unique([clinicId, name])
   @@index([clinicId, active, name])
+  @@index([clinicId, workingStatus, name])
   @@map("clinic_dentists")
 }
 
+model ClinicStaffProfile {
+  id          String           @id @default(uuid()) @db.Uuid
+  clinicId    String           @db.Uuid
+  userId      String           @db.Uuid
+  jobTitle    StaffJobTitle    @default(RECEPTIONIST)
+  phoneNumber String?          @db.VarChar(20)
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(6)
+  membership  ClinicMembership @relation(fields: [userId, clinicId], references: [userId, clinicId], onDelete: Cascade)
+
+  @@unique([userId, clinicId])
+  @@index([clinicId, active, jobTitle])
+  @@map("clinic_staff_profiles")
+}
+
+model ClinicPermissionGrant {
+  clinicId   String           @db.Uuid
+  userId     String           @db.Uuid
+  permission ClinicPermission
+  createdAt  DateTime         @default(now()) @db.Timestamptz(6)
+  membership ClinicMembership @relation(fields: [userId, clinicId], references: [userId, clinicId], onDelete: Cascade)
+
+  @@id([userId, clinicId, permission])
+  @@index([clinicId, permission])
+  @@map("clinic_permission_grants")
+}
+
+model ClinicStaffAudit {
+  id           String            @id @default(uuid()) @db.Uuid
+  clinicId     String            @db.Uuid
+  actorUserId  String            @db.Uuid
+  targetUserId String?           @db.Uuid
+  targetEmail  String?           @db.VarChar(254)
+  action       String            @db.VarChar(40)
+  details      Json?             @db.JsonB
+  createdAt    DateTime          @default(now()) @db.Timestamptz(6)
+  actor        ClinicMembership  @relation("ClinicStaffAuditActor", fields: [actorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  target       ClinicMembership? @relation("ClinicStaffAuditTarget", fields: [targetUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@index([clinicId, targetUserId, createdAt])
+  @@index([clinicId, actorUserId, createdAt])
+  @@map("clinic_staff_audits")
+}
+
 model TreatmentChair {
-  id           String        @id @default(uuid()) @db.Uuid
-  clinicId     String        @db.Uuid
-  label        String        @db.VarChar(80)
-  active       Boolean       @default(true)
-  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
-  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  id           String               @id @default(uuid()) @db.Uuid
+  clinicId     String               @db.Uuid
+  label        String               @db.VarChar(80)
+  active       Boolean              @default(true)
+  createdAt    DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime             @updatedAt @db.Timestamptz(6)
+  clinic       Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   appointments Appointment[]
   requests     AppointmentRequest[]
 
@@ -990,22 +1084,22 @@ model TreatmentChair {
 }
 
 model AppointmentRequest {
-  id                  String                  @id @default(uuid()) @db.Uuid
-  clinicId            String                  @db.Uuid
-  patientName         String                  @db.VarChar(160)
-  phoneNumber         String                  @db.VarChar(20)
-  requestedAt         DateTime                @db.Timestamptz(6)
-  durationMinutes     Int                     @default(30)
-  type                String                  @db.VarChar(160)
-  dentistId           String?                 @db.Uuid
-  chairId             String?                 @db.Uuid
-  status              AppointmentRequestStatus @default(PENDING)
-  notes               String?                 @db.VarChar(1000)
-  createdAt           DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt           DateTime                @updatedAt @db.Timestamptz(6)
-  clinic              Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  dentist             ClinicDentist?          @relation(fields: [dentistId, clinicId], references: [id, clinicId], onDelete: Restrict)
-  chair               TreatmentChair?         @relation(fields: [chairId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  id              String                   @id @default(uuid()) @db.Uuid
+  clinicId        String                   @db.Uuid
+  patientName     String                   @db.VarChar(160)
+  phoneNumber     String                   @db.VarChar(20)
+  requestedAt     DateTime                 @db.Timestamptz(6)
+  durationMinutes Int                      @default(30)
+  type            String                   @db.VarChar(160)
+  dentistId       String?                  @db.Uuid
+  chairId         String?                  @db.Uuid
+  status          AppointmentRequestStatus @default(PENDING)
+  notes           String?                  @db.VarChar(1000)
+  createdAt       DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime                 @updatedAt @db.Timestamptz(6)
+  clinic          Clinic                   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  dentist         ClinicDentist?           @relation(fields: [dentistId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  chair           TreatmentChair?          @relation(fields: [chairId, clinicId], references: [id, clinicId], onDelete: Restrict)
 
   @@unique([id, clinicId])
   @@index([clinicId, status, requestedAt])
