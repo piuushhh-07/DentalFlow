@@ -1,10 +1,6 @@
 "use server";
 
-import {
-  ClinicInvitationStatus,
-  ClinicRole,
-  Prisma,
-} from "@prisma/client";
+import { ClinicInvitationStatus, ClinicRole, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { redirect } from "next/navigation";
 
@@ -18,9 +14,7 @@ import { createSupabaseServerActionClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/features/auth/lib/supabase-admin";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { revalidatePath } from "next/cache";
-import {
-  activatePendingClinicInvitations,
-} from "@/features/auth/lib/invitation-repository";
+import { activatePendingClinicInvitations } from "@/features/auth/lib/invitation-repository";
 
 const signInSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -222,10 +216,9 @@ export async function inviteClinicStaffAction(
 
   try {
     const supabase = createSupabaseAdminClient();
-    const { error } = await supabase.auth.admin.inviteUserByEmail(
-      email.data,
-      { redirectTo },
-    );
+    const { error } = await supabase.auth.admin.inviteUserByEmail(email.data, {
+      redirectTo,
+    });
     if (error) {
       await prisma.clinicInvitation.updateMany({
         where: { id: invitationId, status: ClinicInvitationStatus.PENDING },
@@ -236,7 +229,8 @@ export async function inviteClinicStaffAction(
         code: error.code,
       });
       return {
-        error: "The invitation email could not be sent. Check the email and try again.",
+        error:
+          "The invitation email could not be sent. Check the email and try again.",
       };
     }
   } catch (error) {
