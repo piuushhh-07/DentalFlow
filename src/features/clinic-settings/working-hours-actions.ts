@@ -7,32 +7,52 @@ import { z } from "zod";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { prisma } from "@/lib/db/prisma";
 
-const daySchema = z.object({
+const daySchema = z
+  .object({
   day: z.enum(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]),
   closed: z.boolean(),
   open: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   close: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   breakStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
   breakEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
-}).superRefine((value, context) => {
+  })
+  .superRefine((value, context) => {
   if (value.closed) return;
   if (value.open >= value.close) {
-    context.addIssue({ code: "custom", path: ["close"], message: "Closing time must be after opening time." });
+    context.addIssue({
+      code: "custom",
+      path: ["close"],
+      message: "Closing time must be after opening time.",
+    });
   }
   if (Boolean(value.breakStart) !== Boolean(value.breakEnd)) {
-    context.addIssue({ code: "custom", path: ["breakEnd"], message: "Enter both break times or leave both empty." });
+    context.addIssue({
+      code: "custom",
+      path: ["breakEnd"],
+      message: "Enter both break times or leave both empty.",
+    });
   }
   if (value.breakStart && value.breakEnd) {
-    if (value.breakStart >= value.breakEnd || value.breakStart <= value.open || value.breakEnd >= value.close) {
-      context.addIssue({ code: "custom", path: ["breakStart"], message: "Break must be within clinic hours." });
+    if (
+      value.breakStart >= value.breakEnd ||
+      value.breakStart <= value.open ||
+      value.breakEnd >= value.close
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["breakStart"],
+        message: "Break must be within clinic hours.",
+      });
     }
   }
 });
 
-const schema = z.object({
+const schema = z
+  .object({
   clinicId: z.string().uuid(),
   days: z.array(daySchema).length(7),
-}).superRefine(({ days }, context) => {
+  })
+  .superRefine(({ days }, context) => {
   if (new Set(days.map((day) => day.day)).size !== 7) {
     context.addIssue({ code: "custom", path: ["days"], message: "Each weekday must appear exactly once." });
   }
@@ -57,10 +77,15 @@ export async function saveClinicWorkingHours(
     days: rawDays,
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check your working hours." };
+    return {
+      error:
+        parsed.error.issues[0]?.message ?? "Check your working hours.",
+    };
   }
 
-  const membership = await requireClinicRole(parsed.data.clinicId, [ClinicRole.OWNER]);
+  const membership = await requireClinicRole(parsed.data.clinicId, [
+    ClinicRole.OWNER,
+  ]);
   const clinic = await prisma.clinic.findUnique({
     where: { id: membership.clinicId },
     select: { publicBookingSlug: true },
