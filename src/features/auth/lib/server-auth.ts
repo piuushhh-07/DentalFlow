@@ -26,15 +26,16 @@ export const getAuthenticatedUser = cache(
 
     const result = await measureServerOperation(
       "auth.supabase.get_user",
-      () => supabase.auth.getUser().catch((error: unknown) => {
-        if (isExpectedUnauthenticatedAuthError(error)) {
-          redirect("/login");
-        }
+      () =>
+        supabase.auth.getUser().catch((error: unknown) => {
+          if (isExpectedUnauthenticatedAuthError(error)) {
+            redirect("/login");
+          }
 
-        throw new Error("Unable to verify the Supabase session.", {
-          cause: error,
-        });
-      }),
+          throw new Error("Unable to verify the Supabase session.", {
+            cause: error,
+          });
+        }),
     );
 
     const user = resolveAuthenticatedUser(result.data.user, result.error);
@@ -60,19 +61,20 @@ export const requireClinicMembership = cache(
     const user = await getAuthenticatedUser();
     const membership = await measureServerOperation(
       "auth.clinic_membership",
-      () => prisma.clinicMembership.findFirst({
-        where: {
-          userId: user.id,
-          clinicId: parsedClinicId.data,
-          revokedAt: null,
-        },
-        select: {
-          userId: true,
-          clinicId: true,
-          role: true,
-          revokedAt: true,
-        },
-      }),
+      () =>
+        prisma.clinicMembership.findFirst({
+          where: {
+            userId: user.id,
+            clinicId: parsedClinicId.data,
+            revokedAt: null,
+          },
+          select: {
+            userId: true,
+            clinicId: true,
+            role: true,
+            revokedAt: true,
+          },
+        }),
     );
 
     return authorizeClinicMembership(user.id, parsedClinicId.data, membership);
