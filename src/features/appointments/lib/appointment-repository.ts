@@ -368,12 +368,12 @@ export async function listAppointmentResources(clinicId: string) {
     prisma.clinicDentist.findMany({
       where: { clinicId, active: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, active: true },
     }),
     prisma.treatmentChair.findMany({
       where: { clinicId, active: true },
       orderBy: { label: "asc" },
-      select: { id: true, label: true },
+      select: { id: true, label: true, active: true },
     }),
   ]);
   return { dentists, chairs };

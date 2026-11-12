@@ -67,10 +67,9 @@ export default async function ClinicAppointmentsPage({
     appointments,
     patients,
     visits,
-    resources,
+    resourceData,
     requests,
     bookingSettings,
-    scheduleResources,
   ] = await Promise.all([
     listClinicAppointmentsInRange(
       membership.clinicId,
@@ -79,13 +78,20 @@ export default async function ClinicAppointmentsPage({
     ),
     listAppointmentPatients(membership.clinicId),
     listAppointmentVisits(membership.clinicId),
-    listAppointmentResources(membership.clinicId),
-    listAppointmentRequests(membership.clinicId),
-    getPublicBookingSettings(membership.clinicId),
     membership.role === ClinicRole.OWNER
       ? listScheduleResources(membership.clinicId)
-      : Promise.resolve({ dentists: [], chairs: [] }),
+      : listAppointmentResources(membership.clinicId),
+    listAppointmentRequests(membership.clinicId),
+    getPublicBookingSettings(membership.clinicId),
   ]);
+  const resources = {
+    dentists: resourceData.dentists.filter((dentist) => dentist.active),
+    chairs: resourceData.chairs.filter((chair) => chair.active),
+  };
+  const scheduleResources =
+    membership.role === ClinicRole.OWNER
+      ? resourceData
+      : { dentists: [], chairs: [] };
   let prefill:
     | {
         patientId: string;
