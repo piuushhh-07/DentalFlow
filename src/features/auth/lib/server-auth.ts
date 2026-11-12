@@ -2,7 +2,10 @@ import "server-only";
 
 import { ClinicRole } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { z } from "zod";
+
+import { measureServerOperation } from "@/lib/performance/server-timing";
 
 import { prisma } from "@/lib/db/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -18,10 +21,11 @@ import {
 
 const clinicIdSchema = z.string().uuid();
 
-export async function getAuthenticatedUser() {
+export const getAuthenticatedUser = cache(async function getAuthenticatedUser() {
   const supabase = await createSupabaseServerClient();
 
-  const result = await supabase.auth.getUser().catch((error: unknown) => {
+  const result = await measureServerOperation("auth.supabase.get_user", () =>
+    supabase.auth.getUser().catch((error: unknown) => {
     if (isExpectedUnauthenticatedAuthError(error)) {
       redirect("/login");
     }
@@ -29,7 +33,8 @@ export async function getAuthenticatedUser() {
     throw new Error("Unable to verify the Supabase session.", {
       cause: error,
     });
-  });
+  }),
+  );
 
   const user = resolveAuthenticatedUser(result.data.user, result.error);
 
@@ -38,9 +43,9 @@ export async function getAuthenticatedUser() {
   }
 
   return user;
-}
+});
 
-export async function requireClinicMembership(
+export const requireClinicMembership = cache(async function requireClinicMembership(
   requestedClinicId: string,
 ): Promise<VerifiedClinicMembership> {
   const parsedClinicId = clinicIdSchema.safeParse(requestedClinicId);
@@ -50,7 +55,8 @@ export async function requireClinicMembership(
   }
 
   const user = await getAuthenticatedUser();
-  const membership = await prisma.clinicMembership.findFirst({
+  const membership = await measureServerOperation("auth.clinic_membership", () =>
+    prisma.clinicMembership.findFirst({
     where: {
       userId: user.id,
       clinicId: parsedClinicId.data,
@@ -62,10 +68,11 @@ export async function requireClinicMembership(
       role: true,
       revokedAt: true,
     },
-  });
+  }),
+  );
 
   return authorizeClinicMembership(user.id, parsedClinicId.data, membership);
-}
+});
 
 export async function requireClinicRole(
   requestedClinicId: string,
