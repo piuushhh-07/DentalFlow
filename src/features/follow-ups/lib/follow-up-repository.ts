@@ -278,22 +278,96 @@ export async function getFollowUpSummary(
   clinicId: string,
   clinicToday: string,
 ) {
-  const tabs: readonly FollowUpTab[] = [
-    "due-today",
-    "overdue",
-    "reminder-sent",
-    "confirmed",
-    "no-response",
-    "completed",
-  ];
-  const results = await Promise.all(
-    tabs.map(async (tab) => {
-      const rows = await prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT count(*)::bigint AS "count"
-        FROM (${unionQuery(clinicId, tab, "", clinicToday)}) AS queue_items
-      `;
-      return [tab, Number(rows[0].count)] as const;
-    }),
-  );
-  return Object.fromEntries(results) as Record<FollowUpTab, number>;
+  const dueTodayStatuses = treatmentStatusesForTab("due-today");
+  const overdueStatuses = treatmentStatusesForTab("overdue");
+
+  const [counts] = await prisma.$queryRaw<
+    [
+      {
+        dueToday: bigint;
+        overdue: bigint;
+        reminderSent: bigint;
+        confirmed: bigint;
+        noResponse: bigint;
+        completed: bigint;
+      },
+    ]
+  >`
+    WITH follow_up_items AS (
+      SELECT
+        'treatment-visit'::text AS kind,
+        tv."status"::text AS status,
+        tv."dueDate"::date AS due_date,
+        false AS reminder_sent
+      FROM "treatment_visits" tv
+      JOIN "treatment_plans" tp
+        ON tp."id" = tv."treatmentPlanId"
+        AND tp."clinicId" = tv."clinicId"
+        AND tp."patientId" = tv."patientId"
+      WHERE tv."clinicId" = ${clinicId}::uuid
+        AND tp."status" <> 'CANCELLED'::"TreatmentPlanStatus"
+
+      UNION ALL
+
+      SELECT
+        'preventive-recall'::text AS kind,
+        r."status"::text AS status,
+        r."dueDate"::date AS due_date,
+        EXISTS (
+          SELECT 1
+          FROM "message_logs" ml
+          WHERE ml."preventiveRecallId" = r."id"
+            AND ml."clinicId" = r."clinicId"
+            AND ml."patientId" = r."patientId"
+            AND ml."status" = 'MANUALLY_RECORDED_SENT'
+        ) AS reminder_sent
+      FROM "preventive_recalls" r
+      WHERE r."clinicId" = ${clinicId}::uuid
+    )
+    SELECT
+      COUNT(*) FILTER (
+        WHERE
+          (kind = 'treatment-visit'
+            AND status IN (${Prisma.join(dueTodayStatuses)})
+            AND due_date = ${clinicToday}::date)
+          OR (kind = 'preventive-recall'
+            AND status = 'ACTIVE'
+            AND due_date = ${clinicToday}::date)
+      )::bigint AS "dueToday",
+      COUNT(*) FILTER (
+        WHERE
+          (kind = 'treatment-visit'
+            AND status IN (${Prisma.join(overdueStatuses)})
+            AND due_date < ${clinicToday}::date)
+          OR (kind = 'preventive-recall'
+            AND status = 'ACTIVE'
+            AND due_date < ${clinicToday}::date)
+      )::bigint AS "overdue",
+      COUNT(*) FILTER (
+        WHERE
+          (kind = 'treatment-visit' AND status = 'REMINDER_SENT')
+          OR (kind = 'preventive-recall'
+            AND status = 'ACTIVE'
+            AND reminder_sent)
+      )::bigint AS "reminderSent",
+      COUNT(*) FILTER (
+        WHERE kind = 'treatment-visit' AND status = 'CONFIRMED'
+      )::bigint AS "confirmed",
+      COUNT(*) FILTER (
+        WHERE kind = 'treatment-visit' AND status = 'NO_RESPONSE'
+      )::bigint AS "noResponse",
+      COUNT(*) FILTER (
+        WHERE status = 'COMPLETED'
+      )::bigint AS "completed"
+    FROM follow_up_items
+  `;
+
+  return {
+    "due-today": Number(counts.dueToday),
+    overdue: Number(counts.overdue),
+    "reminder-sent": Number(counts.reminderSent),
+    confirmed: Number(counts.confirmed),
+    "no-response": Number(counts.noResponse),
+    completed: Number(counts.completed),
+  } satisfies Record<FollowUpTab, number>;
 }
