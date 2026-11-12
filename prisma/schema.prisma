@@ -346,6 +346,7 @@ model Clinic {
   contactEmail                       String?                             @db.VarChar(254)
   address                            String?                             @db.VarChar(400)
   timeZone                           String                              @default("Asia/Kolkata") @db.VarChar(64)
+  workingHours                       Json                                @default("[]") @db.JsonB
   onboardingUserId                   String?                             @unique @db.Uuid
   createdAt                          DateTime                            @default(now()) @db.Timestamptz(6)
   updatedAt                          DateTime                            @updatedAt @db.Timestamptz(6)

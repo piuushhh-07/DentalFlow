@@ -405,6 +405,7 @@ export async function getPublicBookingClinic(slug: string) {
       phoneNumber: true,
       address: true,
       timeZone: true,
+      workingHours: true,
       dentists: {
         where: { active: true },
         orderBy: { name: "asc" },
