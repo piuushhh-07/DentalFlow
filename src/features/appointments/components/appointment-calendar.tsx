@@ -731,7 +731,8 @@ export function AppointmentCalendar({
                   <button
                     className="h-10 rounded-md bg-teal-800 px-4 text-sm font-semibold text-white hover:bg-teal-900"
                     onClick={async () => {
-                      if (await loadOptions()) setEditing(true);
+                      await loadOptions();
+                      setEditing(true);
                     }}
                     type="button"
                   >
@@ -743,12 +744,18 @@ export function AppointmentCalendar({
           ) : optionsError ? (
             <p className="text-sm text-red-700" role="alert">
               {optionsError}{" "}
-              <button className="font-semibold underline" onClick={() => void loadOptions()} type="button">
+              <button
+                className="font-semibold underline"
+                onClick={() => void loadOptions()}
+                type="button"
+              >
                 Retry
               </button>
             </p>
           ) : optionsLoading ? (
-            <p className="text-sm text-slate-600">Loading patient and treatment options…</p>
+            <p className="text-sm text-slate-600">
+            Loading patient and treatment options…
+          </p>
           ) : (
             <AppointmentForm
               chairs={chairs}

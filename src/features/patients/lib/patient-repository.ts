@@ -55,10 +55,9 @@ export async function listClinicPatients(
     }),
   ]);
   const pagination = getPatientPagination(totalCount, requestedPage);
-  const patients =
-    pagination.skip === requestedSkip
-      ? firstPageResult
-      : await prisma.patient.findMany({
+  const patients = pagination.skip === requestedSkip
+    ? firstPageResult
+    : await prisma.patient.findMany({
         where,
         orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
         skip: pagination.skip,
