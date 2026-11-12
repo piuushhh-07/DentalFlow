@@ -27,7 +27,8 @@ export default async function ClinicProfileSettingsPage({
     owner = await requireClinicRole(parsedClinicId.data, [ClinicRole.OWNER]);
   } catch (error) {
     if (error instanceof ClinicAccessDeniedError) notFound();
-    if (error instanceof ClinicRoleDeniedError) redirect(`/clinic/${parsedClinicId.data}`);
+    if (error instanceof ClinicRoleDeniedError)
+      redirect(`/clinic/${parsedClinicId.data}`);
     throw error;
   }
 
@@ -46,14 +47,20 @@ export default async function ClinicProfileSettingsPage({
   return (
     <AppShell clinicId={owner.clinicId}>
       <div className="mx-auto max-w-4xl">
-        <Link className="text-sm font-medium text-teal-800 hover:underline" href={`/clinic/${owner.clinicId}`}>
+        <Link
+          className="text-sm font-medium text-teal-800 hover:underline"
+          href={`/clinic/${owner.clinicId}`}
+        >
           ← Back to dashboard
         </Link>
         <header className="mb-6 mt-4">
           <p className="text-sm font-medium text-teal-700">Clinic settings</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Clinic profile</h1>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
+            Clinic profile
+          </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Keep your clinic&apos;s contact information and timezone up to date. These details are used across your workspace.
+            Keep your clinic&apos;s contact information and timezone up to date.
+            These details are used across your workspace.
           </p>
         </header>
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
