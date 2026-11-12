@@ -26,8 +26,7 @@ export const getAuthenticatedUser = cache(
 
     const result = await measureServerOperation(
       "auth.supabase.get_user",
-      () =>
-        supabase.auth.getUser().catch((error: unknown) => {
+      () => supabase.auth.getUser().catch((error: unknown) => {
           if (isExpectedUnauthenticatedAuthError(error)) {
             redirect("/login");
           }
@@ -61,8 +60,7 @@ export const requireClinicMembership = cache(
     const user = await getAuthenticatedUser();
     const membership = await measureServerOperation(
       "auth.clinic_membership",
-      () =>
-        prisma.clinicMembership.findFirst({
+      () => prisma.clinicMembership.findFirst({
           where: {
             userId: user.id,
             clinicId: parsedClinicId.data,
