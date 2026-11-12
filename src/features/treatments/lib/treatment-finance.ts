@@ -633,7 +633,7 @@ export async function getClinicTreatmentFinanceSummary(clinicId: string) {
         outstanding: Prisma.Decimal | null;
       },
     ]
-  >\`
+  >`
     WITH plan_entries AS (
       SELECT
         tp."id",
@@ -694,7 +694,7 @@ export async function getClinicTreatmentFinanceSummary(clinicId: string) {
         ),
         0
       )::numeric AS outstanding
-  \`;
+  `;
 
   return {
     collectionsThisMonth: Math.max(
