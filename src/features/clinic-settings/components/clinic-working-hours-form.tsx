@@ -19,8 +19,13 @@ const dayOrder: ClinicWorkingDay["day"][] = [
   "SUN",
 ];
 const dayLabels: Record<ClinicWorkingDay["day"], string> = {
-  MON: "Monday", TUE: "Tuesday", WED: "Wednesday", THU: "Thursday",
-  FRI: "Friday", SAT: "Saturday", SUN: "Sunday",
+  MON: "Monday",
+  TUE: "Tuesday",
+  WED: "Wednesday",
+  THU: "Thursday",
+  FRI: "Friday",
+  SAT: "Saturday",
+  SUN: "Sunday",
 };
 const defaults = (day: ClinicWorkingDay["day"]): ClinicWorkingDay => ({
   day,
