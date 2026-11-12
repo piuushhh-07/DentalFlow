@@ -3,7 +3,7 @@
 import type { AppointmentStatus } from "@prisma/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AppointmentForm } from "@/features/appointments/components/appointment-form";
 import { loadAppointmentOptionsAction } from "@/features/appointments/actions";
@@ -60,8 +60,6 @@ type AppointmentCalendarProps = Readonly<{
   date: string;
   view: AppointmentCalendarView;
   appointments: readonly Appointment[];
-  patients: readonly Patient[];
-  visits: readonly Visit[];
   dentists: readonly Dentist[];
   chairs: readonly Chair[];
   prefill?: AppointmentPrefill;
@@ -143,8 +141,6 @@ export function AppointmentCalendar({
   date,
   view,
   appointments,
-  patients,
-  visits,
   dentists,
   chairs,
   prefill,
@@ -240,6 +236,7 @@ export function AppointmentCalendar({
   function openNewAppointment() {
     setCreateSlot({ date, time: "09:00" });
     setSelectedAppointment(null);
+    void loadOptions();
   }
 
   function appointmentFormInitial(appointment: Appointment) {
