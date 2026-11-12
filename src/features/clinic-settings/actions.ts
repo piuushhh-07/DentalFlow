@@ -21,7 +21,10 @@ const profileSchema = z.object({
     (value) => (typeof value === "string" ? value.trim() || null : value),
     z.string().email("Enter a valid email address.").max(254).nullable(),
   ),
-  address: z.string().trim().max(400, "Address must be 400 characters or fewer."),
+  address: z
+    .string()
+    .trim()
+    .max(400, "Address must be 400 characters or fewer."),
   timeZone: z
     .string()
     .min(1)
@@ -40,7 +43,10 @@ export type ClinicProfileState = {
   error?: string;
   success?: string;
   fieldErrors?: Partial<
-    Record<"name" | "phoneNumber" | "contactEmail" | "address" | "timeZone", string>
+    Record<
+      "name" | "phoneNumber" | "contactEmail" | "address" | "timeZone",
+      string
+    >
   >;
 };
 
