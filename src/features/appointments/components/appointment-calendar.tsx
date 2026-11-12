@@ -154,6 +154,7 @@ export function AppointmentCalendar({
   const [visits, setVisits] = useState<readonly Visit[]>([]);
   const [optionsLoaded, setOptionsLoaded] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
   const gridRefs = useRef(new Map<string, HTMLDivElement>());
   const [selectedDentist, setSelectedDentist] = useState("");
   const [selectedChair, setSelectedChair] = useState("");
@@ -206,16 +207,20 @@ export function AppointmentCalendar({
     );
   }
 
-  async function loadOptions() {
-    if (optionsLoaded || optionsLoading) return;
+  async function loadOptions(): Promise<boolean> {
+    if (optionsLoaded) return true;
+    if (optionsLoading) return false;
+    setOptionsError(null);
     setOptionsLoading(true);
     try {
       const options = await loadAppointmentOptionsAction(clinicId);
       setPatients(options.patients);
       setVisits(options.visits);
       setOptionsLoaded(true);
+      return true;
     } catch {
-      setOptionsLoaded(false);
+      setOptionsError("Could not load patient and treatment options. Please try again.");
+      return false;
     } finally {
       setOptionsLoading(false);
     }
@@ -614,7 +619,14 @@ export function AppointmentCalendar({
           onClose={() => setCreateSlot(null)}
           title="Schedule appointment"
         >
-          {optionsLoading ? (
+          {optionsError ? (
+            <p className="text-sm text-red-700" role="alert">
+              {optionsError}{" "}
+              <button className="font-semibold underline" onClick={() => void loadOptions()} type="button">
+                Retry
+              </button>
+            </p>
+          ) : optionsLoading ? (
             <p className="text-sm text-slate-600">Loading patient and treatment options…</p>
           ) : patients.length === 0 && !prefill ? (
             <p className="text-sm text-slate-600">
@@ -713,8 +725,7 @@ export function AppointmentCalendar({
                   <button
                     className="h-10 rounded-md bg-teal-800 px-4 text-sm font-semibold text-white hover:bg-teal-900"
                     onClick={async () => {
-                      await loadOptions();
-                      setEditing(true);
+                      if (await loadOptions()) setEditing(true);
                     }}
                     type="button"
                   >
@@ -723,6 +734,15 @@ export function AppointmentCalendar({
                 )}
               </div>
             </div>
+          ) : optionsError ? (
+            <p className="text-sm text-red-700" role="alert">
+              {optionsError}{" "}
+              <button className="font-semibold underline" onClick={() => void loadOptions()} type="button">
+                Retry
+              </button>
+            </p>
+          ) : optionsLoading ? (
+            <p className="text-sm text-slate-600">Loading patient and treatment options…</p>
           ) : (
             <AppointmentForm
               chairs={chairs}
