@@ -63,6 +63,14 @@ export default async function ClinicProfileSettingsPage({
             These details are used across your workspace.
           </p>
         </header>
+        <div className="mb-4 flex justify-end">
+          <Link
+            className="inline-flex h-10 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            href={`/clinic/${owner.clinicId}/settings/hours`}
+          >
+            Manage working hours
+          </Link>
+        </div>
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <ClinicProfileForm clinicId={owner.clinicId} clinic={clinic} />
         </section>
