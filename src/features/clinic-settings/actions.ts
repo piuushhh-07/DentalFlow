@@ -10,26 +10,38 @@ import { prisma } from "@/lib/db/prisma";
 const profileSchema = z.object({
   clinicId: z.string().uuid(),
   name: z.string().trim().min(2, "Enter at least 2 characters.").max(160),
-  phoneNumber: z.string().trim().regex(/^\\+91[6-9]\\d{9}$/, "Enter a valid Indian mobile number in +91 format."),
+  phoneNumber: z
+    .string()
+    .trim()
+    .regex(
+      /^\+91[6-9]\d{9}$/,
+      "Enter a valid Indian mobile number in +91 format.",
+    ),
   contactEmail: z.preprocess(
     (value) => (typeof value === "string" ? value.trim() || null : value),
     z.string().email("Enter a valid email address.").max(254).nullable(),
   ),
   address: z.string().trim().max(400, "Address must be 400 characters or fewer."),
-  timeZone: z.string().min(1).max(64).refine((value) => {
-    try {
-      new Intl.DateTimeFormat("en-IN", { timeZone: value });
-      return true;
-    } catch {
-      return false;
-    }
-  }, "Choose a valid timezone."),
+  timeZone: z
+    .string()
+    .min(1)
+    .max(64)
+    .refine((value) => {
+      try {
+        new Intl.DateTimeFormat("en-IN", { timeZone: value });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Choose a valid timezone."),
 });
 
 export type ClinicProfileState = {
   error?: string;
   success?: string;
-  fieldErrors?: Partial<Record<"name" | "phoneNumber" | "contactEmail" | "address" | "timeZone", string>>;
+  fieldErrors?: Partial<
+    Record<"name" | "phoneNumber" | "contactEmail" | "address" | "timeZone", string>
+  >;
 };
 
 export async function updateClinicProfile(
@@ -50,14 +62,17 @@ export async function updateClinicProfile(
     for (const issue of parsed.error.issues) {
       const key = issue.path[0];
       if (typeof key === "string" && key !== "clinicId") {
-        fieldErrors[key as keyof NonNullable<ClinicProfileState["fieldErrors"]>]
-          ??= issue.message;
+        fieldErrors[
+          key as keyof NonNullable<ClinicProfileState["fieldErrors"]>
+        ] ??= issue.message;
       }
     }
     return { error: "Please check the highlighted fields.", fieldErrors };
   }
 
-  const membership = await requireClinicRole(parsed.data.clinicId, [ClinicRole.OWNER]);
+  const membership = await requireClinicRole(parsed.data.clinicId, [
+    ClinicRole.OWNER,
+  ]);
   try {
     await prisma.clinic.update({
       where: { id: membership.clinicId },
