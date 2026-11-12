@@ -13,9 +13,10 @@ import { PublicBookingSettings } from "@/features/appointments/components/public
 import {
   getPublicBookingSettings,
   listAppointmentRequests,
+  listAppointmentPatients,
   listAppointmentResources,
+  listAppointmentVisits,
   listClinicAppointmentsInRange,
-  getAppointmentPrefill,
   listScheduleResources,
 } from "@/features/appointments/lib/appointment-repository";
 import {
@@ -24,6 +25,7 @@ import {
 } from "@/features/appointments/lib/appointment-calendar";
 import { getClinicToday } from "@/features/follow-ups/lib/follow-up-validation";
 import { toClinicDateInput } from "@/features/treatments/lib/treatment-validation";
+import { measureServerOperation } from "@/lib/performance/server-timing";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +66,8 @@ export default async function ClinicAppointmentsPage({
   );
   const [
     appointments,
+    patients,
+    visits,
     resourceData,
     requests,
     bookingSettings,
@@ -73,6 +77,8 @@ export default async function ClinicAppointmentsPage({
       appointmentRange.startDate,
       appointmentRange.endDate,
     ),
+    listAppointmentPatients(membership.clinicId),
+    listAppointmentVisits(membership.clinicId),
     membership.role === ClinicRole.OWNER
       ? listScheduleResources(membership.clinicId)
       : listAppointmentResources(membership.clinicId),
@@ -110,13 +116,12 @@ export default async function ClinicAppointmentsPage({
       .safeParse(searchParams.treatmentVisitId);
     if (!requestedPatientId.success || !requestedVisitId.success) notFound();
 
-    const appointmentPrefill = await getAppointmentPrefill(
-      membership.clinicId,
-      requestedPatientId.data,
-      requestedVisitId.data,
+    const patient = patients.find(({ id }) => id === requestedPatientId.data);
+    const visit = visits.find(
+      ({ id, patientId }) =>
+        id === requestedVisitId.data && patientId === requestedPatientId.data,
     );
-    if (!appointmentPrefill) notFound();
-    const { patient, visit } = appointmentPrefill;
+    if (!patient || !visit) notFound();
 
     prefill = {
       patientId: patient.id,
@@ -187,8 +192,10 @@ export default async function ClinicAppointmentsPage({
             clinicId={membership.clinicId}
             date={selectedDate}
             dentists={resources.dentists}
+            patients={patients}
             prefill={prefill}
             view={selectedView}
+            visits={visits}
           />
         </div>
 

@@ -20,6 +20,7 @@ import { ClinicSetupChecklist } from "@/features/onboarding/components/clinic-se
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { prisma } from "@/lib/db/prisma";
+import { measureServerOperation } from "@/lib/performance/server-timing";
 import { RecallControls } from "@/features/recalls/components/recall-controls";
 import { TreatmentVisitControls } from "@/features/treatments/components/treatment-visit-controls";
 import { countClinicAppointments } from "@/features/appointments/lib/appointment-repository";
@@ -111,11 +112,11 @@ export default async function ClinicDashboardPage({
     financialSummary,
     appointmentsToday,
   ] = await Promise.all([
-    listFollowUpQueue(membership.clinicId, tab, query, page, clinicToday),
-    getFollowUpSummary(membership.clinicId, clinicToday),
-    getClinicWhatsAppTemplate(membership.clinicId),
-    getClinicTreatmentFinanceSummary(membership.clinicId),
-    countClinicAppointments(membership.clinicId, clinicToday),
+    measureServerOperation("dashboard.follow_up_queue", () => listFollowUpQueue(membership.clinicId, tab, query, page, clinicToday)),
+    measureServerOperation("dashboard.follow_up_summary", () => getFollowUpSummary(membership.clinicId, clinicToday)),
+    measureServerOperation("dashboard.whatsapp_template", () => getClinicWhatsAppTemplate(membership.clinicId)),
+    measureServerOperation("dashboard.financial_summary", () => getClinicTreatmentFinanceSummary(membership.clinicId)),
+    measureServerOperation("dashboard.appointments_today", () => countClinicAppointments(membership.clinicId, clinicToday)),
   ]);
   const { items, pagination } = queue;
   const basePath = `/clinic/${membership.clinicId}`;

@@ -12,6 +12,7 @@ import {
   patientSearchSchema,
 } from "@/features/patients/lib/patient-validation";
 import { listClinicPatients } from "@/features/patients/lib/patient-repository";
+import { measureServerOperation } from "@/lib/performance/server-timing";
 
 type PatientListPageProps = Readonly<{
   params: { clinicId: string };
@@ -57,11 +58,7 @@ export default async function PatientListPage({
   });
   const query = parsedSearch.success ? parsedSearch.data.query : "";
   const requestedPage = parsedSearch.success ? parsedSearch.data.page : 1;
-  const { patients, pagination } = await listClinicPatients(
-    membership.clinicId,
-    query,
-    requestedPage,
-  );
+  const { patients, pagination } = await measureServerOperation("patients.directory_query", () => listClinicPatients(membership.clinicId, query, requestedPage));
   const basePath = `/clinic/${membership.clinicId}/patients`;
 
   return (
