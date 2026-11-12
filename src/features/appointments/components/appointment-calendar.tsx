@@ -215,7 +215,9 @@ export function AppointmentCalendar({
       setOptionsLoaded(true);
       return true;
     } catch {
-      setOptionsError("Could not load patient and treatment options. Please try again.");
+      setOptionsError(
+        "Could not load patient and treatment options. Please try again.",
+      );
       return false;
     } finally {
       setOptionsLoading(false);

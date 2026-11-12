@@ -5,9 +5,8 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { z } from "zod";
 
-import { measureServerOperation } from "@/lib/performance/server-timing";
-
 import { prisma } from "@/lib/db/prisma";
+import { measureServerOperation } from "@/lib/performance/server-timing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   isExpectedUnauthenticatedAuthError,
@@ -24,16 +23,18 @@ const clinicIdSchema = z.string().uuid();
 export const getAuthenticatedUser = cache(async function getAuthenticatedUser() {
   const supabase = await createSupabaseServerClient();
 
-  const result = await measureServerOperation("auth.supabase.get_user", () =>
-    supabase.auth.getUser().catch((error: unknown) => {
-    if (isExpectedUnauthenticatedAuthError(error)) {
-      redirect("/login");
-    }
+  const result = await measureServerOperation(
+    "auth.supabase.get_user",
+    () =>
+      supabase.auth.getUser().catch((error: unknown) => {
+        if (isExpectedUnauthenticatedAuthError(error)) {
+          redirect("/login");
+        }
 
-    throw new Error("Unable to verify the Supabase session.", {
-      cause: error,
-    });
-  }),
+        throw new Error("Unable to verify the Supabase session.", {
+          cause: error,
+        });
+      }),
   );
 
   const user = resolveAuthenticatedUser(result.data.user, result.error);
@@ -55,20 +56,22 @@ export const requireClinicMembership = cache(async function requireClinicMembers
   }
 
   const user = await getAuthenticatedUser();
-  const membership = await measureServerOperation("auth.clinic_membership", () =>
-    prisma.clinicMembership.findFirst({
-    where: {
-      userId: user.id,
-      clinicId: parsedClinicId.data,
-      revokedAt: null,
-    },
-    select: {
-      userId: true,
-      clinicId: true,
-      role: true,
-      revokedAt: true,
-    },
-  }),
+  const membership = await measureServerOperation(
+    "auth.clinic_membership",
+    () =>
+      prisma.clinicMembership.findFirst({
+        where: {
+          userId: user.id,
+          clinicId: parsedClinicId.data,
+          revokedAt: null,
+        },
+        select: {
+          userId: true,
+          clinicId: true,
+          role: true,
+          revokedAt: true,
+        },
+      }),
   );
 
   return authorizeClinicMembership(user.id, parsedClinicId.data, membership);

@@ -335,7 +335,6 @@ export async function listClinicAppointments(clinicId: string, date: string) {
   });
 }
 
-
 export async function getAppointmentPrefill(
   clinicId: string,
   patientId: string,
@@ -352,7 +351,10 @@ export async function getAppointmentPrefill(
         clinicId,
         patientId,
         status: {
-          notIn: [TreatmentVisitStatus.COMPLETED, TreatmentVisitStatus.CANCELLED],
+          notIn: [
+            TreatmentVisitStatus.COMPLETED,
+            TreatmentVisitStatus.CANCELLED,
+          ],
         },
         treatmentPlan: { status: { not: TreatmentPlanStatus.CANCELLED } },
       },

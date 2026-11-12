@@ -112,11 +112,21 @@ export default async function ClinicDashboardPage({
     financialSummary,
     appointmentsToday,
   ] = await Promise.all([
-    measureServerOperation("dashboard.follow_up_queue", () => listFollowUpQueue(membership.clinicId, tab, query, page, clinicToday)),
-    measureServerOperation("dashboard.follow_up_summary", () => getFollowUpSummary(membership.clinicId, clinicToday)),
-    measureServerOperation("dashboard.whatsapp_template", () => getClinicWhatsAppTemplate(membership.clinicId)),
-    measureServerOperation("dashboard.financial_summary", () => getClinicTreatmentFinanceSummary(membership.clinicId)),
-    measureServerOperation("dashboard.appointments_today", () => countClinicAppointments(membership.clinicId, clinicToday)),
+    measureServerOperation("dashboard.follow_up_queue", () =>
+      listFollowUpQueue(membership.clinicId, tab, query, page, clinicToday),
+    ),
+    measureServerOperation("dashboard.follow_up_summary", () =>
+      getFollowUpSummary(membership.clinicId, clinicToday),
+    ),
+    measureServerOperation("dashboard.whatsapp_template", () =>
+      getClinicWhatsAppTemplate(membership.clinicId),
+    ),
+    measureServerOperation("dashboard.financial_summary", () =>
+      getClinicTreatmentFinanceSummary(membership.clinicId),
+    ),
+    measureServerOperation("dashboard.appointments_today", () =>
+      countClinicAppointments(membership.clinicId, clinicToday),
+    ),
   ]);
   const { items, pagination } = queue;
   const basePath = `/clinic/${membership.clinicId}`;
