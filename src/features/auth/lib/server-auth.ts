@@ -24,16 +24,18 @@ const clinicIdSchema = z.string().uuid();
 export const getAuthenticatedUser = cache(async function getAuthenticatedUser() {
   const supabase = await createSupabaseServerClient();
 
-  const result = await measureServerOperation("auth.supabase.get_user", () =>
-    supabase.auth.getUser().catch((error: unknown) => {
-    if (isExpectedUnauthenticatedAuthError(error)) {
-      redirect("/login");
-    }
+  const result = await measureServerOperation(
+    "auth.supabase.get_user",
+    () =>
+      supabase.auth.getUser().catch((error: unknown) => {
+        if (isExpectedUnauthenticatedAuthError(error)) {
+          redirect("/login");
+        }
 
-    throw new Error("Unable to verify the Supabase session.", {
-      cause: error,
-    });
-  }),
+        throw new Error("Unable to verify the Supabase session.", {
+          cause: error,
+        });
+      }),
   );
 
   const user = resolveAuthenticatedUser(result.data.user, result.error);

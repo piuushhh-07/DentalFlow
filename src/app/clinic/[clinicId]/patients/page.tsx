@@ -58,7 +58,10 @@ export default async function PatientListPage({
   });
   const query = parsedSearch.success ? parsedSearch.data.query : "";
   const requestedPage = parsedSearch.success ? parsedSearch.data.page : 1;
-  const { patients, pagination } = await measureServerOperation("patients.directory_query", () => listClinicPatients(membership.clinicId, query, requestedPage));
+  const { patients, pagination } = await measureServerOperation(
+    "patients.directory_query",
+    () => listClinicPatients(membership.clinicId, query, requestedPage),
+  );
   const basePath = `/clinic/${membership.clinicId}/patients`;
 
   return (

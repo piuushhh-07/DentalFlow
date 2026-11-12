@@ -622,12 +622,18 @@ export function AppointmentCalendar({
           {optionsError ? (
             <p className="text-sm text-red-700" role="alert">
               {optionsError}{" "}
-              <button className="font-semibold underline" onClick={() => void loadOptions()} type="button">
+              <button
+                className="font-semibold underline"
+                onClick={() => void loadOptions()}
+                type="button"
+              >
                 Retry
               </button>
             </p>
           ) : optionsLoading ? (
-            <p className="text-sm text-slate-600">Loading patient and treatment options…</p>
+            <p className="text-sm text-slate-600">
+              Loading patient and treatment options…
+            </p>
           ) : patients.length === 0 && !prefill ? (
             <p className="text-sm text-slate-600">
               Add a patient before scheduling.{" "}
