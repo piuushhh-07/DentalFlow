@@ -301,7 +301,8 @@ export async function createPublicBookingRequestAction(
         requestedTime < dayHours.breakEnd)
     ) {
       return {
-        error: "That time is outside the clinic's working hours. Please choose an open time.",
+        error:
+          "That time is outside the clinic's working hours. Please choose an open time.",
       };
     }
   }
