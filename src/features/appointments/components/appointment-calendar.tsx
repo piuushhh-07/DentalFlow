@@ -239,6 +239,34 @@ export function AppointmentCalendar({
     void loadOptions();
   }
 
+  useEffect(() => {
+    if (!prefill) return;
+
+    let cancelled = false;
+    setOptionsLoading(true);
+    loadAppointmentOptionsAction(clinicId)
+      .then((options) => {
+        if (cancelled) return;
+        setPatients(options.patients);
+        setVisits(options.visits);
+        setOptionsLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOptionsError(
+            "Could not load patient and treatment options. Please try again.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOptionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clinicId, prefill]);
+
   function appointmentFormInitial(appointment: Appointment) {
     const appointmentDateTimeValue = appointmentDateTime(
       appointment.scheduledAt,
