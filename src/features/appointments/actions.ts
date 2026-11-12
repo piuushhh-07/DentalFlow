@@ -32,6 +32,8 @@ import {
   setScheduleResourceActive,
   approveAppointmentRequest,
   getPublicBookingClinic,
+  listAppointmentPatients,
+  listAppointmentVisits,
   rejectAppointmentRequest,
   setPublicBookingEnabled,
   updateClinicAppointment,
@@ -502,4 +504,17 @@ export async function updateAppointmentStatusAction(
     logAppointmentError(error);
     return { error: userFacingAppointmentError(error) };
   }
+}
+
+export async function loadAppointmentOptionsAction(clinicId: string) {
+  const parsedClinicId = z.string().uuid().safeParse(clinicId);
+  if (!parsedClinicId.success) {
+    throw new Error("A valid clinic selection is required.");
+  }
+  const membership = await requireClinicMembership(parsedClinicId.data);
+  const [patients, visits] = await Promise.all([
+    listAppointmentPatients(membership.clinicId),
+    listAppointmentVisits(membership.clinicId),
+  ]);
+  return { patients, visits };
 }

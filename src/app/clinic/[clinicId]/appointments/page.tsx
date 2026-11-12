@@ -13,10 +13,9 @@ import { PublicBookingSettings } from "@/features/appointments/components/public
 import {
   getPublicBookingSettings,
   listAppointmentRequests,
-  listAppointmentPatients,
   listAppointmentResources,
-  listAppointmentVisits,
   listClinicAppointmentsInRange,
+  getAppointmentPrefill,
   listScheduleResources,
 } from "@/features/appointments/lib/appointment-repository";
 import {
@@ -65,8 +64,6 @@ export default async function ClinicAppointmentsPage({
   );
   const [
     appointments,
-    patients,
-    visits,
     resourceData,
     requests,
     bookingSettings,
@@ -76,8 +73,6 @@ export default async function ClinicAppointmentsPage({
       appointmentRange.startDate,
       appointmentRange.endDate,
     ),
-    listAppointmentPatients(membership.clinicId),
-    listAppointmentVisits(membership.clinicId),
     membership.role === ClinicRole.OWNER
       ? listScheduleResources(membership.clinicId)
       : listAppointmentResources(membership.clinicId),
@@ -115,12 +110,13 @@ export default async function ClinicAppointmentsPage({
       .safeParse(searchParams.treatmentVisitId);
     if (!requestedPatientId.success || !requestedVisitId.success) notFound();
 
-    const patient = patients.find(({ id }) => id === requestedPatientId.data);
-    const visit = visits.find(
-      ({ id, patientId }) =>
-        id === requestedVisitId.data && patientId === requestedPatientId.data,
+    const appointmentPrefill = await getAppointmentPrefill(
+      membership.clinicId,
+      requestedPatientId.data,
+      requestedVisitId.data,
     );
-    if (!patient || !visit) notFound();
+    if (!appointmentPrefill) notFound();
+    const { patient, visit } = appointmentPrefill;
 
     prefill = {
       patientId: patient.id,
@@ -191,10 +187,8 @@ export default async function ClinicAppointmentsPage({
             clinicId={membership.clinicId}
             date={selectedDate}
             dentists={resources.dentists}
-            patients={patients}
             prefill={prefill}
             view={selectedView}
-            visits={visits}
           />
         </div>
 

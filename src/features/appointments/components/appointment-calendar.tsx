@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
-import { AppointmentForm } from "@/features/appointments/components/appointment-form";
+import { AppointmentForm } from "@/features/appointments/components/appointment-form";\nimport { loadAppointmentOptionsAction } from "@/features/appointments/actions";
 import { AppointmentStatusForm } from "@/features/appointments/components/appointment-status-form";
 import {
   addCalendarDays,
@@ -148,7 +148,7 @@ export function AppointmentCalendar({
   chairs,
   prefill,
 }: AppointmentCalendarProps) {
-  const router = useRouter();
+  const router = useRouter();\n  const [patients, setPatients] = useState<readonly Patient[]>([]);\n  const [visits, setVisits] = useState<readonly Visit[]>([]);\n  const [optionsLoaded, setOptionsLoaded] = useState(false);\n  const [optionsLoading, setOptionsLoading] = useState(false);
   const gridRefs = useRef(new Map<string, HTMLDivElement>());
   const [selectedDentist, setSelectedDentist] = useState("");
   const [selectedChair, setSelectedChair] = useState("");
@@ -201,7 +201,7 @@ export function AppointmentCalendar({
     );
   }
 
-  function openSlot(slotDate: string, clientY: number, grid: HTMLDivElement) {
+  async function loadOptions() {\n    if (optionsLoaded || optionsLoading) return;\n    setOptionsLoading(true);\n    try {\n      const options = await loadAppointmentOptionsAction(clinicId);\n      setPatients(options.patients);\n      setVisits(options.visits);\n      setOptionsLoaded(true);\n    } finally {\n      setOptionsLoading(false);\n    }\n  }\n\n  function openSlot(slotDate: string, clientY: number, grid: HTMLDivElement) {
     const time = getAppointmentTimeAtCalendarPosition(
       clientY,
       grid.getBoundingClientRect(),
@@ -593,7 +593,7 @@ export function AppointmentCalendar({
           onClose={() => setCreateSlot(null)}
           title="Schedule appointment"
         >
-          {patients.length === 0 ? (
+          {optionsLoading ? (\n            <p className="text-sm text-slate-600">Loading patient and treatment options…</p>\n          ) : patients.length === 0 && !prefill ? (
             <p className="text-sm text-slate-600">
               Add a patient before scheduling.{" "}
               <Link
@@ -689,7 +689,7 @@ export function AppointmentCalendar({
                 ) && (
                   <button
                     className="h-10 rounded-md bg-teal-800 px-4 text-sm font-semibold text-white hover:bg-teal-900"
-                    onClick={() => setEditing(true)}
+                    onClick={async () => {\n                      await loadOptions();\n                      setEditing(true);\n                    }}
                     type="button"
                   >
                     Edit appointment

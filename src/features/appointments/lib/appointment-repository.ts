@@ -335,6 +335,39 @@ export async function listClinicAppointments(clinicId: string, date: string) {
   });
 }
 
+
+export async function getAppointmentPrefill(
+  clinicId: string,
+  patientId: string,
+  visitId: string,
+) {
+  const [patient, visit] = await Promise.all([
+    prisma.patient.findFirst({
+      where: { id: patientId, clinicId },
+      select: { id: true, fullName: true },
+    }),
+    prisma.treatmentVisit.findFirst({
+      where: {
+        id: visitId,
+        clinicId,
+        patientId,
+        status: {
+          notIn: [TreatmentVisitStatus.COMPLETED, TreatmentVisitStatus.CANCELLED],
+        },
+        treatmentPlan: { status: { not: TreatmentPlanStatus.CANCELLED } },
+      },
+      select: {
+        id: true,
+        patientId: true,
+        visitNumber: true,
+        dueDate: true,
+        treatmentPlan: { select: { name: true } },
+      },
+    }),
+  ]);
+  return patient && visit ? { patient, visit } : null;
+}
+
 export async function listAppointmentPatients(clinicId: string) {
   return prisma.patient.findMany({
     where: { clinicId },
