@@ -5,6 +5,7 @@ import {
   ArrowRight,
   CalendarPlus,
   CheckCircle2,
+  Globe2,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -16,15 +17,20 @@ type ClinicSetupChecklistProps = Readonly<{ clinicId: string }>;
 export async function ClinicSetupChecklist({
   clinicId,
 }: ClinicSetupChecklistProps) {
-  const [dentists, chairs, patients, appointments, staff] = await Promise.all([
-    prisma.clinicDentist.count({ where: { clinicId, active: true } }),
-    prisma.treatmentChair.count({ where: { clinicId, active: true } }),
-    prisma.patient.count({ where: { clinicId } }),
-    prisma.appointment.count({ where: { clinicId } }),
-    prisma.clinicMembership.count({
-      where: { clinicId, role: "STAFF", active: true, revokedAt: null },
-    }),
-  ]);
+  const [dentists, chairs, patients, appointments, staff, bookingSettings] =
+    await Promise.all([
+      prisma.clinicDentist.count({ where: { clinicId, active: true } }),
+      prisma.treatmentChair.count({ where: { clinicId, active: true } }),
+      prisma.patient.count({ where: { clinicId } }),
+      prisma.appointment.count({ where: { clinicId } }),
+      prisma.clinicMembership.count({
+        where: { clinicId, role: "STAFF", active: true, revokedAt: null },
+      }),
+      prisma.clinic.findUnique({
+        where: { id: clinicId },
+        select: { publicBookingEnabled: true },
+      }),
+    ]);
 
   const requiredItems = [
     {
@@ -54,6 +60,7 @@ export async function ClinicSetupChecklist({
   ];
   const completed = requiredItems.filter((item) => item.done).length;
   const allRequiredComplete = completed === requiredItems.length;
+  const onlineBookingEnabled = bookingSettings?.publicBookingEnabled ?? false;
 
   return (
     <section
@@ -127,6 +134,40 @@ export async function ClinicSetupChecklist({
           );
         })}
       </ul>
+
+      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 text-teal-700">
+              {onlineBookingEnabled ? (
+                <CheckCircle2 aria-label="Enabled" className="size-5" />
+              ) : (
+                <Globe2 aria-hidden="true" className="size-5" />
+              )}
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-slate-900">
+                Online appointment requests
+                <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                  Optional
+                </span>
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">
+                {onlineBookingEnabled
+                  ? "Enabled — patients can request appointments through your public booking page."
+                  : "Let patients request appointments online. You can review each request before confirming it."}
+              </span>
+            </span>
+          </div>
+          <Link
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            href={`/clinic/${clinicId}/appointments`}
+          >
+            {onlineBookingEnabled ? "Manage booking" : "Set up booking"}
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        </div>
+      </div>
 
       <div className="mt-4 flex flex-col gap-2 border-t border-teal-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2 text-sm text-slate-600">
