@@ -781,8 +781,8 @@ export function AppointmentCalendar({
             </p>
           ) : optionsLoading ? (
             <p className="text-sm text-slate-600">
-            Loading patient and treatment options…
-          </p>
+              Loading patient and treatment options…
+            </p>
           ) : (
             <AppointmentForm
               chairs={chairs}

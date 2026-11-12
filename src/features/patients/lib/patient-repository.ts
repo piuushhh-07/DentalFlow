@@ -59,19 +59,19 @@ export async function listClinicPatients(
     pagination.skip === requestedSkip
       ? firstPageResult
       : await prisma.patient.findMany({
-        where,
-        orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
-        skip: pagination.skip,
-        take: pagination.pageSize,
-        select: {
-          id: true,
-          fullName: true,
-          phoneNumber: true,
-          whatsappOptIn: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
+          where,
+          orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
+          skip: pagination.skip,
+          take: pagination.pageSize,
+          select: {
+            id: true,
+            fullName: true,
+            phoneNumber: true,
+            whatsappOptIn: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
 
   return { patients, pagination };
 }

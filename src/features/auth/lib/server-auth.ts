@@ -20,62 +20,66 @@ import {
 
 const clinicIdSchema = z.string().uuid();
 
-export const getAuthenticatedUser = cache(async function getAuthenticatedUser() {
-  const supabase = await createSupabaseServerClient();
+export const getAuthenticatedUser = cache(
+  async function getAuthenticatedUser() {
+    const supabase = await createSupabaseServerClient();
 
-  const result = await measureServerOperation(
-    "auth.supabase.get_user",
-    () =>
-      supabase.auth.getUser().catch((error: unknown) => {
-        if (isExpectedUnauthenticatedAuthError(error)) {
-          redirect("/login");
-        }
+    const result = await measureServerOperation(
+      "auth.supabase.get_user",
+      () =>
+        supabase.auth.getUser().catch((error: unknown) => {
+          if (isExpectedUnauthenticatedAuthError(error)) {
+            redirect("/login");
+          }
 
-        throw new Error("Unable to verify the Supabase session.", {
-          cause: error,
-        });
-      }),
-  );
+          throw new Error("Unable to verify the Supabase session.", {
+            cause: error,
+          });
+        }),
+    );
 
-  const user = resolveAuthenticatedUser(result.data.user, result.error);
+    const user = resolveAuthenticatedUser(result.data.user, result.error);
 
-  if (!user) {
-    redirect("/login");
-  }
+    if (!user) {
+      redirect("/login");
+    }
 
-  return user;
-});
+    return user;
+  },
+);
 
-export const requireClinicMembership = cache(async function requireClinicMembership(
-  requestedClinicId: string,
-): Promise<VerifiedClinicMembership> {
-  const parsedClinicId = clinicIdSchema.safeParse(requestedClinicId);
+export const requireClinicMembership = cache(
+  async function requireClinicMembership(
+    requestedClinicId: string,
+  ): Promise<VerifiedClinicMembership> {
+    const parsedClinicId = clinicIdSchema.safeParse(requestedClinicId);
 
-  if (!parsedClinicId.success) {
-    throw new Error("A valid clinic selection is required.");
-  }
+    if (!parsedClinicId.success) {
+      throw new Error("A valid clinic selection is required.");
+    }
 
-  const user = await getAuthenticatedUser();
-  const membership = await measureServerOperation(
-    "auth.clinic_membership",
-    () =>
-      prisma.clinicMembership.findFirst({
-        where: {
-          userId: user.id,
-          clinicId: parsedClinicId.data,
-          revokedAt: null,
-        },
-        select: {
-          userId: true,
-          clinicId: true,
-          role: true,
-          revokedAt: true,
-        },
-      }),
-  );
+    const user = await getAuthenticatedUser();
+    const membership = await measureServerOperation(
+      "auth.clinic_membership",
+      () =>
+        prisma.clinicMembership.findFirst({
+          where: {
+            userId: user.id,
+            clinicId: parsedClinicId.data,
+            revokedAt: null,
+          },
+          select: {
+            userId: true,
+            clinicId: true,
+            role: true,
+            revokedAt: true,
+          },
+        }),
+    );
 
-  return authorizeClinicMembership(user.id, parsedClinicId.data, membership);
-});
+    return authorizeClinicMembership(user.id, parsedClinicId.data, membership);
+  },
+);
 
 export async function requireClinicRole(
   requestedClinicId: string,
