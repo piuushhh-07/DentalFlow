@@ -90,7 +90,7 @@ test("records a fresh timestamp when consent is newly enabled", () => {
   const newlyRecordedAt = new Date("2026-03-04T05:06:07.000Z");
 
   assert.equal(
-    resolvePatientEnabledAtTimestamp(false, true, null, newlyRecordedAt),
+    resolvePatientEnabledAtTimestamp(true, true, null, newlyRecordedAt),
     newlyRecordedAt,
   );
   assert.equal(
