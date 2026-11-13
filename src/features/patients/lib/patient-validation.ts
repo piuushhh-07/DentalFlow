@@ -49,7 +49,7 @@ export const patientInputSchema = z
     portalAccessEnabledAt: patient.portalAccessEnabled ? new Date() : null,
   }));
 
-export function resolvePatientConsentTimestamp(
+export function resolvePatientEnabledAtTimestamp(
   enabled: boolean,
   wasPreviouslyEnabled: boolean,
   previousTimestamp: Date | null,
