@@ -620,10 +620,11 @@ export default async function PatientDetailPage({
               Delete patient
             </h2>
             <p className="mb-4 mt-1 text-sm leading-5 text-slate-600">
-              Deletion is available only for an empty patient record with no linked
-              clinical, appointment, financial, insurance, recall, message,
-              prescription, or export history. Records with history must be
-              retained; deleting a patient never removes that linked history.
+              Deletion is available only for an empty patient record with no
+              linked clinical, appointment, financial, insurance, recall,
+              message, prescription, or export history. Records with history
+              must be retained; deleting a patient never removes that linked
+              history.
             </p>
             <DeletePatientButton
               clinicId={membership.clinicId}
