@@ -230,9 +230,7 @@ export async function requestPatientPortalMagicLink(
       ? "http://localhost:3000"
       : undefined);
   if (!siteUrl) {
-    console.error(
-      "Patient portal magic link requires NEXT_PUBLIC_SITE_URL.",
-    );
+    console.error("Patient portal magic link requires NEXT_PUBLIC_SITE_URL.");
     return {
       error: "Patient portal sign-in is not configured. Contact the clinic.",
     };
