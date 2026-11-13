@@ -49,7 +49,7 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet, headers) {
           for (const { name, value } of cookiesToSet) {
             request.cookies.set(name, value);
           }
@@ -59,27 +59,33 @@ export async function middleware(request: NextRequest) {
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
           }
+
+          // Preserve Supabase cache-control headers during token refresh so
+          // authenticated responses cannot be cached and shared across users.
+          for (const [name, value] of Object.entries(headers)) {
+            response.headers.set(name, value);
+          }
         },
       },
     },
   );
 
-  let user = null;
+  let hasVerifiedSession = false;
   let error: unknown = null;
 
   try {
-    // Middleware uses the cookie-backed session only for redirect UX.
-    // Protected pages, route handlers, and server actions must still verify
-    // the user with auth.getUser() before accessing clinic data.
-    const result = await supabase.auth.getSession();
-    user = result.data.session?.user ?? null;
+    // Verify the JWT for middleware redirect decisions. Protected pages,
+    // route handlers, and server actions still call getUser() and enforce
+    // clinic membership/role checks before accessing clinic data.
+    const result = await supabase.auth.getClaims();
+    hasVerifiedSession = Boolean(result.data?.claims);
     error = result.error;
   } catch (authError) {
     error = authError;
   }
 
   if (isExpectedUnauthenticatedAuthError(error)) {
-    user = null;
+    hasVerifiedSession = false;
     error = null;
   }
 
@@ -100,7 +106,7 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  if (!user && !isLoginPage) {
+  if (!hasVerifiedSession && !isLoginPage) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = "";
@@ -111,7 +117,7 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  if (user && isLoginPage) {
+  if (hasVerifiedSession && isLoginPage) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = "/";
     homeUrl.search = "";
