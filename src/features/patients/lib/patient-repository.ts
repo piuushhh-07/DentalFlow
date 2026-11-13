@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { assertPatientCapacity } from "@/features/billing/lib/billing-entitlements";
 import {
   getPatientPagination,
+  resolvePatientConsentTimestamp,
   PATIENT_PAGE_SIZE,
   patientBelongsToClinic,
   type PatientInput,
@@ -169,17 +170,19 @@ export async function updateClinicPatient(
         email: input.email,
         normalizedEmail: input.email,
         portalAccessEnabled: input.portalAccessEnabled,
-        portalAccessEnabledAt: input.portalAccessEnabled
-          ? existing.portalAccessEnabled && existing.portalAccessEnabledAt
-            ? existing.portalAccessEnabledAt
-            : input.portalAccessEnabledAt
-          : null,
+        portalAccessEnabledAt: resolvePatientConsentTimestamp(
+          input.portalAccessEnabled,
+          existing.portalAccessEnabled,
+          existing.portalAccessEnabledAt,
+          input.portalAccessEnabledAt ?? new Date(),
+        ),
         whatsappOptIn: input.whatsappOptIn,
-        whatsappOptedInAt: input.whatsappOptIn
-          ? existing.whatsappOptIn && existing.whatsappOptedInAt
-            ? existing.whatsappOptedInAt
-            : input.whatsappOptedInAt
-          : null,
+        whatsappOptedInAt: resolvePatientConsentTimestamp(
+          input.whatsappOptIn,
+          existing.whatsappOptIn,
+          existing.whatsappOptedInAt,
+          input.whatsappOptedInAt ?? new Date(),
+        ),
         notes: input.notes,
       },
     });
