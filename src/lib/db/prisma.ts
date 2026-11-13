@@ -16,9 +16,9 @@ const slowQueryThresholdMs = Number(
   process.env.DENTALFLOW_SLOW_QUERY_THRESHOLD_MS ?? 300,
 );
 
-export const prisma =
+export const prisma: PrismaClientWithQueryLogging =
   globalForPrisma.prisma ??
-  new PrismaClientWithQueryLogging({
+  new PrismaClient<Prisma.PrismaClientOptions, "query" | "warn" | "error">({
     log: [
       { emit: "event", level: "query" },
       { emit: "stdout", level: "warn" },
