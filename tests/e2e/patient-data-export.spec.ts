@@ -16,7 +16,7 @@ async function signIn(
   await emailField.fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/clinic\/[0-9a-f-]{36}(?:\\?.*)?$/i, {
+  await expect(page).toHaveURL(/\/clinic\/[0-9a-f-]{36}(?:\?.*)?$/i, {
     timeout: 30_000,
   });
   const clinicId = page.url().match(/\/clinic\/([0-9a-f-]{36})/i)?.[1];
