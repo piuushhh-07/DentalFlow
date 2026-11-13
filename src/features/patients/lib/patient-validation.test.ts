@@ -3,7 +3,7 @@ import test from "node:test";
 
 import {
   getPatientPagination,
-  resolvePatientConsentTimestamp,
+  resolvePatientEnabledAtTimestamp,
   hasDuplicatePatientPhoneError,
   patientBelongsToClinic,
   patientInputSchema,
@@ -81,7 +81,7 @@ test("preserves the original consent timestamp while consent remains enabled", (
   const laterEditAt = new Date("2026-02-03T04:05:06.000Z");
 
   assert.equal(
-    resolvePatientConsentTimestamp(true, true, recordedAt, laterEditAt),
+    resolvePatientEnabledAtTimestamp(true, true, recordedAt, laterEditAt),
     recordedAt,
   );
 });
@@ -90,18 +90,18 @@ test("records a fresh timestamp when consent is newly enabled", () => {
   const newlyRecordedAt = new Date("2026-03-04T05:06:07.000Z");
 
   assert.equal(
-    resolvePatientConsentTimestamp(false, true, null, newlyRecordedAt),
+    resolvePatientEnabledAtTimestamp(false, true, null, newlyRecordedAt),
     newlyRecordedAt,
   );
   assert.equal(
-    resolvePatientConsentTimestamp(true, false, null, newlyRecordedAt),
+    resolvePatientEnabledAtTimestamp(true, false, null, newlyRecordedAt),
     newlyRecordedAt,
   );
 });
 
 test("clears the consent timestamp when consent is withdrawn", () => {
   assert.equal(
-    resolvePatientConsentTimestamp(false, true, new Date(), new Date()),
+    resolvePatientEnabledAtTimestamp(false, true, new Date(), new Date()),
     null,
   );
 });
