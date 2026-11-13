@@ -198,7 +198,7 @@ export async function deletePatient(
     if (!deleted) {
       return {
         error:
-          "This patient cannot be deleted while message or clinical chart history exists, or the record is no longer available.",
+          "This patient cannot be deleted while linked clinical, appointment, financial, insurance, recall, message, prescription, or export history exists. Archive or retain the record instead.",
       };
     }
   } catch (error) {
