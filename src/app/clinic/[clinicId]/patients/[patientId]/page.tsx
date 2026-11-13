@@ -620,9 +620,11 @@ export default async function PatientDetailPage({
               Delete patient
             </h2>
             <p className="mb-4 mt-1 text-sm leading-5 text-slate-600">
-              This also removes treatment plans and recalls. A patient with
-              message or clinical chart history cannot be deleted so the audit
-              trail is preserved.
+              Deletion is available only for an empty patient record with no
+              linked clinical, appointment, financial, insurance, recall,
+              message, prescription, or export history. Records with history
+              must be retained; deleting a patient never removes that linked
+              history.
             </p>
             <DeletePatientButton
               clinicId={membership.clinicId}
