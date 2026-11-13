@@ -613,107 +613,95 @@ export async function getTreatmentPaymentReceipt(
 }
 
 export async function getClinicTreatmentFinanceSummary(clinicId: string) {
+  const now = new Date();
   const nowParts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
     year: "numeric",
     month: "2-digit",
-  }).formatToParts(new Date());
+  }).formatToParts(now);
   const monthParts = Object.fromEntries(
     nowParts.map(({ type, value }) => [type, value]),
   );
   const monthStart = new Date(
     `${monthParts.year}-${monthParts.month}-01T00:00:00+05:30`,
   );
-  const diagnostic = startTransactionDiagnostic("financeSummary");
-  let entries;
-  let plans;
-  try {
-    [entries, plans] = await prisma.$transaction(
-      async (transaction) => {
-        recordTransactionPhase(diagnostic, "callback_entry");
-        try {
-          const result = await Promise.all([
-            measureTransactionQuery(diagnostic, "financialEntries", () =>
-              transaction.treatmentFinancialEntry.findMany({
-                where: {
-                  clinicId,
-                  entryType: {
-                    in: [FinancialEntryType.PAYMENT, FinancialEntryType.REFUND],
-                  },
-                  paidAt: { gte: monthStart, lte: new Date() },
-                },
-                select: { entryType: true, amount: true, paidAt: true },
-              }),
-            ),
-            measureTransactionQuery(diagnostic, "treatmentPlans", () =>
-              transaction.treatmentPlan.findMany({
-                where: {
-                  clinicId,
-                  status: { not: TreatmentPlanStatus.CANCELLED },
-                },
-                select: {
-                  id: true,
-                  finalAmount: true,
-                  estimatedAmount: true,
-                  financialEntries: {
-                    select: { entryType: true, amount: true },
-                  },
-                },
-              }),
-            ),
-          ]);
-          recordTransactionPhase(diagnostic, "callback_completed");
-          return result;
-        } catch (error) {
-          recordTransactionPhase(diagnostic, "callback_failed", error);
-          throw error;
-        }
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
-    );
-    recordTransactionPhase(diagnostic, "outer_resolved");
-  } catch (error) {
-    recordTransactionPhase(diagnostic, "outer_rejected", error);
-    throw error;
-  }
-  const collectionsThisMonth = entries.reduce(
-    (sum, entry) =>
-      entry.entryType === FinancialEntryType.PAYMENT
-        ? sum.plus(entry.amount)
-        : sum.minus(entry.amount),
-    new Prisma.Decimal(0),
-  );
 
-  const outstanding = plans.reduce((sum, plan) => {
-    const totals = plan.financialEntries.reduce(
-      (result, entry) => {
-        if (entry.entryType === FinancialEntryType.PAYMENT)
-          result.payments = result.payments.plus(entry.amount);
-        if (entry.entryType === FinancialEntryType.REFUND)
-          result.refunds = result.refunds.plus(entry.amount);
-        if (entry.entryType === FinancialEntryType.DISCOUNT)
-          result.discounts = result.discounts.plus(entry.amount);
-        return result;
-      },
+  const [summary] = await prisma.$queryRaw<
+    [
       {
-        payments: new Prisma.Decimal(0),
-        refunds: new Prisma.Decimal(0),
-        discounts: new Prisma.Decimal(0),
+        collectionsThisMonth: Prisma.Decimal | null;
+        outstanding: Prisma.Decimal | null;
       },
-    );
-    const final =
-      plan.finalAmount ?? plan.estimatedAmount ?? new Prisma.Decimal(0);
-    const balance = calculateTreatmentLedgerBalance(final, totals);
-    return balance.isPositive() ? sum.plus(balance) : sum;
-  }, new Prisma.Decimal(0));
+    ]
+  >`
+    WITH plan_entries AS (
+      SELECT
+        tp."id",
+        COALESCE(tp."finalAmount", tp."estimatedAmount", 0)::numeric AS plan_total,
+        COALESCE(
+          SUM(tfe."amount") FILTER (
+            WHERE tfe."entryType" = 'DISCOUNT'::"FinancialEntryType"
+          ),
+          0
+        )::numeric AS discounts,
+        COALESCE(
+          SUM(tfe."amount") FILTER (
+            WHERE tfe."entryType" = 'PAYMENT'::"FinancialEntryType"
+          ),
+          0
+        )::numeric AS payments,
+        COALESCE(
+          SUM(tfe."amount") FILTER (
+            WHERE tfe."entryType" = 'REFUND'::"FinancialEntryType"
+          ),
+          0
+        )::numeric AS refunds
+      FROM "treatment_plans" tp
+      LEFT JOIN "treatment_financial_entries" tfe
+        ON tfe."treatmentPlanId" = tp."id"
+        AND tfe."clinicId" = tp."clinicId"
+      WHERE tp."clinicId" = ${clinicId}::uuid
+        AND tp."status" <> 'CANCELLED'::"TreatmentPlanStatus"
+      GROUP BY tp."id"
+    ),
+    month_collections AS (
+      SELECT
+        COALESCE(
+          SUM(
+            CASE
+              WHEN "entryType" = 'PAYMENT'::"FinancialEntryType" THEN "amount"
+              WHEN "entryType" = 'REFUND'::"FinancialEntryType" THEN -"amount"
+              ELSE 0
+            END
+          ),
+          0
+        )::numeric AS total
+      FROM "treatment_financial_entries"
+      WHERE "clinicId" = ${clinicId}::uuid
+        AND "entryType" IN (
+          'PAYMENT'::"FinancialEntryType",
+          'REFUND'::"FinancialEntryType"
+        )
+        AND "paidAt" >= ${monthStart}
+        AND "paidAt" <= ${now}
+    )
+    SELECT
+      (SELECT total FROM month_collections) AS "collectionsThisMonth",
+      COALESCE(
+        (
+          SELECT SUM(GREATEST(plan_total - discounts - payments + refunds, 0))
+          FROM plan_entries
+        ),
+        0
+      )::numeric AS outstanding
+  `;
 
   return {
-    collectionsThisMonth: decimalNumber(
-      collectionsThisMonth.isNegative()
-        ? new Prisma.Decimal(0)
-        : collectionsThisMonth,
+    collectionsThisMonth: Math.max(
+      Number(summary.collectionsThisMonth ?? 0),
+      0,
     ),
-    outstanding: decimalNumber(outstanding),
+    outstanding: Number(summary.outstanding ?? 0),
   };
 }
 

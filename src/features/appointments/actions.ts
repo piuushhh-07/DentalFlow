@@ -32,6 +32,8 @@ import {
   setScheduleResourceActive,
   approveAppointmentRequest,
   getPublicBookingClinic,
+  listAppointmentPatients,
+  listAppointmentVisits,
   rejectAppointmentRequest,
   setPublicBookingEnabled,
   updateClinicAppointment,
@@ -274,6 +276,38 @@ export async function createPublicBookingRequestAction(
       error: "Online appointment requests are not available for this clinic.",
     };
   }
+  const weekday = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][
+    new Date(`${parsed.data.date}T00:00:00.000Z`).getUTCDay()
+  ];
+  const configuredHours = Array.isArray(clinic.workingHours)
+    ? (clinic.workingHours as unknown as Array<{
+        day: string;
+        closed: boolean;
+        open: string;
+        close: string;
+        breakStart: string | null;
+        breakEnd: string | null;
+      }>)
+    : [];
+  const dayHours = configuredHours.find((hours) => hours.day === weekday);
+  if (configuredHours.length > 0) {
+    const requestedTime = parsed.data.time;
+    if (
+      !dayHours ||
+      dayHours.closed ||
+      requestedTime < dayHours.open ||
+      requestedTime >= dayHours.close ||
+      (dayHours.breakStart &&
+        dayHours.breakEnd &&
+        requestedTime >= dayHours.breakStart &&
+        requestedTime < dayHours.breakEnd)
+    ) {
+      return {
+        error:
+          "That time is outside the clinic's working hours. Please choose an open time.",
+      };
+    }
+  }
   const requestedAt = appointmentStartAt(parsed.data.date, parsed.data.time);
   const now = Date.now();
   if (
@@ -470,4 +504,17 @@ export async function updateAppointmentStatusAction(
     logAppointmentError(error);
     return { error: userFacingAppointmentError(error) };
   }
+}
+
+export async function loadAppointmentOptionsAction(clinicId: string) {
+  const parsedClinicId = z.string().uuid().safeParse(clinicId);
+  if (!parsedClinicId.success) {
+    throw new Error("A valid clinic selection is required.");
+  }
+  const membership = await requireClinicMembership(parsedClinicId.data);
+  const [patients, visits] = await Promise.all([
+    listAppointmentPatients(membership.clinicId),
+    listAppointmentVisits(membership.clinicId),
+  ]);
+  return { patients, visits };
 }

@@ -335,6 +335,41 @@ export async function listClinicAppointments(clinicId: string, date: string) {
   });
 }
 
+export async function getAppointmentPrefill(
+  clinicId: string,
+  patientId: string,
+  visitId: string,
+) {
+  const [patient, visit] = await Promise.all([
+    prisma.patient.findFirst({
+      where: { id: patientId, clinicId },
+      select: { id: true, fullName: true },
+    }),
+    prisma.treatmentVisit.findFirst({
+      where: {
+        id: visitId,
+        clinicId,
+        patientId,
+        status: {
+          notIn: [
+            TreatmentVisitStatus.COMPLETED,
+            TreatmentVisitStatus.CANCELLED,
+          ],
+        },
+        treatmentPlan: { status: { not: TreatmentPlanStatus.CANCELLED } },
+      },
+      select: {
+        id: true,
+        patientId: true,
+        visitNumber: true,
+        dueDate: true,
+        treatmentPlan: { select: { name: true } },
+      },
+    }),
+  ]);
+  return patient && visit ? { patient, visit } : null;
+}
+
 export async function listAppointmentPatients(clinicId: string) {
   return prisma.patient.findMany({
     where: { clinicId },
@@ -368,12 +403,12 @@ export async function listAppointmentResources(clinicId: string) {
     prisma.clinicDentist.findMany({
       where: { clinicId, active: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, active: true },
     }),
     prisma.treatmentChair.findMany({
       where: { clinicId, active: true },
       orderBy: { label: "asc" },
-      select: { id: true, label: true },
+      select: { id: true, label: true, active: true },
     }),
   ]);
   return { dentists, chairs };
@@ -405,6 +440,7 @@ export async function getPublicBookingClinic(slug: string) {
       phoneNumber: true,
       address: true,
       timeZone: true,
+      workingHours: true,
       dentists: {
         where: { active: true },
         orderBy: { name: "asc" },

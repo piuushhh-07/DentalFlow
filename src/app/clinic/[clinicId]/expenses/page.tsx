@@ -7,6 +7,7 @@ import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { createClinicExpense } from "@/features/expenses/actions";
 import { prisma } from "@/lib/db/prisma";
+import { measureServerOperation } from "@/lib/performance/server-timing";
 
 export const dynamic = "force-dynamic";
 
@@ -77,48 +78,56 @@ export default async function ClinicExpensesPage({
     throw error;
   }
 
-  const clinic = await prisma.clinic.findUnique({
-    where: { id: membership.clinicId },
-    select: { name: true, timeZone: true },
-  });
+  const clinic = await measureServerOperation("expenses.clinic", () =>
+    prisma.clinic.findUnique({
+      where: { id: membership.clinicId },
+      select: { name: true, timeZone: true },
+    }),
+  );
   if (!clinic) notFound();
 
   const today = clinicToday(clinic.timeZone);
   const start = monthStart(today);
   const end = nextMonthStart(today);
   const [expenses, monthlyTotal, categoryTotals] = await Promise.all([
-    prisma.clinicExpense.findMany({
-      where: { clinicId: membership.clinicId },
-      orderBy: [{ expenseDate: "desc" }, { createdAt: "desc" }],
-      take: 100,
-      select: {
-        id: true,
-        description: true,
-        category: true,
-        vendor: true,
-        amount: true,
-        expenseDate: true,
-        paymentMethod: true,
-        reference: true,
-      },
-    }),
-    prisma.clinicExpense.aggregate({
-      where: {
-        clinicId: membership.clinicId,
-        expenseDate: { gte: start, lt: end },
-      },
-      _sum: { amount: true },
-      _count: { _all: true },
-    }),
-    prisma.clinicExpense.groupBy({
-      by: ["category"],
-      where: {
-        clinicId: membership.clinicId,
-        expenseDate: { gte: start, lt: end },
-      },
-      _sum: { amount: true },
-      orderBy: { _sum: { amount: "desc" } },
-    }),
+    measureServerOperation("expenses.recent_entries", () =>
+      prisma.clinicExpense.findMany({
+        where: { clinicId: membership.clinicId },
+        orderBy: [{ expenseDate: "desc" }, { createdAt: "desc" }],
+        take: 100,
+        select: {
+          id: true,
+          description: true,
+          category: true,
+          vendor: true,
+          amount: true,
+          expenseDate: true,
+          paymentMethod: true,
+          reference: true,
+        },
+      }),
+    ),
+    measureServerOperation("expenses.monthly_total", () =>
+      prisma.clinicExpense.aggregate({
+        where: {
+          clinicId: membership.clinicId,
+          expenseDate: { gte: start, lt: end },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+    ),
+    measureServerOperation("expenses.category_totals", () =>
+      prisma.clinicExpense.groupBy({
+        by: ["category"],
+        where: {
+          clinicId: membership.clinicId,
+          expenseDate: { gte: start, lt: end },
+        },
+        _sum: { amount: true },
+        orderBy: { _sum: { amount: "desc" } },
+      }),
+    ),
   ]);
 
   const canManage = membership.role === "OWNER";
