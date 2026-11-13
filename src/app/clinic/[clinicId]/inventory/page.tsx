@@ -9,6 +9,7 @@ import {
   recordInventoryMovement,
 } from "@/features/inventory/actions";
 import { prisma } from "@/lib/db/prisma";
+import { measureServerOperation } from "@/lib/performance/server-timing";
 
 export const dynamic = "force-dynamic";
 
@@ -41,37 +42,43 @@ export default async function ClinicInventoryPage({
     throw error;
   }
   const [clinic, items, transactions] = await Promise.all([
-    prisma.clinic.findUnique({
-      where: { id: membership.clinicId },
-      select: { name: true },
-    }),
-    prisma.inventoryItem.findMany({
-      where: { clinicId: membership.clinicId, active: true },
-      orderBy: [{ name: "asc" }],
-      select: {
-        id: true,
-        name: true,
-        category: true,
-        sku: true,
-        unit: true,
-        currentStock: true,
-        reorderLevel: true,
-        unitCost: true,
-      },
-    }),
-    prisma.inventoryTransaction.findMany({
-      where: { clinicId: membership.clinicId },
-      orderBy: { createdAt: "desc" },
-      take: 12,
-      select: {
-        id: true,
-        type: true,
-        quantity: true,
-        createdAt: true,
-        reference: true,
-        item: { select: { name: true, unit: true } },
-      },
-    }),
+    measureServerOperation("inventory.clinic", () =>
+      prisma.clinic.findUnique({
+        where: { id: membership.clinicId },
+        select: { name: true },
+      }),
+    ),
+    measureServerOperation("inventory.items", () =>
+      prisma.inventoryItem.findMany({
+        where: { clinicId: membership.clinicId, active: true },
+        orderBy: [{ name: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          sku: true,
+          unit: true,
+          currentStock: true,
+          reorderLevel: true,
+          unitCost: true,
+        },
+      }),
+    ),
+    measureServerOperation("inventory.recent_movements", () =>
+      prisma.inventoryTransaction.findMany({
+        where: { clinicId: membership.clinicId },
+        orderBy: { createdAt: "desc" },
+        take: 12,
+        select: {
+          id: true,
+          type: true,
+          quantity: true,
+          createdAt: true,
+          reference: true,
+          item: { select: { name: true, unit: true } },
+        },
+      }),
+    ),
   ]);
   if (!clinic) notFound();
   const lowStock = items.filter((item) =>

@@ -15,6 +15,7 @@ import {
   listAvailableBillingPlans,
 } from "@/features/billing/lib/billing-repository";
 import { ClinicRole } from "@prisma/client";
+import { measureServerOperation } from "@/lib/performance/server-timing";
 
 type BillingPageProps = Readonly<{
   params: { clinicId: string };
@@ -40,8 +41,12 @@ export default async function ClinicBillingPage({ params }: BillingPageProps) {
   }
 
   const [subscription, plans] = await Promise.all([
-    getClinicBillingPortalData(membership.clinicId),
-    listAvailableBillingPlans(),
+    measureServerOperation("billing.subscription_portal", () =>
+      getClinicBillingPortalData(membership.clinicId),
+    ),
+    measureServerOperation("billing.available_plans", () =>
+      listAvailableBillingPlans(),
+    ),
   ]);
   const portalSubscription = subscription
     ? {
