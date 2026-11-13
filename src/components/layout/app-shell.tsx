@@ -29,10 +29,10 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <div className="min-h-svh bg-slate-50 text-slate-900">
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col border-r border-slate-200 bg-white px-4 py-5 lg:flex print:hidden">
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col overflow-hidden border-r border-slate-200 bg-white px-4 py-5 lg:flex print:hidden">
         <Link
           aria-label="DentalFlow dashboard"
-          className="mb-10 flex items-center gap-3 px-2"
+          className="mb-10 flex shrink-0 items-center gap-3 px-2"
           href={`/clinic/${clinicId}`}
         >
           <span className="grid size-10 place-items-center rounded-xl bg-teal-700 text-white shadow-sm">
@@ -42,8 +42,10 @@ export function AppShell({
             DentalFlow
           </span>
         </Link>
-        <AppNavigation clinicId={clinicId} activeSection={activeSection} />
-        <div className="mt-auto rounded-xl border border-teal-100 bg-teal-50/70 p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+          <AppNavigation clinicId={clinicId} activeSection={activeSection} />
+        </div>
+        <div className="mt-4 shrink-0 rounded-xl border border-teal-100 bg-teal-50/70 p-4">
           <p className="text-xs font-semibold text-teal-900">
             A little more continuity
           </p>
