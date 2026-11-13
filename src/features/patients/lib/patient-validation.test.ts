@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   getPatientPagination,
+  resolvePatientConsentTimestamp,
   hasDuplicatePatientPhoneError,
   patientBelongsToClinic,
   patientInputSchema,
