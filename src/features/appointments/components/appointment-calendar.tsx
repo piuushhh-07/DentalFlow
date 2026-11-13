@@ -3,9 +3,10 @@
 import type { AppointmentStatus } from "@prisma/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AppointmentForm } from "@/features/appointments/components/appointment-form";
+import { loadAppointmentOptionsAction } from "@/features/appointments/actions";
 import { AppointmentStatusForm } from "@/features/appointments/components/appointment-status-form";
 import {
   addCalendarDays,
@@ -59,8 +60,6 @@ type AppointmentCalendarProps = Readonly<{
   date: string;
   view: AppointmentCalendarView;
   appointments: readonly Appointment[];
-  patients: readonly Patient[];
-  visits: readonly Visit[];
   dentists: readonly Dentist[];
   chairs: readonly Chair[];
   prefill?: AppointmentPrefill;
@@ -142,13 +141,16 @@ export function AppointmentCalendar({
   date,
   view,
   appointments,
-  patients,
-  visits,
   dentists,
   chairs,
   prefill,
 }: AppointmentCalendarProps) {
   const router = useRouter();
+  const [patients, setPatients] = useState<readonly Patient[]>([]);
+  const [visits, setVisits] = useState<readonly Visit[]>([]);
+  const [optionsLoaded, setOptionsLoaded] = useState(false);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
   const gridRefs = useRef(new Map<string, HTMLDivElement>());
   const [selectedDentist, setSelectedDentist] = useState("");
   const [selectedChair, setSelectedChair] = useState("");
@@ -201,6 +203,27 @@ export function AppointmentCalendar({
     );
   }
 
+  async function loadOptions(): Promise<boolean> {
+    if (optionsLoaded) return true;
+    if (optionsLoading) return false;
+    setOptionsError(null);
+    setOptionsLoading(true);
+    try {
+      const options = await loadAppointmentOptionsAction(clinicId);
+      setPatients(options.patients);
+      setVisits(options.visits);
+      setOptionsLoaded(true);
+      return true;
+    } catch {
+      setOptionsError(
+        "Could not load patient and treatment options. Please try again.",
+      );
+      return false;
+    } finally {
+      setOptionsLoading(false);
+    }
+  }
+
   function openSlot(slotDate: string, clientY: number, grid: HTMLDivElement) {
     const time = getAppointmentTimeAtCalendarPosition(
       clientY,
@@ -209,12 +232,42 @@ export function AppointmentCalendar({
     );
     setCreateSlot({ date: slotDate, time });
     setSelectedAppointment(null);
+    void loadOptions();
   }
 
   function openNewAppointment() {
     setCreateSlot({ date, time: "09:00" });
     setSelectedAppointment(null);
+    void loadOptions();
   }
+
+  useEffect(() => {
+    if (!prefill) return;
+
+    let cancelled = false;
+    setOptionsLoading(true);
+    loadAppointmentOptionsAction(clinicId)
+      .then((options) => {
+        if (cancelled) return;
+        setPatients(options.patients);
+        setVisits(options.visits);
+        setOptionsLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOptionsError(
+            "Could not load patient and treatment options. Please try again.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOptionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clinicId, prefill]);
 
   function appointmentFormInitial(appointment: Appointment) {
     const appointmentDateTimeValue = appointmentDateTime(
@@ -593,7 +646,22 @@ export function AppointmentCalendar({
           onClose={() => setCreateSlot(null)}
           title="Schedule appointment"
         >
-          {patients.length === 0 ? (
+          {optionsError ? (
+            <p className="text-sm text-red-700" role="alert">
+              {optionsError}{" "}
+              <button
+                className="font-semibold underline"
+                onClick={() => void loadOptions()}
+                type="button"
+              >
+                Retry
+              </button>
+            </p>
+          ) : optionsLoading ? (
+            <p className="text-sm text-slate-600">
+              Loading patient and treatment options…
+            </p>
+          ) : patients.length === 0 && !prefill ? (
             <p className="text-sm text-slate-600">
               Add a patient before scheduling.{" "}
               <Link
@@ -689,7 +757,10 @@ export function AppointmentCalendar({
                 ) && (
                   <button
                     className="h-10 rounded-md bg-teal-800 px-4 text-sm font-semibold text-white hover:bg-teal-900"
-                    onClick={() => setEditing(true)}
+                    onClick={async () => {
+                      await loadOptions();
+                      setEditing(true);
+                    }}
                     type="button"
                   >
                     Edit appointment
@@ -697,6 +768,21 @@ export function AppointmentCalendar({
                 )}
               </div>
             </div>
+          ) : optionsError ? (
+            <p className="text-sm text-red-700" role="alert">
+              {optionsError}{" "}
+              <button
+                className="font-semibold underline"
+                onClick={() => void loadOptions()}
+                type="button"
+              >
+                Retry
+              </button>
+            </p>
+          ) : optionsLoading ? (
+            <p className="text-sm text-slate-600">
+              Loading patient and treatment options…
+            </p>
           ) : (
             <AppointmentForm
               chairs={chairs}

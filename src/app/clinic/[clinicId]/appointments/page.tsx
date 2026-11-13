@@ -13,10 +13,9 @@ import { PublicBookingSettings } from "@/features/appointments/components/public
 import {
   getPublicBookingSettings,
   listAppointmentRequests,
-  listAppointmentPatients,
   listAppointmentResources,
-  listAppointmentVisits,
   listClinicAppointmentsInRange,
+  getAppointmentPrefill,
   listScheduleResources,
 } from "@/features/appointments/lib/appointment-repository";
 import {
@@ -25,6 +24,7 @@ import {
 } from "@/features/appointments/lib/appointment-calendar";
 import { getClinicToday } from "@/features/follow-ups/lib/follow-up-validation";
 import { toClinicDateInput } from "@/features/treatments/lib/treatment-validation";
+import { measureServerOperation } from "@/lib/performance/server-timing";
 
 export const dynamic = "force-dynamic";
 
@@ -63,27 +63,27 @@ export default async function ClinicAppointmentsPage({
     selectedDate,
     selectedView,
   );
-  const [
-    appointments,
-    patients,
-    visits,
-    resourceData,
-    requests,
-    bookingSettings,
-  ] = await Promise.all([
-    listClinicAppointmentsInRange(
-      membership.clinicId,
-      appointmentRange.startDate,
-      appointmentRange.endDate,
-    ),
-    listAppointmentPatients(membership.clinicId),
-    listAppointmentVisits(membership.clinicId),
-    membership.role === ClinicRole.OWNER
-      ? listScheduleResources(membership.clinicId)
-      : listAppointmentResources(membership.clinicId),
-    listAppointmentRequests(membership.clinicId),
-    getPublicBookingSettings(membership.clinicId),
-  ]);
+  const [appointments, resourceData, requests, bookingSettings] =
+    await Promise.all([
+      measureServerOperation("appointments.calendar_range", () =>
+        listClinicAppointmentsInRange(
+          membership.clinicId,
+          appointmentRange.startDate,
+          appointmentRange.endDate,
+        ),
+      ),
+      measureServerOperation("appointments.resources", () =>
+        membership.role === ClinicRole.OWNER
+          ? listScheduleResources(membership.clinicId)
+          : listAppointmentResources(membership.clinicId),
+      ),
+      measureServerOperation("appointments.pending_requests", () =>
+        listAppointmentRequests(membership.clinicId),
+      ),
+      measureServerOperation("appointments.booking_settings", () =>
+        getPublicBookingSettings(membership.clinicId),
+      ),
+    ]);
   const resources = {
     dentists: resourceData.dentists.filter((dentist) => dentist.active),
     chairs: resourceData.chairs.filter((chair) => chair.active),
@@ -115,12 +115,13 @@ export default async function ClinicAppointmentsPage({
       .safeParse(searchParams.treatmentVisitId);
     if (!requestedPatientId.success || !requestedVisitId.success) notFound();
 
-    const patient = patients.find(({ id }) => id === requestedPatientId.data);
-    const visit = visits.find(
-      ({ id, patientId }) =>
-        id === requestedVisitId.data && patientId === requestedPatientId.data,
+    const appointmentPrefill = await getAppointmentPrefill(
+      membership.clinicId,
+      requestedPatientId.data,
+      requestedVisitId.data,
     );
-    if (!patient || !visit) notFound();
+    if (!appointmentPrefill) notFound();
+    const { patient, visit } = appointmentPrefill;
 
     prefill = {
       patientId: patient.id,
@@ -191,10 +192,8 @@ export default async function ClinicAppointmentsPage({
             clinicId={membership.clinicId}
             date={selectedDate}
             dentists={resources.dentists}
-            patients={patients}
             prefill={prefill}
             view={selectedView}
-            visits={visits}
           />
         </div>
 

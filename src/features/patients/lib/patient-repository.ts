@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { assertPatientCapacity } from "@/features/billing/lib/billing-entitlements";
 import {
   getPatientPagination,
+  PATIENT_PAGE_SIZE,
   patientBelongsToClinic,
   type PatientInput,
 } from "@/features/patients/lib/patient-validation";
@@ -35,23 +36,42 @@ export async function listClinicPatients(
       : {}),
   };
 
-  const totalCount = await prisma.patient.count({ where });
+  const requestedSkip = (Math.max(1, requestedPage) - 1) * PATIENT_PAGE_SIZE;
+  const [totalCount, firstPageResult] = await Promise.all([
+    prisma.patient.count({ where }),
+    prisma.patient.findMany({
+      where,
+      orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
+      skip: requestedSkip,
+      take: PATIENT_PAGE_SIZE,
+      select: {
+        id: true,
+        fullName: true,
+        phoneNumber: true,
+        whatsappOptIn: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
+  ]);
   const pagination = getPatientPagination(totalCount, requestedPage);
-  const patients = await prisma.patient.findMany({
-    where,
-    orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
-    skip: pagination.skip,
-    take: pagination.pageSize,
-    select: {
-      id: true,
-      clinicId: true,
-      fullName: true,
-      phoneNumber: true,
-      whatsappOptIn: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  const patients =
+    pagination.skip === requestedSkip
+      ? firstPageResult
+      : await prisma.patient.findMany({
+          where,
+          orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
+          skip: pagination.skip,
+          take: pagination.pageSize,
+          select: {
+            id: true,
+            fullName: true,
+            phoneNumber: true,
+            whatsappOptIn: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
 
   return { patients, pagination };
 }
