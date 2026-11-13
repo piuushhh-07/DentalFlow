@@ -70,7 +70,7 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  let claims = null;
+  let hasVerifiedSession = false;
   let error: unknown = null;
 
   try {
@@ -78,14 +78,14 @@ export async function middleware(request: NextRequest) {
     // route handlers, and server actions still call getUser() and enforce
     // clinic membership/role checks before accessing clinic data.
     const result = await supabase.auth.getClaims();
-    claims = result.data?.claims ?? null;
+    hasVerifiedSession = Boolean(result.data?.claims);
     error = result.error;
   } catch (authError) {
     error = authError;
   }
 
   if (isExpectedUnauthenticatedAuthError(error)) {
-    claims = null;
+    hasVerifiedSession = false;
     error = null;
   }
 
@@ -106,7 +106,7 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  if (!claims && !isLoginPage) {
+  if (!hasVerifiedSession && !isLoginPage) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = "";
@@ -117,7 +117,7 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  if (claims && isLoginPage) {
+  if (hasVerifiedSession && isLoginPage) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = "/";
     homeUrl.search = "";
