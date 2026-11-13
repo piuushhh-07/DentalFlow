@@ -60,9 +60,8 @@ export async function middleware(request: NextRequest) {
             response.cookies.set(name, value, options);
           }
 
-          // @supabase/ssr supplies cache-control headers when it refreshes
-          // cookies. Preserve them to prevent authenticated responses from
-          // being cached and shared across users.
+          // Preserve Supabase cache-control headers during token refresh so
+          // authenticated responses cannot be cached and shared across users.
           for (const [name, value] of Object.entries(headers)) {
             response.headers.set(name, value);
           }
@@ -71,21 +70,22 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  let user = null;
+  let hasVerifiedSession = false;
   let error: unknown = null;
 
   try {
-    // getClaims verifies the JWT signature. Never use getSession() to make
-    // server-side access decisions because cookie contents can be spoofed.
+    // Verify the JWT for middleware redirect decisions. Protected pages,
+    // route handlers, and server actions still call getUser() and enforce
+    // clinic membership/role checks before accessing clinic data.
     const result = await supabase.auth.getClaims();
-    user = result.data?.claims ?? null;
+    hasVerifiedSession = Boolean(result.data?.claims);
     error = result.error;
   } catch (authError) {
     error = authError;
   }
 
   if (isExpectedUnauthenticatedAuthError(error)) {
-    user = null;
+    hasVerifiedSession = false;
     error = null;
   }
 
@@ -106,7 +106,7 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  if (!user && !isLoginPage) {
+  if (!hasVerifiedSession && !isLoginPage) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = "";
@@ -117,7 +117,7 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  if (user && isLoginPage) {
+  if (hasVerifiedSession && isLoginPage) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = "/";
     homeUrl.search = "";
