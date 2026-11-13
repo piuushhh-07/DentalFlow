@@ -1,10 +1,15 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
+
+type PrismaClientWithQueryLogging = PrismaClient<
+  Prisma.PrismaClientOptions,
+  "query" | "warn" | "error"
+>;
 
 const globalForPrisma = globalThis as typeof globalThis & {
-  prisma?: PrismaClient;
+  prisma?: PrismaClientWithQueryLogging;
 };
 
 const slowQueryThresholdMs = Number(
@@ -13,7 +18,7 @@ const slowQueryThresholdMs = Number(
 
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient({
+  new PrismaClientWithQueryLogging({
     log: [
       { emit: "event", level: "query" },
       { emit: "stdout", level: "warn" },
