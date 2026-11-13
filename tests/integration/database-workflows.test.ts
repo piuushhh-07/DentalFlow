@@ -412,6 +412,18 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           dueDates: ["2099-01-10"],
         }),
       );
+      assert.equal(
+        await deleteClinicPatient(clinicAId, patientA.id),
+        false,
+        "A patient with a treatment plan must be retained.",
+      );
+      assert.ok(
+        await freshReader.patient.findFirst({
+          where: { id: patientA.id, clinicId: clinicAId },
+          select: { id: true },
+        }),
+        "The patient and linked treatment history must remain intact.",
+      );
       const clinicAPlanWithVisits = await getClinicTreatmentPlan(
         clinicAId,
         patientA.id,
