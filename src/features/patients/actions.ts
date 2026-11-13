@@ -258,7 +258,9 @@ export async function requestPatientPortalMagicLink(
       status: error.status,
       code: error.code,
     });
-    return { error: "We couldn't send a sign-in link. Please try again later." };
+    return {
+      error: "We couldn't send a sign-in link. Please try again later.",
+    };
   }
 
   return {
