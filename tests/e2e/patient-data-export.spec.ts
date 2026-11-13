@@ -35,7 +35,9 @@ test("clinic OWNER can export a patient record as a private JSON attachment", as
   const clinicId = await signIn(page, ownerEmail!, ownerPassword!);
   await page.goto(`/clinic/${clinicId}/patients`);
 
-  const patientLink = page.locator(`a[href^="/clinic/${clinicId}/patients/"]`).first();
+  const patientLink = page
+    .locator(`a[href^="/clinic/${clinicId}/patients/"]`)
+    .first();
   test.skip(
     (await patientLink.count()) === 0,
     "The staging clinic needs at least one synthetic patient for export coverage.",
