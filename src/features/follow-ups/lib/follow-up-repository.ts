@@ -203,23 +203,50 @@ export async function listFollowUpQueue(
   clinicToday: string,
 ) {
   const base = unionQuery(clinicId, tab, query, clinicToday);
-  const countRows = await prisma.$queryRaw<[{ count: bigint }]>`
-    SELECT count(*)::bigint AS "count"
-    FROM (${base}) AS queue_items
-  `;
-  const totalCount = Number(countRows[0].count);
-  const pagination = buildFollowUpPagination(
-    totalCount,
-    requestedPage,
-    FOLLOW_UP_PAGE_SIZE,
-  );
-  const items = await prisma.$queryRaw<DatabaseQueueItem[]>`
-    SELECT *
+  const requestedOffset =
+    (Math.max(1, requestedPage) - 1) * FOLLOW_UP_PAGE_SIZE;
+  const pageRows = await prisma.$queryRaw<
+    (DatabaseQueueItem & { totalCount: bigint })[]
+>`
+    SELECT
+      queue_items.*,
+      count(*) OVER()::bigint AS "totalCount"
     FROM (${base}) AS queue_items
     ORDER BY "dueDate" ASC, "patientName" ASC, "kind" ASC, "id" ASC
-    LIMIT ${pagination.pageSize}
-    OFFSET ${pagination.offset}
+    LIMIT ${FOLLOW_UP_PAGE_SIZE}
+    OFFSET ${requestedOffset}
   `;
+
+  // The normal page path reads the page and total count in one round trip.
+  // Only an out-of-range page needs a separate count and clamped page fetch.
+  let items: DatabaseQueueItem[];
+  let pagination: ReturnType<typeof buildFollowUpPagination>;
+
+  if (pageRows.length > 0) {
+    pagination = buildFollowUpPagination(
+      Number(pageRows[0].totalCount),
+      requestedPage,
+      FOLLOW_UP_PAGE_SIZE,
+    );
+    items = pageRows.map(({ totalCount: _totalCount, ...item }) => item);
+  } else {
+    const countRows = await prisma.$queryRaw<[{ count: bigint }]>`
+      SELECT count(*)::bigint AS "count"
+      FROM (${base}) AS queue_items
+    `;
+    pagination = buildFollowUpPagination(
+      Number(countRows[0].count),
+      requestedPage,
+      FOLLOW_UP_PAGE_SIZE,
+    );
+    items = await prisma.$queryRaw<DatabaseQueueItem[]>`
+      SELECT *
+      FROM (${base}) AS queue_items
+      ORDER BY "dueDate" ASC, "patientName" ASC, "kind" ASC, "id" ASC
+      LIMIT ${pagination.pageSize}
+      OFFSET ${pagination.offset}
+    `;
+  }
 
   const validatedItems: FollowUpQueueItem[] = items.map((item) => {
     if (
