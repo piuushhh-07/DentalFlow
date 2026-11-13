@@ -75,6 +75,36 @@ test("clears the consent timestamp when WhatsApp opt-in is false", () => {
   assert.equal(patient.whatsappOptedInAt, null);
 });
 
+test("preserves the original consent timestamp while consent remains enabled", () => {
+  const recordedAt = new Date("2026-01-02T03:04:05.000Z");
+  const laterEditAt = new Date("2026-02-03T04:05:06.000Z");
+
+  assert.equal(
+    resolvePatientConsentTimestamp(true, true, recordedAt, laterEditAt),
+    recordedAt,
+  );
+});
+
+test("records a fresh timestamp when consent is newly enabled", () => {
+  const newlyRecordedAt = new Date("2026-03-04T05:06:07.000Z");
+
+  assert.equal(
+    resolvePatientConsentTimestamp(false, true, null, newlyRecordedAt),
+    newlyRecordedAt,
+  );
+  assert.equal(
+    resolvePatientConsentTimestamp(true, false, null, newlyRecordedAt),
+    newlyRecordedAt,
+  );
+});
+
+test("clears the consent timestamp when consent is withdrawn", () => {
+  assert.equal(
+    resolvePatientConsentTimestamp(false, true, new Date(), new Date()),
+    null,
+  );
+});
+
 test("maps only the clinic-scoped normalized phone unique conflict", () => {
   assert.equal(
     hasDuplicatePatientPhoneError({
