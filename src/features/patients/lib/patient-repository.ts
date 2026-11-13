@@ -148,23 +148,44 @@ export async function updateClinicPatient(
   patientId: string,
   input: PatientInput,
 ) {
-  const result = await prisma.patient.updateMany({
-    where: { id: patientId, clinicId },
-    data: {
-      fullName: input.fullName,
-      phoneNumber: input.phoneNumber,
-      normalizedPhone: input.phoneNumber,
-      email: input.email,
-      normalizedEmail: input.email,
-      portalAccessEnabled: input.portalAccessEnabled,
-      portalAccessEnabledAt: input.portalAccessEnabledAt,
-      whatsappOptIn: input.whatsappOptIn,
-      whatsappOptedInAt: input.whatsappOptedInAt,
-      notes: input.notes,
-    },
-  });
+  return prisma.$transaction(async (transaction) => {
+    const existing = await transaction.patient.findFirst({
+      where: { id: patientId, clinicId },
+      select: {
+        portalAccessEnabled: true,
+        portalAccessEnabledAt: true,
+        whatsappOptIn: true,
+        whatsappOptedInAt: true,
+      },
+    });
+    if (!existing) return false;
 
-  return result.count > 0;
+    const result = await transaction.patient.updateMany({
+      where: { id: patientId, clinicId },
+      data: {
+        fullName: input.fullName,
+        phoneNumber: input.phoneNumber,
+        normalizedPhone: input.phoneNumber,
+        email: input.email,
+        normalizedEmail: input.email,
+        portalAccessEnabled: input.portalAccessEnabled,
+        portalAccessEnabledAt: input.portalAccessEnabled
+          ? existing.portalAccessEnabled && existing.portalAccessEnabledAt
+            ? existing.portalAccessEnabledAt
+            : input.portalAccessEnabledAt
+          : null,
+        whatsappOptIn: input.whatsappOptIn,
+        whatsappOptedInAt: input.whatsappOptIn
+          ? existing.whatsappOptIn && existing.whatsappOptedInAt
+            ? existing.whatsappOptedInAt
+            : input.whatsappOptedInAt
+          : null,
+        notes: input.notes,
+      },
+    });
+
+    return result.count > 0;
+  });
 }
 
 export async function deleteClinicPatient(clinicId: string, patientId: string) {
