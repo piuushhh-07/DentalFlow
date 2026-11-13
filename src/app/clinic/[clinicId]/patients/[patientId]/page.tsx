@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ClinicRole } from "@prisma/client";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { measureServerOperation } from "@/lib/performance/server-timing";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { DeletePatientButton } from "@/features/patients/components/delete-patient-button";
@@ -79,13 +80,8 @@ export default async function PatientDetailPage({
     throw error;
   }
 
-  const patient = await getClinicPatient(membership.clinicId, patientId.data);
-
-  if (!patient) {
-    notFound();
-  }
-
   const [
+    patient,
     insurancePolicies,
     odontogramEntries,
     odontogramTreatmentPlans,
@@ -101,25 +97,60 @@ export default async function PatientDetailPage({
     preAuthorizations,
     messageHistory,
   ] = await Promise.all([
-    listInsurancePolicies(membership.clinicId, "", patient.id),
-    listPatientOdontogramEntries(membership.clinicId, patient.id),
-    listPatientOdontogramTreatmentPlans(membership.clinicId, patient.id),
-    listPatientTreatmentPlans(membership.clinicId, patient.id),
-    listPatientDentalClinicalRecords(membership.clinicId, patient.id),
-    listPatientPrescriptions(membership.clinicId, patient.id),
-    listClinicPrescriptionMedicineCatalogue(membership.clinicId),
-    listPatientTreatmentEstimates(membership.clinicId, patient.id),
-    listPatientAppointments(membership.clinicId, patient.id),
-    listPatientRecalls(membership.clinicId, patient.id),
-    listPatientTreatmentFinancialEntries(membership.clinicId, patient.id),
-    listInsuranceClaims(membership.clinicId, {
-      query: "",
-      patientId: patient.id,
-      page: 1,
-    }),
-    listInsurancePreAuthorizations(membership.clinicId, "", patient.id),
-    listPatientMessageHistory(membership.clinicId, patient.id),
+    measureServerOperation("patient360.patient", () =>
+      getClinicPatient(membership.clinicId, patientId.data),
+    ),
+    measureServerOperation("patient360.insurance_policies", () =>
+      listInsurancePolicies(membership.clinicId, "", patientId.data),
+    ),
+    measureServerOperation("patient360.odontogram_entries", () =>
+      listPatientOdontogramEntries(membership.clinicId, patientId.data),
+    ),
+    measureServerOperation("patient360.odontogram_treatment_plans", () =>
+      listPatientOdontogramTreatmentPlans(membership.clinicId, patientId.data),
+    ),
+    measureServerOperation("patient360.treatment_plans", () =>
+      listPatientTreatmentPlans(membership.clinicId, patientId.data),
+    ),
+    measureServerOperation("patient360.clinical_records", () =>
+      listPatientDentalClinicalRecords(membership.clinicId, patientId.data),
+    ),
+    measureServerOperation("patient360.prescriptions", () =>
+      listPatientPrescriptions(membership.clinicId, patientId.data),
+    ),
+    measureServerOperation("patient360.medicine_catalogue", () =>
+      listClinicPrescriptionMedicineCatalogue(membership.clinicId),
+    ),
+    measureServerOperation("patient360.estimates", () =>
+      listPatientTreatmentEstimates(membership.clinicId, patientId.data),
+    ),
+    measureServerOperation("patient360.appointments", () =>
+      listPatientAppointments(membership.clinicId, patientId.data),
+    ),
+    measureServerOperation("patient360.recalls", () =>
+      listPatientRecalls(membership.clinicId, patientId.data),
+    ),
+    measureServerOperation("patient360.financial_entries", () =>
+      listPatientTreatmentFinancialEntries(membership.clinicId, patientId.data),
+    ),
+    measureServerOperation("patient360.insurance_claims", () =>
+      listInsuranceClaims(membership.clinicId, {
+        query: "",
+        patientId: patientId.data,
+        page: 1,
+      }),
+    ),
+    measureServerOperation("patient360.pre_authorizations", () =>
+      listInsurancePreAuthorizations(membership.clinicId, "", patientId.data),
+    ),
+    measureServerOperation("patient360.message_history", () =>
+      listPatientMessageHistory(membership.clinicId, patientId.data),
+    ),
   ]);
+
+  if (!patient) {
+    notFound();
+  }
   const correctionSource = prescriptions.find(
     (prescription) => prescription.id === searchParams?.amendsPrescriptionId,
   );
