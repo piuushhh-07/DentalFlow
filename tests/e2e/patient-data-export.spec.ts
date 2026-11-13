@@ -16,10 +16,10 @@ async function signIn(
   await emailField.fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/clinic\/[0-9a-f-]{36}(?:\?.*)?$/i, {
+  await expect(page).toHaveURL(/\\/clinic\\/[0-9a-f-]{36}(?:\\?.*)?$/i, {
     timeout: 30_000,
   });
-  const clinicId = page.url().match(/\/clinic\/([0-9a-f-]{36})/i)?.[1];
+  const clinicId = page.url().match(/\\/clinic\\/([0-9a-f-]{36})/i)?.[1];
   expect(clinicId).toBeTruthy();
   return clinicId!;
 }
@@ -77,7 +77,9 @@ test("clinic STAFF cannot export patient data even with a direct endpoint reques
   const clinicId = await signIn(page, staffEmail!, staffPassword!);
   await page.goto(`/clinic/${clinicId}/patients`);
 
-  const patientLink = page.locator(`a[href^="/clinic/${clinicId}/patients/"]`).first();
+  const patientLink = page
+    .locator(`a[href^="/clinic/${clinicId}/patients/"]`)
+    .first();
   test.skip(
     (await patientLink.count()) === 0,
     "The staging clinic needs at least one synthetic patient for export coverage.",
@@ -88,7 +90,7 @@ test("clinic STAFF cannot export patient data even with a direct endpoint reques
     page.getByRole("link", { name: "Export patient data", exact: true }),
   ).toHaveCount(0);
 
-  const patientId = page.url().match(/\/patients\/([0-9a-f-]{36})/i)?.[1];
+  const patientId = page.url().match(/\\/patients\\/([0-9a-f-]{36})/i)?.[1];
   expect(patientId).toBeTruthy();
 
   const response = await page.request.get(
