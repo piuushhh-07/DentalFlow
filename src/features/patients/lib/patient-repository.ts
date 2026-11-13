@@ -172,8 +172,19 @@ export async function deleteClinicPatient(clinicId: string, patientId: string) {
     where: {
       id: patientId,
       clinicId,
+      treatmentPlans: { none: {} },
+      treatmentFinancialEntries: { none: {} },
+      treatmentEstimates: { none: {} },
+      appointments: { none: {} },
+      preventiveRecalls: { none: {} },
       messageLogs: { none: {} },
+      insurancePolicies: { none: {} },
+      insuranceClaims: { none: {} },
+      insurancePreAuthorizations: { none: {} },
       odontogramEntries: { none: {} },
+      dentalClinicalRecords: { none: {} },
+      digitalPrescriptions: { none: {} },
+      dataExportAudits: { none: {} },
     },
   });
 
