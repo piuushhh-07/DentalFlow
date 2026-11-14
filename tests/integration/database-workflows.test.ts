@@ -44,6 +44,7 @@ import {
   getClinicPatient,
   updateClinicPatient,
 } from "@/features/patients/lib/patient-repository";
+import { exportClinicPatientData } from "@/features/patients/lib/patient-export-repository";
 import {
   createPatientOdontogramEntry,
   OdontogramCorrectionNotFoundError,
@@ -2486,6 +2487,60 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.equal(
         (await getInsuranceDashboard(clinicAId)).outstandingInsurerPayments,
         "4000.00",
+      );
+
+      const exportAuditCountBefore = await freshReader.patientDataExportAudit.count({
+        where: { clinicId: clinicAId, patientId: patientA.id },
+      });
+      const patientExport = await exportClinicPatientData(
+        clinicAId,
+        patientA.id,
+        userAId,
+      );
+      assert.ok(patientExport);
+      assert.equal(patientExport.formatVersion, 2);
+      assert.equal(patientExport.scope.includesPrivateStorageFileContents, false);
+      assert.equal(patientExport.scope.excludesPrivateStoragePaths, true);
+      assert.equal(patientExport.patient.insurancePolicies.length, 1);
+      assert.equal(
+        patientExport.patient.insurancePolicies[0].provider.name,
+        provider.name,
+      );
+      assert.equal(patientExport.patient.insurancePreAuthorizations.length, 1);
+      assert.ok(
+        patientExport.patient.insurancePreAuthorizations[0].activities.length >= 2,
+      );
+      assert.equal(patientExport.patient.insuranceClaims.length, 1);
+      assert.equal(patientExport.patient.insuranceClaims[0].payments.length, 1);
+      assert.ok(
+        patientExport.patient.insuranceClaims[0].activities.length >= 4,
+      );
+      assert.ok(
+        patientExport.patient.insuranceClaims[0].documents.length >= 3,
+      );
+      assert.equal(
+        patientExport.patient.insuranceClaims[0].documents[0].storagePath,
+        undefined,
+      );
+      const serializedPatientExport = JSON.stringify(patientExport);
+      for (const privateStoragePath of uploadedStoragePaths) {
+        assert.equal(
+          serializedPatientExport.includes(privateStoragePath),
+          false,
+          "Patient export must not expose private Storage object paths.",
+        );
+      }
+      assert.equal(
+        await exportClinicPatientData(clinicBId, patientA.id, userBId),
+        null,
+        "A different clinic must not export another clinic's patient.",
+      );
+      assert.equal(
+        await freshReader.patientDataExportAudit.count({
+          where: { clinicId: clinicAId, patientId: patientA.id },
+        }),
+        exportAuditCountBefore + 1,
+        "Only the successful clinic-scoped export must create an audit event.",
       );
 
       const uploadedPath =
