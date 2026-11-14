@@ -482,7 +482,7 @@ export async function processRazorpayWebhook(
 
   try {
     await applySubscriptionEvent(event);
-    await prisma.billingWebhookEvent.updateMany({
+    const finalized = await prisma.billingWebhookEvent.updateMany({
       where: {
         providerEventId: eventId,
         status: BillingWebhookStatus.PROCESSING,
@@ -494,6 +494,11 @@ export async function processRazorpayWebhook(
         processingStartedAt: null,
       },
     });
+    if (finalized.count !== 1) {
+      throw new RazorpayWebhookProcessingBusyError(
+        "The provider event processing lease was reclaimed.",
+      );
+    }
     return "processed";
   } catch (error) {
     await prisma.billingWebhookEvent.updateMany({
