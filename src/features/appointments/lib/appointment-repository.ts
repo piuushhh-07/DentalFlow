@@ -180,9 +180,7 @@ async function lockAppointmentResources(
     chairId,
   );
   for (const lockKey of lockKeys) {
-    await transaction.$queryRaw`
-      SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
-    `;
+    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
   }
 }
 
