@@ -143,7 +143,7 @@ export async function createDigitalPrescription(
     async (transaction) => {
       const [patient, clinic, authorMembership] = await Promise.all([
         transaction.patient.findFirst({
-          where: { id: patientId, clinicId },
+          where: { id: patientId, clinicId, archivedAt: null },
           select: { id: true },
         }),
         transaction.clinic.findUnique({

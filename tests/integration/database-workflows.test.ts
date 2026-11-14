@@ -599,6 +599,24 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         }),
         PrescriptionAlreadyAmendedError,
       );
+
+      await prisma.patient.update({
+        where: { id: patientA.id },
+        data: { archivedAt: new Date() },
+      });
+      await assert.rejects(
+        createDigitalPrescription(clinicAId, patientA.id, userAId, input),
+        PrescriptionPatientNotFoundError,
+      );
+      assert.equal(
+        (await listPatientPrescriptions(clinicAId, patientA.id)).length,
+        2,
+        "Archiving a patient must preserve existing prescription history.",
+      );
+      await prisma.patient.update({
+        where: { id: patientA.id },
+        data: { archivedAt: null },
+      });
     },
   );
 
@@ -2112,6 +2130,26 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         ).status,
         PreventiveRecallStatus.COMPLETED,
       );
+
+      await prisma.patient.update({
+        where: { id: patientA.id },
+        data: { archivedAt: new Date() },
+      });
+      await assert.rejects(
+        createClinicRecall(clinicAId, patientA.id, {
+          ...recallInput,
+          dueDate: "2099-03-11",
+        }),
+        RecallPatientNotFoundError,
+      );
+      assert.ok(
+        await getClinicRecall(clinicAId, recallId),
+        "Archiving a patient must preserve access to existing recall history.",
+      );
+      await prisma.patient.update({
+        where: { id: patientA.id },
+        data: { archivedAt: null },
+      });
     },
   );
 
