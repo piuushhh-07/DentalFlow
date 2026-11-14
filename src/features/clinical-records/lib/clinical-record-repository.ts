@@ -81,7 +81,7 @@ export async function createDentalClinicalRecord(
   return prisma.$transaction(
     async (transaction) => {
       const patient = await transaction.patient.findFirst({
-        where: { id: patientId, clinicId },
+        where: { id: patientId, clinicId, archivedAt: null },
         select: { id: true },
       });
 
