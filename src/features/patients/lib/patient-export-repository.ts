@@ -20,7 +20,7 @@ export async function exportClinicPatientData(
       messageLogs: true,
       insurancePolicies: {
         include: {
-          provider: true,
+          provider: { select: { id: true, name: true, kind: true } },
           activities: true,
         },
       },
