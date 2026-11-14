@@ -65,6 +65,12 @@ jobs:
           fi
 
           mapfile -t FILES <<< "$CHANGED_FILES"
+          for FILE in "${FILES[@]}"; do
+            FORMATTED="$(mktemp)"
+            npx prettier "$FILE" > "$FORMATTED"
+            diff -u "$FILE" "$FORMATTED" || true
+            rm "$FORMATTED"
+          done
           npx prettier --check "${FILES[@]}"
 
       - name: Build
