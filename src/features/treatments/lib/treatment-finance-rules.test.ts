@@ -9,9 +9,7 @@ import {
   calculateTreatmentLedgerBalance,
 } from "@/features/treatments/lib/treatment-finance-rules";
 import { treatmentFinancialEntrySchema } from "@/features/treatments/lib/treatment-finance-validation";
-import {
-  createTreatmentFinancialEntryRequestHash,
-} from "@/features/treatments/lib/treatment-finance-idempotency";
+import { createTreatmentFinancialEntryRequestHash } from "@/features/treatments/lib/treatment-finance-idempotency";
 
 const zero = new Prisma.Decimal(0);
 const requestKey = "a7627c15-9507-4887-bcf0-5d8b88b07dd8";
@@ -95,32 +93,28 @@ test("refunds cannot exceed net received payments and ledger handles credits", (
   );
 });
 
-test(
-  "financial idempotency hashes include payment references and audit reasons",
-  () => {
-    const base = treatmentFinancialEntrySchema.parse({
-      entryType: "REFUND",
-      amount: "25.00",
-      notes: "Refund approved by clinic owner",
-      reference: "UPI-REF-100",
-      paidAt: "2026-11-14T10:00:00.000Z",
-      requestKey,
-    });
-    const hash = (input: typeof base) =>
-      createTreatmentFinancialEntryRequestHash(
-        "patient-a",
-        "plan-a",
-        "owner-a",
-        input,
-      );
-
-    assert.equal(hash(base), hash({ ...base }));
-    assert.notEqual(
-      hash(base),
-      hash({ ...base, notes: "Different refund reason" }),
+test("financial idempotency hashes include payment references and audit reasons", () => {
+  const base = treatmentFinancialEntrySchema.parse({
+    entryType: "REFUND",
+    amount: "25.00",
+    notes: "Refund approved by clinic owner",
+    reference: "UPI-REF-100",
+    paidAt: "2026-11-14T10:00:00.000Z",
+    requestKey,
+  });
+  const hash = (input: typeof base) =>
+    createTreatmentFinancialEntryRequestHash(
+      "patient-a",
+      "plan-a",
+      "owner-a",
+      input,
     );
-    assert.notEqual(hash(base), hash({ ...base, reference: "UPI-REF-101" }));
-    assert.notEqual(hash(base), hash({ ...base, amount: "26.00" }));
-  },
-);
 
+  assert.equal(hash(base), hash({ ...base }));
+  assert.notEqual(
+    hash(base),
+    hash({ ...base, notes: "Different refund reason" }),
+  );
+  assert.notEqual(hash(base), hash({ ...base, reference: "UPI-REF-101" }));
+  assert.notEqual(hash(base), hash({ ...base, amount: "26.00" }));
+});
