@@ -165,7 +165,7 @@ export async function updateClinicPatient(
     if (!existing) return false;
 
     const result = await transaction.patient.updateMany({
-      where: { id: patientId, clinicId },
+      where: { id: patientId, clinicId, archivedAt: null },
       data: {
         fullName: input.fullName,
         phoneNumber: input.phoneNumber,
