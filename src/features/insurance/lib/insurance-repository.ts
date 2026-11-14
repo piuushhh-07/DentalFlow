@@ -1652,7 +1652,7 @@ export async function authorizeInsuranceDocumentUpload(
         (${storagePath}, ${clinicId}::uuid, ${claimId}::uuid, ${documentId}::uuid)
       ON CONFLICT (storage_path) DO NOTHING
     `;
-  });
+  }, { maxWait: 10_000, timeout: 15_000 });
 }
 
 export async function registerInsuranceDocumentUpload(
@@ -1759,7 +1759,7 @@ export async function registerInsuranceDocumentUpload(
       });
       return { registered: true as const };
     },
-    { timeout: 10_000 },
+    { maxWait: 10_000, timeout: 15_000 },
   );
 }
 

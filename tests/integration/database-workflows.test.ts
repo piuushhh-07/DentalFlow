@@ -958,13 +958,27 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           ),
           BillingLimitReachedError,
         );
+        const billingDentist = await prisma.clinicDentist.create({
+          data: {
+            clinicId: clinicAId,
+            name: `${marker} billing limit`,
+          },
+          select: { id: true },
+        });
+        const billingChair = await prisma.treatmentChair.create({
+          data: {
+            clinicId: clinicAId,
+            label: `${marker} billing chair`,
+          },
+          select: { id: true },
+        });
         const appointmentBase = {
           patientId: patientA.id,
           treatmentVisitId: "",
           date: "2099-12-30",
           durationMinutes: "30",
-          dentistName: `${marker} billing limit`,
-          chairLabel: `${marker} billing chair`,
+          dentistId: billingDentist.id,
+          chairId: billingChair.id,
           type: "Review",
           notes: "",
         };
