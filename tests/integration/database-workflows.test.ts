@@ -2510,10 +2510,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         patientExport.patient.insurancePolicies[0].provider.id,
         provider.id,
       );
-      assert.equal(
-        patientExport.patient.insurancePreAuthorizations.length,
-        1,
-      );
+      assert.equal(patientExport.patient.insurancePreAuthorizations.length, 1);
       assert.ok(
         patientExport.patient.insurancePreAuthorizations[0].activities.length >=
           2,
