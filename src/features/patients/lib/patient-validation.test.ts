@@ -3,13 +3,13 @@ import test from "node:test";
 
 import {
   getPatientPagination,
-  resolvePatientEnabledAtTimestamp,
   hasDuplicatePatientPhoneError,
   patientBelongsToClinic,
   patientInputSchema,
   assertPatientWhatsAppConsent,
   PatientWhatsAppConsentRequiredError,
 } from "@/features/patients/lib/patient-validation";
+import { resolvePatientEnabledAtTimestamp } from "@/features/patients/lib/patient-consent-timestamps";
 import { normalizeIndianPhoneNumber } from "@/features/onboarding/lib/validation";
 
 const clinicOne = "20000000-0000-4000-8000-000000000001";
