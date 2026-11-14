@@ -6,11 +6,11 @@ import { prisma } from "@/lib/db/prisma";
 import { assertPatientCapacity } from "@/features/billing/lib/billing-entitlements";
 import {
   getPatientPagination,
-  resolvePatientEnabledAtTimestamp,
   PATIENT_PAGE_SIZE,
   patientBelongsToClinic,
   type PatientInput,
 } from "@/features/patients/lib/patient-validation";
+import { resolvePatientEnabledAtTimestamp } from "@/features/patients/lib/patient-consent-timestamps";
 
 export async function listClinicPatients(
   clinicId: string,
