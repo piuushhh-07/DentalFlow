@@ -444,6 +444,7 @@ export async function listInsurancePatients(
   return prisma.patient.findMany({
     where: {
       clinicId,
+      archivedAt: null,
       ...(patientId ? { id: patientId } : {}),
       ...(query
         ? {
@@ -579,7 +580,7 @@ export async function createInsurancePolicy(
 ) {
   const [patient, provider] = await Promise.all([
     prisma.patient.findFirst({
-      where: { id: input.patientId, clinicId },
+      where: { id: input.patientId, clinicId, archivedAt: null },
       select: { id: true },
     }),
     prisma.insuranceProvider.findFirst({
@@ -637,6 +638,7 @@ export async function createInsuranceClaim(
           id: input.policyId,
           clinicId,
           patientId: input.patientId,
+          patient: { archivedAt: null },
         },
         select: {
           id: true,
