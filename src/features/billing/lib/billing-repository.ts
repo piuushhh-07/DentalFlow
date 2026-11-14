@@ -134,7 +134,8 @@ export async function startClinicSubscriptionCheckout(
         SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
       `;
 
-      const activeSubscription = await transaction.clinicSubscription.findFirst({
+      const activeSubscription =
+        await transaction.clinicSubscription.findFirst({
         where: { clinicId, status: { in: [...CURRENT_STATUSES] } },
         orderBy: { createdAt: "desc" },
         select: {
