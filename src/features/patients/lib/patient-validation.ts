@@ -49,23 +49,6 @@ export const patientInputSchema = z
     portalAccessEnabledAt: patient.portalAccessEnabled ? new Date() : null,
   }));
 
-export function resolvePatientEnabledAtTimestamp(
-  enabled: boolean,
-  wasPreviouslyEnabled: boolean,
-  previousTimestamp: Date | null,
-  newlyRecordedTimestamp: Date,
-): Date | null {
-  if (!enabled) {
-    return null;
-  }
-
-  if (wasPreviouslyEnabled && previousTimestamp) {
-    return previousTimestamp;
-  }
-
-  return newlyRecordedTimestamp;
-}
-
 export type PatientInput = z.output<typeof patientInputSchema>;
 
 export const patientIdSchema = z.string().uuid();
