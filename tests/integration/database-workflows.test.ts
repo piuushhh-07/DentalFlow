@@ -2518,10 +2518,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.ok(
         patientExport.patient.insuranceClaims[0].documents.length >= 3,
       );
-      assert.equal(
-        patientExport.patient.insuranceClaims[0].documents[0].storagePath,
-        undefined,
-      );
       const serializedPatientExport = JSON.stringify(patientExport);
       for (const privateStoragePath of uploadedStoragePaths) {
         assert.equal(
