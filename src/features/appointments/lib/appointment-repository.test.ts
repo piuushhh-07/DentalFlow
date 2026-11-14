@@ -95,6 +95,7 @@ function createTransactionClient(state: {
     notes: null,
   };
   const transaction = {
+    $queryRaw: async () => [],
     appointment: {
       findFirst: async () => ({ id: appointmentId, status: "SCHEDULED" }),
       findMany: async () => [],
