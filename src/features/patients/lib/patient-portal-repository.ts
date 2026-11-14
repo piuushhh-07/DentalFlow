@@ -24,10 +24,7 @@ export async function listPatientPortalRecords(email: string) {
         where: {
           scheduledAt: { gte: now },
           status: {
-            notIn: [
-              AppointmentStatus.CANCELLED,
-              AppointmentStatus.NO_SHOW,
-            ],
+            notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW],
           },
         },
         orderBy: { scheduledAt: "asc" },
