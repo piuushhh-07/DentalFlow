@@ -136,16 +136,16 @@ export async function startClinicSubscriptionCheckout(
 
       const activeSubscription =
         await transaction.clinicSubscription.findFirst({
-        where: { clinicId, status: { in: [...CURRENT_STATUSES] } },
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          planVersionId: true,
-          status: true,
-          checkoutUrl: true,
-          checkoutExpiresAt: true,
-        },
-      });
+          where: { clinicId, status: { in: [...CURRENT_STATUSES] } },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            planVersionId: true,
+            status: true,
+            checkoutUrl: true,
+            checkoutExpiresAt: true,
+          },
+        });
       const pendingCheckoutExpired =
         activeSubscription?.status ===
           BillingSubscriptionStatus.CHECKOUT_PENDING &&
