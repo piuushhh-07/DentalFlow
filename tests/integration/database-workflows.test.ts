@@ -1094,7 +1094,9 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         );
         assert.equal(
           concurrentSuccesses.filter(
-            (result) => result.status === "fulfilled" && result.value === "processed",
+            (result) =>
+              result.status === "fulfilled" &&
+              result.value === "processed",
           ).length,
           1,
           "Only one concurrent delivery may process the provider event.",
