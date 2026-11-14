@@ -65,14 +65,7 @@ jobs:
           fi
 
           mapfile -t FILES <<< "$CHANGED_FILES"
-          npx prettier --write "${FILES[@]}"
-
-      - name: Upload formatter output for diagnosis
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: prettier-formatted-billing-repository
-          path: src/features/billing/lib/billing-repository.ts
+          npx prettier --check "${FILES[@]}"
 
       - name: Build
         run: npm run build
