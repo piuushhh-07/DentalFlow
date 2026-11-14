@@ -55,8 +55,14 @@ export function resolvePatientEnabledAtTimestamp(
   previousTimestamp: Date | null,
   newlyRecordedTimestamp: Date,
 ): Date | null {
-  if (!enabled) return null;
-  if (wasPreviouslyEnabled && previousTimestamp) return previousTimestamp;
+  if (!enabled) {
+    return null;
+  }
+
+  if (wasPreviouslyEnabled && previousTimestamp) {
+    return previousTimestamp;
+  }
+
   return newlyRecordedTimestamp;
 }
 
