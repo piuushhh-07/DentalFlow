@@ -133,6 +133,7 @@ export async function listClinicRecallPatients(
 ) {
   const where: Prisma.PatientWhereInput = {
     clinicId,
+    archivedAt: null,
     ...(query
       ? { fullName: { contains: query, mode: "insensitive" as const } }
       : {}),
@@ -174,7 +175,7 @@ export async function createClinicRecall(
   return prisma.$transaction(
     async (transaction) => {
       const patient = await transaction.patient.findFirst({
-        where: { id: patientId, clinicId },
+        where: { id: patientId, clinicId, archivedAt: null },
         select: { id: true },
       });
       if (!patient) {
