@@ -231,7 +231,9 @@ export async function requestPatientPortalMagicLink(
       : undefined);
   if (!siteUrl) {
     console.error("Patient portal magic link requires NEXT_PUBLIC_SITE_URL.");
-    return { error: "Patient portal sign-in is not configured. Contact the clinic." };
+    return {
+      error: "Patient portal sign-in is not configured. Contact the clinic.",
+    };
   }
 
   let redirectTo: string;
@@ -241,7 +243,9 @@ export async function requestPatientPortalMagicLink(
     console.error("Patient portal site URL is invalid.", {
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
-    return { error: "Patient portal sign-in is not configured. Contact the clinic." };
+    return {
+      error: "Patient portal sign-in is not configured. Contact the clinic.",
+    };
   }
 
   const supabase = await createSupabaseServerActionClient();
@@ -254,7 +258,9 @@ export async function requestPatientPortalMagicLink(
       status: error.status,
       code: error.code,
     });
-    return { error: "We couldn't send a sign-in link. Please try again later." };
+    return {
+      error: "We couldn't send a sign-in link. Please try again later.",
+    };
   }
 
   return {
