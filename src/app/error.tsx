@@ -26,9 +26,8 @@ export default function ApplicationError({
           This page could not be loaded
         </h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Something went wrong while loading this page. Your records have not
-          been changed by this error. Please try again, or contact your clinic
-          administrator if the problem continues.
+          Something went wrong while loading this page. Please try again, or
+          contact your clinic administrator if the problem continues.
         </p>
         {error.digest && (
           <p className="mt-3 text-xs text-slate-500">
