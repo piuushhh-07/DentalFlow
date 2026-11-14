@@ -226,7 +226,7 @@ export async function archivePatient(formData: FormData): Promise<void> {
   );
   if (!archived)
     throw new Error("This patient is already archived or could not be found.");
-  redirect(`/clinic/${membership.clinicId}/patients?archived=1`);
+  redirect(`/clinic/${membership.clinicId}/patients?view=archived`);
 }
 
 export async function restorePatient(formData: FormData): Promise<void> {
