@@ -14,6 +14,7 @@ export async function middleware(request: NextRequest) {
     pathname === "/portal" || pathname.startsWith("/portal/");
   const isAuthCallbackRoute = pathname === "/auth/callback";
   const isWhatsAppReminderJob = pathname === "/api/cron/whatsapp-reminders";
+  const isHealthCheck = pathname === "/api/health";
 
   if (isDemoRoute) {
     if (
@@ -33,7 +34,8 @@ export async function middleware(request: NextRequest) {
     isPublicBookingRoute ||
     isPatientPortalRoute ||
     isAuthCallbackRoute ||
-    isWhatsAppReminderJob
+    isWhatsAppReminderJob ||
+    isHealthCheck
   ) {
     return NextResponse.next();
   }
