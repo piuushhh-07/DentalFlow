@@ -161,7 +161,7 @@ export async function createTreatmentEstimate(
     async (transaction) => {
       const [patient, clinic, plan, author] = await Promise.all([
         transaction.patient.findFirst({
-          where: { id: patientId, clinicId },
+          where: { id: patientId, clinicId, archivedAt: null },
           select: { id: true, fullName: true, phoneNumber: true },
         }),
         transaction.clinic.findUnique({
