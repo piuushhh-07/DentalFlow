@@ -154,6 +154,7 @@ function unionQuery(
     FROM "treatment_visits" tv
     JOIN "patients" p
       ON p."id" = tv."patientId" AND p."clinicId" = tv."clinicId"
+      AND p."archivedAt" IS NULL
     JOIN "treatment_plans" tp
       ON tp."id" = tv."treatmentPlanId"
       AND tp."clinicId" = tv."clinicId"
@@ -191,6 +192,7 @@ function unionQuery(
     FROM "preventive_recalls" r
     JOIN "patients" p
       ON p."id" = r."patientId" AND p."clinicId" = r."clinicId"
+      AND p."archivedAt" IS NULL
     WHERE ${recallWhere(clinicId, tab, query, today)}
   `;
 }
