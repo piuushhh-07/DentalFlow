@@ -55,11 +55,15 @@ export function resolvePatientEnabledAtTimestamp(
   previousTimestamp: Date | null,
   newlyRecordedTimestamp: Date,
 ): Date | null {
-  return enabled
-    ? wasPreviouslyEnabled && previousTimestamp
-      ? previousTimestamp
-      : newlyRecordedTimestamp
-    : null;
+  if (!enabled) {
+    return null;
+  }
+
+  if (wasPreviouslyEnabled && previousTimestamp) {
+    return previousTimestamp;
+  }
+
+  return newlyRecordedTimestamp;
 }
 
 export type PatientInput = z.output<typeof patientInputSchema>;
