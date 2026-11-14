@@ -7,7 +7,6 @@ import {
 
 import { prisma } from "@/lib/db/prisma";
 
-// prettier-ignore
 export async function listPatientPortalRecords(email: string) {
   const now = new Date();
   const patients = await prisma.patient.findMany({
