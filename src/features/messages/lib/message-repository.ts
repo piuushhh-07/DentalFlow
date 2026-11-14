@@ -190,7 +190,7 @@ export async function recordManualWhatsAppReminder(
       }
 
       const patient = await transaction.patient.findFirst({
-        where: { id: patientId, clinicId: input.clinicId },
+        where: { id: patientId, clinicId: input.clinicId, archivedAt: null },
         select: {
           id: true,
           phoneNumber: true,
