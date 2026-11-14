@@ -16,9 +16,11 @@ export async function listClinicPatients(
   clinicId: string,
   query: string,
   requestedPage: number,
+  includeArchived = false,
 ) {
   const where: Prisma.PatientWhereInput = {
     clinicId,
+    archivedAt: includeArchived ? { not: null } : null,
     ...(query
       ? {
           OR: [
@@ -95,6 +97,7 @@ export async function getClinicPatient(clinicId: string, patientId: string) {
       notes: true,
       createdAt: true,
       updatedAt: true,
+      archivedAt: true,
     },
   });
 
@@ -151,7 +154,7 @@ export async function updateClinicPatient(
 ) {
   return prisma.$transaction(async (transaction) => {
     const existing = await transaction.patient.findFirst({
-      where: { id: patientId, clinicId },
+      where: { id: patientId, clinicId, archivedAt: null },
       select: {
         portalAccessEnabled: true,
         portalAccessEnabledAt: true,
@@ -162,7 +165,7 @@ export async function updateClinicPatient(
     if (!existing) return false;
 
     const result = await transaction.patient.updateMany({
-      where: { id: patientId, clinicId },
+      where: { id: patientId, clinicId, archivedAt: null },
       data: {
         fullName: input.fullName,
         phoneNumber: input.phoneNumber,
@@ -196,6 +199,7 @@ export async function deleteClinicPatient(clinicId: string, patientId: string) {
     where: {
       id: patientId,
       clinicId,
+      archivedAt: null,
       treatmentPlans: { none: {} },
       treatmentFinancialEntries: { none: {} },
       treatmentEstimates: { none: {} },
@@ -212,5 +216,27 @@ export async function deleteClinicPatient(clinicId: string, patientId: string) {
     },
   });
 
+  return result.count > 0;
+}
+
+export async function archiveClinicPatient(
+  clinicId: string,
+  patientId: string,
+) {
+  const result = await prisma.patient.updateMany({
+    where: { id: patientId, clinicId, archivedAt: null },
+    data: { archivedAt: new Date() },
+  });
+  return result.count > 0;
+}
+
+export async function restoreClinicPatient(
+  clinicId: string,
+  patientId: string,
+) {
+  const result = await prisma.patient.updateMany({
+    where: { id: patientId, clinicId, archivedAt: { not: null } },
+    data: { archivedAt: null },
+  });
   return result.count > 0;
 }
