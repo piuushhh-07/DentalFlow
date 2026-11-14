@@ -10,6 +10,7 @@ import {
   patientBelongsToClinic,
   type PatientInput,
 } from "@/features/patients/lib/patient-validation";
+import { resolvePatientEnabledAtTimestamp } from "@/features/patients/lib/patient-consent-timestamps";
 
 export async function listClinicPatients(
   clinicId: string,
@@ -148,23 +149,46 @@ export async function updateClinicPatient(
   patientId: string,
   input: PatientInput,
 ) {
-  const result = await prisma.patient.updateMany({
-    where: { id: patientId, clinicId },
-    data: {
-      fullName: input.fullName,
-      phoneNumber: input.phoneNumber,
-      normalizedPhone: input.phoneNumber,
-      email: input.email,
-      normalizedEmail: input.email,
-      portalAccessEnabled: input.portalAccessEnabled,
-      portalAccessEnabledAt: input.portalAccessEnabledAt,
-      whatsappOptIn: input.whatsappOptIn,
-      whatsappOptedInAt: input.whatsappOptedInAt,
-      notes: input.notes,
-    },
-  });
+  return prisma.$transaction(async (transaction) => {
+    const existing = await transaction.patient.findFirst({
+      where: { id: patientId, clinicId },
+      select: {
+        portalAccessEnabled: true,
+        portalAccessEnabledAt: true,
+        whatsappOptIn: true,
+        whatsappOptedInAt: true,
+      },
+    });
+    if (!existing) return false;
 
-  return result.count > 0;
+    const result = await transaction.patient.updateMany({
+      where: { id: patientId, clinicId },
+      data: {
+        fullName: input.fullName,
+        phoneNumber: input.phoneNumber,
+        normalizedPhone: input.phoneNumber,
+        email: input.email,
+        normalizedEmail: input.email,
+        portalAccessEnabled: input.portalAccessEnabled,
+        portalAccessEnabledAt: resolvePatientEnabledAtTimestamp(
+          input.portalAccessEnabled,
+          existing.portalAccessEnabled,
+          existing.portalAccessEnabledAt,
+          input.portalAccessEnabledAt ?? new Date(),
+        ),
+        whatsappOptIn: input.whatsappOptIn,
+        whatsappOptedInAt: resolvePatientEnabledAtTimestamp(
+          input.whatsappOptIn,
+          existing.whatsappOptIn,
+          existing.whatsappOptedInAt,
+          input.whatsappOptedInAt ?? new Date(),
+        ),
+        notes: input.notes,
+      },
+    });
+
+    return result.count > 0;
+  });
 }
 
 export async function deleteClinicPatient(clinicId: string, patientId: string) {
