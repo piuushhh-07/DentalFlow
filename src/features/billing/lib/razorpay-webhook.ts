@@ -260,7 +260,7 @@ async function storeWebhookEvent(event: ParsedRazorpayEvent) {
   }
 }
 
-async function claimWebhookEvent(eventId: string): Promise<boolean> {
+async function claimWebhookEvent(eventId: string): Promise<Date | null> {
   const now = new Date();
   const staleBefore = new Date(now.getTime() - eventLeaseMs);
   const event = await prisma.billingWebhookEvent.findUnique({
@@ -268,7 +268,7 @@ async function claimWebhookEvent(eventId: string): Promise<boolean> {
     select: { status: true, processingStartedAt: true },
   });
   if (!event) throw new Error("The persisted provider event is unavailable.");
-  if (event.status === BillingWebhookStatus.PROCESSED) return false;
+  if (event.status === BillingWebhookStatus.PROCESSED) return null;
   if (
     !isWebhookClaimAvailable(
       event.status,
@@ -305,12 +305,12 @@ async function claimWebhookEvent(eventId: string): Promise<boolean> {
     },
   });
 
-  if (claimed.count === 1) return true;
+  if (claimed.count === 1) return now;
   const latest = await prisma.billingWebhookEvent.findUnique({
     where: { providerEventId: eventId },
     select: { status: true },
   });
-  if (latest?.status === BillingWebhookStatus.PROCESSED) return false;
+  if (latest?.status === BillingWebhookStatus.PROCESSED) return null;
   throw new RazorpayWebhookProcessingBusyError(
     "The provider event is already being processed.",
   );
@@ -477,8 +477,8 @@ export async function processRazorpayWebhook(
   const stored = await storeWebhookEvent(event);
   if (stored.status === BillingWebhookStatus.PROCESSED) return "duplicate";
 
-  const claimed = await claimWebhookEvent(eventId);
-  if (!claimed) return "duplicate";
+  const claimStartedAt = await claimWebhookEvent(eventId);
+  if (!claimStartedAt) return "duplicate";
 
   try {
     await applySubscriptionEvent(event);
@@ -486,6 +486,7 @@ export async function processRazorpayWebhook(
       where: {
         providerEventId: eventId,
         status: BillingWebhookStatus.PROCESSING,
+        processingStartedAt: claimStartedAt,
       },
       data: {
         status: BillingWebhookStatus.PROCESSED,
