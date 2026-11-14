@@ -28,7 +28,10 @@ test("appointment resource locks are isolated by clinic", () => {
     "chair-a",
   );
 
-  assert.equal(clinicA.some((key) => clinicB.includes(key)), false);
+  assert.equal(
+    clinicA.some((key) => clinicB.includes(key)),
+    false,
+  );
 });
 
 test("shared dentist or chair produces a shared lock key", () => {
