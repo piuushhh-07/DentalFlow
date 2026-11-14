@@ -121,61 +121,85 @@ export async function startClinicSubscriptionCheckout(
   });
   if (!plan?.providerPlanId) throw new BillingPlanUnavailableError();
 
-  const activeSubscription = await prisma.clinicSubscription.findFirst({
-    where: { clinicId, status: { in: [...CURRENT_STATUSES] } },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      planVersionId: true,
-      status: true,
-      checkoutUrl: true,
-      checkoutExpiresAt: true,
-    },
-  });
-  const pendingCheckoutExpired =
-    activeSubscription?.status === BillingSubscriptionStatus.CHECKOUT_PENDING &&
-    activeSubscription.checkoutExpiresAt !== null &&
-    activeSubscription.checkoutExpiresAt <= now;
-  if (pendingCheckoutExpired && activeSubscription) {
-    await prisma.clinicSubscription.updateMany({
-      where: {
-        id: activeSubscription.id,
-        clinicId,
-        status: BillingSubscriptionStatus.CHECKOUT_PENDING,
-      },
-      data: { status: BillingSubscriptionStatus.FAILED },
-    });
-  } else if (activeSubscription) {
-    if (
-      activeSubscription.planVersionId === plan.id &&
-      activeSubscription.checkoutUrl
-    ) {
-      return { checkoutUrl: activeSubscription.checkoutUrl };
-    }
-    throw new BillingSubscriptionAlreadyExistsError();
-  }
+  let reservation: {
+    subscriptionId: string | null;
+    checkoutUrl: string | null;
+    trialEndsAt: Date | null;
+  };
 
-  const previousTrial = await prisma.clinicSubscription.findFirst({
-    where: { clinicId, trialStartedAt: { not: null } },
-    select: { id: true },
-  });
-  const isTrialEligible = plan.trialDays > 0 && previousTrial === null;
-  const trialEndsAt = isTrialEligible
-    ? new Date(now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000)
-    : null;
-
-  let subscription;
   try {
-    subscription = await prisma.clinicSubscription.create({
-      data: {
-        clinicId,
-        planVersionId: plan.id,
-        status: BillingSubscriptionStatus.CHECKOUT_PENDING,
-        trialStartedAt: isTrialEligible ? now : null,
+    reservation = await prisma.$transaction(async (transaction) => {
+      const lockKey = `clinic-billing-checkout:${clinicId}`;
+      await transaction.$queryRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
+      `;
+
+      const activeSubscription = await transaction.clinicSubscription.findFirst({
+        where: { clinicId, status: { in: [...CURRENT_STATUSES] } },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          planVersionId: true,
+          status: true,
+          checkoutUrl: true,
+          checkoutExpiresAt: true,
+        },
+      });
+      const pendingCheckoutExpired =
+        activeSubscription?.status ===
+          BillingSubscriptionStatus.CHECKOUT_PENDING &&
+        activeSubscription.checkoutExpiresAt !== null &&
+        activeSubscription.checkoutExpiresAt <= now;
+
+      if (pendingCheckoutExpired && activeSubscription) {
+        await transaction.clinicSubscription.updateMany({
+          where: {
+            id: activeSubscription.id,
+            clinicId,
+            status: BillingSubscriptionStatus.CHECKOUT_PENDING,
+          },
+          data: { status: BillingSubscriptionStatus.FAILED },
+        });
+      } else if (activeSubscription) {
+        if (
+          activeSubscription.planVersionId === plan.id &&
+          activeSubscription.checkoutUrl
+        ) {
+          return {
+            subscriptionId: null,
+            checkoutUrl: activeSubscription.checkoutUrl,
+            trialEndsAt: null,
+          };
+        }
+        throw new BillingSubscriptionAlreadyExistsError();
+      }
+
+      const previousTrial = await transaction.clinicSubscription.findFirst({
+        where: { clinicId, trialStartedAt: { not: null } },
+        select: { id: true },
+      });
+      const isTrialEligible = plan.trialDays > 0 && previousTrial === null;
+      const trialEndsAt = isTrialEligible
+        ? new Date(now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      const created = await transaction.clinicSubscription.create({
+        data: {
+          clinicId,
+          planVersionId: plan.id,
+          status: BillingSubscriptionStatus.CHECKOUT_PENDING,
+          trialStartedAt: isTrialEligible ? now : null,
+          trialEndsAt,
+          checkoutExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+        },
+        select: { id: true },
+      });
+
+      return {
+        subscriptionId: created.id,
+        checkoutUrl: null,
         trialEndsAt,
-        checkoutExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
-      },
-      select: { id: true },
+      };
     });
   } catch (error) {
     if (
@@ -187,12 +211,21 @@ export async function startClinicSubscriptionCheckout(
     throw error;
   }
 
+  if (reservation.checkoutUrl) {
+    return { checkoutUrl: reservation.checkoutUrl };
+  }
+  if (!reservation.subscriptionId) {
+    throw new BillingCheckoutConflictError();
+  }
+  const subscriptionId = reservation.subscriptionId;
+  const trialEndsAt = reservation.trialEndsAt;
+
   try {
     const providerSubscription = await createRazorpaySubscription({
       planId: plan.providerPlanId,
       totalBillingCycles: plan.totalBillingCycles,
       trialEndsAt,
-      localSubscriptionId: subscription.id,
+      localSubscriptionId: subscriptionId,
       clinicId,
       planCode: plan.code,
       planVersion: plan.version,
@@ -200,7 +233,7 @@ export async function startClinicSubscriptionCheckout(
 
     const updated = await prisma.clinicSubscription.updateMany({
       where: {
-        id: subscription.id,
+        id: subscriptionId,
         clinicId,
         status: BillingSubscriptionStatus.CHECKOUT_PENDING,
       },
@@ -218,7 +251,7 @@ export async function startClinicSubscriptionCheckout(
     return { checkoutUrl: providerSubscription.checkoutUrl };
   } catch (error) {
     await prisma.clinicSubscription.updateMany({
-      where: { id: subscription.id, clinicId },
+      where: { id: subscriptionId, clinicId },
       data: {
         status: BillingSubscriptionStatus.FAILED,
         trialStartedAt: null,
@@ -255,7 +288,7 @@ export async function cancelClinicSubscriptionAtPeriodEnd(
   );
   const isCancelled = providerResult.status === "cancelled";
   await prisma.clinicSubscription.updateMany({
-    where: { id: subscription.id, clinicId },
+    where: { id: subscriptionId, clinicId },
     data: {
       status: isCancelled
         ? BillingSubscriptionStatus.CANCELLED
