@@ -22,7 +22,7 @@ type PatientListPageProps = Readonly<{
     created?: string;
     updated?: string;
     deleted?: string;
-    archived?: string;
+    view?: string;
   };
 }>;
 
@@ -59,7 +59,7 @@ export default async function PatientListPage({
   });
   const query = parsedSearch.success ? parsedSearch.data.query : "";
   const requestedPage = parsedSearch.success ? parsedSearch.data.page : 1;
-  const showingArchived = searchParams.archived === "1";
+  const showingArchived = searchParams.view === "archived";
   const { patients, pagination } = await measureServerOperation(
     "patients.directory_query",
     () => listClinicPatients(membership.clinicId, query, requestedPage, showingArchived),
@@ -92,7 +92,7 @@ export default async function PatientListPage({
 
         <div className="mt-5 flex flex-wrap gap-2">
           <Link className={showingArchived ? "rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50" : "rounded-md bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800"} href={basePath}>Active patients</Link>
-          <Link className={showingArchived ? "rounded-md bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800" : "rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"} href={`${basePath}?archived=1`}>Archived patients</Link>
+          <Link className={showingArchived ? "rounded-md bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800" : "rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"} href={`${basePath}?view=archived`}>Archived patients</Link>
         </div>
 
         <form
