@@ -2507,8 +2507,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.equal(patientExport.scope.excludesPrivateStoragePaths, true);
       assert.equal(patientExport.patient.insurancePolicies.length, 1);
       assert.equal(
-        patientExport.patient.insurancePolicies[0].provider.name,
-        provider.name,
+        patientExport.patient.insurancePolicies[0].provider.id,
+        provider.id,
       );
       assert.equal(
         patientExport.patient.insurancePreAuthorizations.length,
