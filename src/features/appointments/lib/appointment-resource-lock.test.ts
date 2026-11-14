@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  getAppointmentResourceLockKeys,
-} from "@/features/appointments/lib/appointment-resource-lock";
+import { getAppointmentResourceLockKeys } from "@/features/appointments/lib/appointment-resource-lock";
 
 test("appointment resource locks are deterministic and ordered", () => {
   const keys = getAppointmentResourceLockKeys(
