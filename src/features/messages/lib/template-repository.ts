@@ -25,7 +25,7 @@ export async function saveClinicWhatsAppTemplate(
 
 export async function getClinicTemplatePreviewPatient(clinicId: string) {
   return prisma.patient.findFirst({
-    where: { clinicId },
+    where: { clinicId, archivedAt: null },
     orderBy: [{ fullName: "asc" }, { createdAt: "asc" }],
     select: {
       fullName: true,
