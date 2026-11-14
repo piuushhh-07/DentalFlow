@@ -9,7 +9,9 @@ import {
   calculateTreatmentLedgerBalance,
 } from "@/features/treatments/lib/treatment-finance-rules";
 import { treatmentFinancialEntrySchema } from "@/features/treatments/lib/treatment-finance-validation";
-import { createTreatmentFinancialEntryRequestHash } from "@/features/treatments/lib/treatment-finance-idempotency";
+import {
+  createTreatmentFinancialEntryRequestHash,
+} from "@/features/treatments/lib/treatment-finance-idempotency";
 
 const zero = new Prisma.Decimal(0);
 const requestKey = "a7627c15-9507-4887-bcf0-5d8b88b07dd8";
