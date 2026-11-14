@@ -157,7 +157,7 @@ export default async function PatientDetailPage({
     return (
       <AppShell activeSection="patients" clinicId={membership.clinicId}>
         <div className="mx-auto max-w-3xl">
-          <Link className="inline-flex min-h-9 items-center gap-2 text-sm font-medium text-slate-600 hover:text-teal-800" href={`/clinic/${membership.clinicId}/patients?archived=1`}>
+          <Link className="inline-flex min-h-9 items-center gap-2 text-sm font-medium text-slate-600 hover:text-teal-800" href={`/clinic/${membership.clinicId}/patients?view=archived`}>
             <ArrowLeft aria-hidden="true" className="size-4" />
             Back to archived patients
           </Link>
@@ -371,12 +371,21 @@ export default async function PatientDetailPage({
           </div>
           <div className="flex flex-wrap gap-2">
             {membership.role === ClinicRole.OWNER && (
-              <a
-                className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
-                href={`${patientPath}/export`}
-              >
-                Export patient data
-              </a>
+              <>
+                <a
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                  href={`${patientPath}/export`}
+                >
+                  Export patient data
+                </a>
+                <form action={archivePatient}>
+                  <input name="clinicId" type="hidden" value={membership.clinicId} />
+                  <input name="patientId" type="hidden" value={patient.id} />
+                  <button className="inline-flex h-10 items-center justify-center rounded-md border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-50" type="submit">
+                    Archive patient
+                  </button>
+                </form>
+              </>
             )}
             <Link
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
