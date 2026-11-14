@@ -500,6 +500,7 @@ export async function processRazorpayWebhook(
       where: {
         providerEventId: eventId,
         status: BillingWebhookStatus.PROCESSING,
+        processingStartedAt: claimStartedAt,
       },
       data: {
         status: BillingWebhookStatus.FAILED,
