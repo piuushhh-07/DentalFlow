@@ -2489,9 +2489,10 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "4000.00",
       );
 
-      const exportAuditCountBefore = await freshReader.patientDataExportAudit.count({
-        where: { clinicId: clinicAId, patientId: patientA.id },
-      });
+      const exportAuditCountBefore =
+        await freshReader.patientDataExportAudit.count({
+          where: { clinicId: clinicAId, patientId: patientA.id },
+        });
       const patientExport = await exportClinicPatientData(
         clinicAId,
         patientA.id,
@@ -2499,19 +2500,29 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       );
       assert.ok(patientExport);
       assert.equal(patientExport.formatVersion, 2);
-      assert.equal(patientExport.scope.includesPrivateStorageFileContents, false);
+      assert.equal(
+        patientExport.scope.includesPrivateStorageFileContents,
+        false,
+      );
       assert.equal(patientExport.scope.excludesPrivateStoragePaths, true);
       assert.equal(patientExport.patient.insurancePolicies.length, 1);
       assert.equal(
         patientExport.patient.insurancePolicies[0].provider.name,
         provider.name,
       );
-      assert.equal(patientExport.patient.insurancePreAuthorizations.length, 1);
+      assert.equal(
+        patientExport.patient.insurancePreAuthorizations.length,
+        1,
+      );
       assert.ok(
-        patientExport.patient.insurancePreAuthorizations[0].activities.length >= 2,
+        patientExport.patient.insurancePreAuthorizations[0].activities.length >=
+          2,
       );
       assert.equal(patientExport.patient.insuranceClaims.length, 1);
-      assert.equal(patientExport.patient.insuranceClaims[0].payments.length, 1);
+      assert.equal(
+        patientExport.patient.insuranceClaims[0].payments.length,
+        1,
+      );
       assert.ok(
         patientExport.patient.insuranceClaims[0].activities.length >= 4,
       );
