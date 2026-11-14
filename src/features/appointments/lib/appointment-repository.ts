@@ -174,11 +174,7 @@ async function lockAppointmentResources(
   dentistId: string,
   chairId: string,
 ): Promise<void> {
-  const lockKeys = getAppointmentResourceLockKeys(
-    clinicId,
-    dentistId,
-    chairId,
-  );
+  const lockKeys = getAppointmentResourceLockKeys(clinicId, dentistId, chairId);
   for (const lockKey of lockKeys) {
     await transaction.$queryRaw`
       SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
