@@ -126,7 +126,10 @@ import { getClinicReportMetrics } from "@/features/reports/lib/report-repository
 import { getClinicReportDateRange } from "@/features/reports/lib/report-validation";
 import { createSupabaseTestClient } from "./test-supabase-client";
 import { getClinicBillingPortalData } from "@/features/billing/lib/billing-repository";
-import { processRazorpayWebhook } from "@/features/billing/lib/razorpay-webhook";
+import {
+  processRazorpayWebhook,
+  RazorpayWebhookProcessingBusyError,
+} from "@/features/billing/lib/razorpay-webhook";
 import { BillingLimitReachedError } from "@/features/billing/lib/billing-entitlements";
 import {
   createDigitalPrescription,
@@ -1065,6 +1068,48 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           await processRazorpayWebhook(chargeEventId, chargeBody),
           "duplicate",
         );
+
+        const concurrentEventId = `evt_${randomUUID().replaceAll("-", "")}`;
+        const concurrentBody = subscriptionWebhookBody(
+          "subscription.charged",
+          providerSubscriptionA,
+          "active",
+          new Date(trialStartedAt.getTime() + 1_500),
+          {
+            id: `pay_${randomUUID().replaceAll("-", "")}`,
+            status: "captured",
+          },
+          clinicBId,
+        );
+        webhookEventIds.push(concurrentEventId);
+        const concurrentDeliveries = await Promise.allSettled([
+          processRazorpayWebhook(concurrentEventId, concurrentBody),
+          processRazorpayWebhook(concurrentEventId, concurrentBody),
+        ]);
+        const concurrentSuccesses = concurrentDeliveries.filter(
+          (result) => result.status === "fulfilled",
+        );
+        const concurrentFailures = concurrentDeliveries.filter(
+          (result) => result.status === "rejected",
+        );
+        assert.equal(
+          concurrentSuccesses.filter(
+            (result) => result.status === "fulfilled" && result.value === "processed",
+          ).length,
+          1,
+          "Only one concurrent delivery may process the provider event.",
+        );
+        assert.equal(
+          concurrentSuccesses.length + concurrentFailures.length,
+          2,
+        );
+        for (const failure of concurrentFailures) {
+          assert.ok(
+            failure.status === "rejected" &&
+              failure.reason instanceof RazorpayWebhookProcessingBusyError,
+            "A competing delivery must receive a retryable busy error.",
+          );
+        }
 
         const failedPayment = `pay_${randomUUID().replaceAll("-", "")}`;
         await submit("subscription.pending", "pending", 2_000, {
