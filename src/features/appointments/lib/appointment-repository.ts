@@ -38,6 +38,7 @@ import {
   PUBLIC_BOOKING_TRANSACTION_TIMEOUT_MS,
 } from "@/features/appointments/lib/public-booking-idempotency";
 import { getClinicDateRangeBounds } from "@/features/appointments/lib/appointment-calendar";
+import { getAppointmentResourceLockKeys } from "@/features/appointments/lib/appointment-resource-lock";
 
 export class AppointmentPatientNotFoundError extends Error {}
 export class AppointmentVisitNotFoundError extends Error {}
@@ -165,6 +166,22 @@ async function getActiveScheduleResources(
   ]);
   if (!dentist || !chair) throw new AppointmentResourceNotFoundError();
   return { dentistName: dentist.name, chairLabel: chair.label };
+}
+
+async function lockAppointmentResources(
+  transaction: Prisma.TransactionClient,
+  clinicId: string,
+  dentistId: string,
+  chairId: string,
+): Promise<void> {
+  const lockKeys = getAppointmentResourceLockKeys(
+    clinicId,
+    dentistId,
+    chairId,
+  );
+  for (const lockKey of lockKeys) {
+    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+  }
 }
 
 async function validatePatientAndVisit(
@@ -543,6 +560,12 @@ export async function createPublicAppointmentRequest(
               await transaction.$queryRaw<{ locked: number }[]>(
                 getPublicBookingPhoneLockQuery(phoneLockKey),
               );
+              await lockAppointmentResources(
+                transaction,
+                clinicId,
+                dentist.id,
+                chair.id,
+              );
               return operation();
             },
             findRecentRequests: () =>
@@ -707,6 +730,12 @@ export async function approveAppointmentRequest(
           if (!request.dentistId || !request.chairId) {
             throw new AppointmentResourceNotFoundError();
           }
+          await lockAppointmentResources(
+            transaction,
+            clinicId,
+            request.dentistId,
+            request.chairId,
+          );
 
           const startAt = request.requestedAt;
           const resources = await getActiveScheduleResources(
@@ -910,6 +939,12 @@ async function createClinicAppointmentTransaction(
 ) {
   return prisma.$transaction(
     async (transaction) => {
+      await lockAppointmentResources(
+        transaction,
+        clinicId,
+        input.dentistId,
+        input.chairId,
+      );
       await assertMonthlyAppointmentCapacity(transaction, clinicId);
       await validatePatientAndVisit(transaction, clinicId, input);
       await validateVisitBookingAvailability(
@@ -985,6 +1020,12 @@ export async function updateClinicAppointment(
         async (transaction) => {
           recordTransactionPhase(diagnostic, "callback_entry");
           try {
+            await lockAppointmentResources(
+              transaction,
+              clinicId,
+              input.dentistId,
+              input.chairId,
+            );
             const existing = await measureTransactionQuery(
               diagnostic,
               "findAppointment",
