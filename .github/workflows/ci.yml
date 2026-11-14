@@ -65,6 +65,7 @@ jobs:
           fi
 
           mapfile -t FILES <<< "$CHANGED_FILES"
+          npx prettier tests/integration/database-workflows.test.ts | sed -n '1060,1130p'
           npx prettier --check "${FILES[@]}"
 
       - name: Build
