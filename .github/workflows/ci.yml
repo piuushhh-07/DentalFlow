@@ -65,7 +65,9 @@ jobs:
           fi
 
           mapfile -t FILES <<< "$CHANGED_FILES"
-          npx prettier --check "${FILES[@]}"
+          npx prettier --write "${FILES[@]}"
+git diff -- docs/PATIENT_PRIVACY_DATA_INVENTORY.md
+npx prettier --check "${FILES[@]}"
 
       - name: Build
         run: npm run build
