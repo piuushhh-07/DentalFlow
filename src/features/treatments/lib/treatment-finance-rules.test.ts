@@ -112,7 +112,10 @@ test("financial idempotency hashes include payment references and audit reasons"
     );
 
   assert.equal(hash(base), hash({ ...base }));
-  assert.notEqual(hash(base), hash({ ...base, notes: "Different refund reason" }));
+  assert.notEqual(
+    hash(base),
+    hash({ ...base, notes: "Different refund reason" }),
+  );
   assert.notEqual(hash(base), hash({ ...base, reference: "UPI-REF-101" }));
   assert.notEqual(hash(base), hash({ ...base, amount: "26.00" }));
 });
