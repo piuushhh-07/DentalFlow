@@ -116,7 +116,11 @@ large-scale rewrite.
    isolated restore exercise plan; no implementation assumptions hidden.
 4. **M3 — Operational launch baseline (P0).** Configure monitoring, alert
    routing, support intake/escalation, deployment secrets, and staged release
-   gates. **Exit:** synthetic failures alert correctly; support and deploy
+   gates. The repository now includes a database readiness endpoint, a root
+   application error fallback, privacy-conscious timing logs, and an initial
+   operator runbook. External alert routing, staffed support intake, backup/
+   restore verification, and rehearsed escalation remain deployment-level
+   work. **Exit:** synthetic failures alert correctly; support and deploy
    runbooks are rehearsed.
 5. **M4 — Clinic access lifecycle (P1).** Define permissions; implement
    invitation, role assignment/removal, and offboarding by extending existing

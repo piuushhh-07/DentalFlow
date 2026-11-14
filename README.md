@@ -538,3 +538,12 @@ prepare access, incident-response and breach-notification processes. Minimize
 patient information in messages and logs. This software documentation is not
 legal advice or a substitute for verifying the applicable law and current
 regulations.
+
+## Operational health and incident response
+
+`GET /api/health` is a public, uncached readiness probe that performs a
+read-only database check. It returns HTTP 200 when the runtime database
+connection is healthy and HTTP 503 when the database probe fails. It does not
+verify Auth, Storage, external providers, scheduled jobs, backups, or restore
+readiness. See [the operational runbook](docs/OPERATIONS_RUNBOOK.md) for
+deployment checks, log interpretation, and incident triage.
