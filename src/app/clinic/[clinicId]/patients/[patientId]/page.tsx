@@ -9,6 +9,7 @@ import { measureServerOperation } from "@/lib/performance/server-timing";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { DeletePatientButton } from "@/features/patients/components/delete-patient-button";
+import { archivePatient, restorePatient } from "@/features/patients/actions";
 import { getClinicPatient } from "@/features/patients/lib/patient-repository";
 import { formatIndianPhoneNumber } from "@/features/patients/lib/patient-validation";
 import {
@@ -323,6 +324,7 @@ export default async function PatientDetailPage({
               {patient.email && (
                 <p className="mt-1 text-sm text-slate-600">{patient.email}</p>
               )}
+              {patient.archivedAt && <p className="mt-2 inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Archived {dateFormatter.format(patient.archivedAt)}</p>}
               {patient.portalAccessEnabled && (
                 <p className="mt-1 text-xs font-medium text-teal-800">
                   Patient portal enabled
