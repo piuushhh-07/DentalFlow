@@ -157,33 +157,89 @@ export default async function PatientDetailPage({
     return (
       <AppShell activeSection="patients" clinicId={membership.clinicId}>
         <div className="mx-auto max-w-3xl">
-          <Link className="inline-flex min-h-9 items-center gap-2 text-sm font-medium text-slate-600 hover:text-teal-800" href={`/clinic/${membership.clinicId}/patients?view=archived`}>
+          <Link
+            className="inline-flex min-h-9 items-center gap-2 text-sm font-medium text-slate-600 hover:text-teal-800"
+            href={`/clinic/${membership.clinicId}/patients?view=archived`}
+          >
             <ArrowLeft aria-hidden="true" className="size-4" />
             Back to archived patients
           </Link>
           <section className="mt-6 rounded-xl border border-amber-200 bg-amber-50/60 p-6">
-            <p className="text-sm font-semibold text-amber-900">Archived patient record</p>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-900">{patient.fullName}</h1>
-            <p className="mt-1 text-sm text-slate-700">{formatIndianPhoneNumber(patient.phoneNumber)}</p>
-            {patient.email && <p className="mt-1 text-sm text-slate-700">{patient.email}</p>}
-            <p className="mt-3 text-sm text-amber-900">Archived on {dateFormatter.format(patient.archivedAt)}. This record is read-only while archived. Existing clinical and financial history remains retained.</p>
+            <p className="text-sm font-semibold text-amber-900">
+              Archived patient record
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-900">
+              {patient.fullName}
+            </h1>
+            <p className="mt-1 text-sm text-slate-700">
+              {formatIndianPhoneNumber(patient.phoneNumber)}
+            </p>
+            {patient.email && (
+              <p className="mt-1 text-sm text-slate-700">{patient.email}</p>
+            )}
+            <p className="mt-3 text-sm text-amber-900">
+              Archived on {dateFormatter.format(patient.archivedAt)}. This
+              record is read-only while archived. Existing clinical and
+              financial history remains retained.
+            </p>
             {membership.role === ClinicRole.OWNER && (
               <form action={restorePatient} className="mt-5">
-                <input name="clinicId" type="hidden" value={membership.clinicId} />
+                <input
+                  name="clinicId"
+                  type="hidden"
+                  value={membership.clinicId}
+                />
                 <input name="patientId" type="hidden" value={patient.id} />
-                <button className="inline-flex h-10 items-center rounded-md bg-teal-800 px-4 text-sm font-medium text-white hover:bg-teal-900" type="submit">Restore patient</button>
+                <button
+                  className="inline-flex h-10 items-center rounded-md bg-teal-800 px-4 text-sm font-medium text-white hover:bg-teal-900"
+                  type="submit"
+                >
+                  Restore patient
+                </button>
               </form>
             )}
           </section>
           <section className="mt-5 rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="font-semibold text-slate-900">Patient record details</h2>
+            <h2 className="font-semibold text-slate-900">
+              Patient record details
+            </h2>
             <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div><dt className="text-xs uppercase text-slate-500">Created</dt><dd className="mt-1 text-sm">{dateFormatter.format(patient.createdAt)}</dd></div>
-              <div><dt className="text-xs uppercase text-slate-500">Last updated</dt><dd className="mt-1 text-sm">{dateFormatter.format(patient.updatedAt)}</dd></div>
-              <div><dt className="text-xs uppercase text-slate-500">WhatsApp consent</dt><dd className="mt-1 text-sm">{patient.whatsappOptIn ? "Opted in" : "Not opted in"}</dd></div>
-              <div><dt className="text-xs uppercase text-slate-500">Patient portal</dt><dd className="mt-1 text-sm">{patient.portalAccessEnabled ? "Enabled" : "Disabled"}</dd></div>
+              <div>
+                <dt className="text-xs uppercase text-slate-500">Created</dt>
+                <dd className="mt-1 text-sm">
+                  {dateFormatter.format(patient.createdAt)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-slate-500">
+                  Last updated
+                </dt>
+                <dd className="mt-1 text-sm">
+                  {dateFormatter.format(patient.updatedAt)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-slate-500">
+                  WhatsApp consent
+                </dt>
+                <dd className="mt-1 text-sm">
+                  {patient.whatsappOptIn ? "Opted in" : "Not opted in"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-slate-500">
+                  Patient portal
+                </dt>
+                <dd className="mt-1 text-sm">
+                  {patient.portalAccessEnabled ? "Enabled" : "Disabled"}
+                </dd>
+              </div>
             </dl>
-            {patient.notes && <p className="mt-4 whitespace-pre-wrap text-sm text-slate-700">{patient.notes}</p>}
+            {patient.notes && (
+              <p className="mt-4 whitespace-pre-wrap text-sm text-slate-700">
+                {patient.notes}
+              </p>
+            )}
           </section>
         </div>
       </AppShell>
@@ -361,7 +417,11 @@ export default async function PatientDetailPage({
               {patient.email && (
                 <p className="mt-1 text-sm text-slate-600">{patient.email}</p>
               )}
-              {patient.archivedAt && <p className="mt-2 inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Archived {dateFormatter.format(patient.archivedAt)}</p>}
+              {patient.archivedAt && (
+                <p className="mt-2 inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                  Archived {dateFormatter.format(patient.archivedAt)}
+                </p>
+              )}
               {patient.portalAccessEnabled && (
                 <p className="mt-1 text-xs font-medium text-teal-800">
                   Patient portal enabled
@@ -379,9 +439,16 @@ export default async function PatientDetailPage({
                   Export patient data
                 </a>
                 <form action={archivePatient}>
-                  <input name="clinicId" type="hidden" value={membership.clinicId} />
+                  <input
+                    name="clinicId"
+                    type="hidden"
+                    value={membership.clinicId}
+                  />
                   <input name="patientId" type="hidden" value={patient.id} />
-                  <button className="inline-flex h-10 items-center justify-center rounded-md border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-50" type="submit">
+                  <button
+                    className="inline-flex h-10 items-center justify-center rounded-md border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-50"
+                    type="submit"
+                  >
                     Archive patient
                   </button>
                 </form>

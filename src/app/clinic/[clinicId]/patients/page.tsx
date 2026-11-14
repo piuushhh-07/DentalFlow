@@ -62,7 +62,13 @@ export default async function PatientListPage({
   const showingArchived = searchParams.view === "archived";
   const { patients, pagination } = await measureServerOperation(
     "patients.directory_query",
-    () => listClinicPatients(membership.clinicId, query, requestedPage, showingArchived),
+    () =>
+      listClinicPatients(
+        membership.clinicId,
+        query,
+        requestedPage,
+        showingArchived,
+      ),
   );
   const basePath = `/clinic/${membership.clinicId}/patients`;
 
@@ -78,7 +84,9 @@ export default async function PatientListPage({
               {showingArchived ? "Archived patients" : "Patients"}
             </h1>
             <p className="mt-2 text-sm text-slate-600">
-              {showingArchived ? "Archived records are retained for reference and can be restored by a clinic owner." : "A clinic-scoped directory for ongoing care and follow-ups."}
+              {showingArchived
+                ? "Archived records are retained for reference and can be restored by a clinic owner."
+                : "A clinic-scoped directory for ongoing care and follow-ups."}
             </p>
           </div>
           <Link
@@ -91,8 +99,26 @@ export default async function PatientListPage({
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
-          <Link className={showingArchived ? "rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50" : "rounded-md bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800"} href={basePath}>Active patients</Link>
-          <Link className={showingArchived ? "rounded-md bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800" : "rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"} href={`${basePath}?view=archived`}>Archived patients</Link>
+          <Link
+            className={
+              showingArchived
+                ? "rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                : "rounded-md bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800"
+            }
+            href={basePath}
+          >
+            Active patients
+          </Link>
+          <Link
+            className={
+              showingArchived
+                ? "rounded-md bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800"
+                : "rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            }
+            href={`${basePath}?view=archived`}
+          >
+            Archived patients
+          </Link>
         </div>
 
         <form
@@ -133,7 +159,11 @@ export default async function PatientListPage({
                 <UsersRound aria-hidden="true" className="size-6" />
               </span>
               <h2 className="mt-4 text-lg font-semibold text-slate-900">
-                {query ? "No matching patients" : showingArchived ? "No archived patients" : "Your patient list is empty"}
+                {query
+                  ? "No matching patients"
+                  : showingArchived
+                    ? "No archived patients"
+                    : "Your patient list is empty"}
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
                 {query
@@ -190,7 +220,11 @@ export default async function PatientListPage({
                           >
                             {patient.fullName}
                           </Link>
-                          {showingArchived && <span className="ml-2 rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">Archived</span>}
+                          {showingArchived && (
+                            <span className="ml-2 rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+                              Archived
+                            </span>
+                          )}
                         </td>
                         <td className="px-5 py-4 text-sm text-slate-600">
                           {formatIndianPhoneNumber(patient.phoneNumber)}
@@ -216,7 +250,11 @@ export default async function PatientListPage({
                       <span className="block font-semibold text-slate-900">
                         {patient.fullName}
                       </span>
-                      {showingArchived && <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">Archived</span>}
+                      {showingArchived && (
+                        <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+                          Archived
+                        </span>
+                      )}
                       <span className="mt-1 block text-sm text-slate-600">
                         {formatIndianPhoneNumber(patient.phoneNumber)}
                       </span>

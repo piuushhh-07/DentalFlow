@@ -211,16 +211,21 @@ export async function deletePatient(
   redirect(`/clinic/${membership.clinicId}/patients`);
 }
 
-
 export async function archivePatient(formData: FormData): Promise<void> {
   const requestedClinicId = clinicIdSchema.safeParse(formData.get("clinicId"));
   const patientId = patientIdSchema.safeParse(formData.get("patientId"));
   if (!requestedClinicId.success || !patientId.success) {
     throw new Error("This patient record could not be found.");
   }
-  const membership = await requireClinicRole(requestedClinicId.data, [ClinicRole.OWNER]);
-  const archived = await archiveClinicPatient(membership.clinicId, patientId.data);
-  if (!archived) throw new Error("This patient is already archived or could not be found.");
+  const membership = await requireClinicRole(requestedClinicId.data, [
+    ClinicRole.OWNER,
+  ]);
+  const archived = await archiveClinicPatient(
+    membership.clinicId,
+    patientId.data,
+  );
+  if (!archived)
+    throw new Error("This patient is already archived or could not be found.");
   redirect(`/clinic/${membership.clinicId}/patients?archived=1`);
 }
 
@@ -230,9 +235,15 @@ export async function restorePatient(formData: FormData): Promise<void> {
   if (!requestedClinicId.success || !patientId.success) {
     throw new Error("This patient record could not be found.");
   }
-  const membership = await requireClinicRole(requestedClinicId.data, [ClinicRole.OWNER]);
-  const restored = await restoreClinicPatient(membership.clinicId, patientId.data);
-  if (!restored) throw new Error("This patient is not archived or could not be found.");
+  const membership = await requireClinicRole(requestedClinicId.data, [
+    ClinicRole.OWNER,
+  ]);
+  const restored = await restoreClinicPatient(
+    membership.clinicId,
+    patientId.data,
+  );
+  if (!restored)
+    throw new Error("This patient is not archived or could not be found.");
   redirect(`/clinic/${membership.clinicId}/patients/${patientId.data}`);
 }
 

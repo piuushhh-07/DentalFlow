@@ -219,8 +219,10 @@ export async function deleteClinicPatient(clinicId: string, patientId: string) {
   return result.count > 0;
 }
 
-
-export async function archiveClinicPatient(clinicId: string, patientId: string) {
+export async function archiveClinicPatient(
+  clinicId: string,
+  patientId: string,
+) {
   const result = await prisma.patient.updateMany({
     where: { id: patientId, clinicId, archivedAt: null },
     data: { archivedAt: new Date() },
@@ -228,7 +230,10 @@ export async function archiveClinicPatient(clinicId: string, patientId: string) 
   return result.count > 0;
 }
 
-export async function restoreClinicPatient(clinicId: string, patientId: string) {
+export async function restoreClinicPatient(
+  clinicId: string,
+  patientId: string,
+) {
   const result = await prisma.patient.updateMany({
     where: { id: patientId, clinicId, archivedAt: { not: null } },
     data: { archivedAt: null },
