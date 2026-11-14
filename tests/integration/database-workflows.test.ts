@@ -1094,17 +1094,12 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         );
         assert.equal(
           concurrentSuccesses.filter(
-            (result) =>
-              result.status === "fulfilled" &&
-              result.value === "processed",
+            (result) => result.status === "fulfilled" && result.value === "processed",
           ).length,
           1,
           "Only one concurrent delivery may process the provider event.",
         );
-        assert.equal(
-          concurrentSuccesses.length + concurrentFailures.length,
-          2,
-        );
+        assert.equal(concurrentSuccesses.length + concurrentFailures.length, 2);
         for (const failure of concurrentFailures) {
           assert.ok(
             failure.status === "rejected" &&
