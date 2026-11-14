@@ -504,13 +504,22 @@ Vercel and Supabase audit/operational logs without copying patient data or
 credentials into third-party logs. This repository does not configure an
 external error-monitoring or alerting service.
 
+The owner-only patient JSON export is clinic-scoped and audit-logged. It
+includes structured patient, treatment, appointment, recall, message,
+insurance, odontogram, clinical-record, and prescription data. Insurance
+document metadata and extraction results are included, but private Storage
+file contents and internal Storage object paths are intentionally excluded.
+The export is not a complete Storage backup or an approved legal erasure
+workflow; verify completeness against the clinic's documented requirements
+before using it to fulfil a formal data-access request.
+
 The application currently has no configurable patient-record retention
-schedule, automatic deletion workflow, or verified clinic data-export and
-erasure process. Define these with the clinic before launch; do not assume
-database cascades or the insurance audit immutability triggers implement a
-complete retention policy. Review access to clinic memberships periodically
-and define an incident-response process, including escalation and breach
-notification responsibilities.
+schedule, automatic deletion workflow, or verified clinic data-erasure
+process. Define these with the clinic before launch; do not assume database
+cascades or the insurance audit immutability triggers implement a complete
+retention policy. Review access to clinic memberships periodically and define
+an incident-response process, including escalation and breach notification
+responsibilities.
 
 The insurance document AI provider configuration is server-only. However,
 the current extraction and policy-answer helpers are not connected to a
