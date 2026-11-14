@@ -14,6 +14,7 @@ export async function listPatientPortalRecords(email: string) {
       normalizedEmail: email.toLowerCase(),
       portalAccessEnabled: true,
       portalAccessEnabledAt: { not: null },
+      archivedAt: null,
     },
     orderBy: [{ clinic: { name: "asc" } }, { fullName: "asc" }],
     select: {
