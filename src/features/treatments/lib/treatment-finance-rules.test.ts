@@ -95,7 +95,9 @@ test("refunds cannot exceed net received payments and ledger handles credits", (
   );
 });
 
-test("financial idempotency hashes include payment references and audit reasons", () => {
+test(
+  "financial idempotency hashes include payment references and audit reasons",
+  () => {
   const base = treatmentFinancialEntrySchema.parse({
     entryType: "REFUND",
     amount: "25.00",
@@ -119,5 +121,6 @@ test("financial idempotency hashes include payment references and audit reasons"
   );
   assert.notEqual(hash(base), hash({ ...base, reference: "UPI-REF-101" }));
   assert.notEqual(hash(base), hash({ ...base, amount: "26.00" }));
-});
+  },
+);
 
