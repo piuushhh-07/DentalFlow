@@ -180,7 +180,7 @@ async function validatePatientAndVisit(
       "validatePatient",
       () =>
         transaction.patient.findFirst({
-          where: { id: input.patientId, clinicId },
+          where: { id: input.patientId, clinicId, archivedAt: null },
           select: { id: true },
         }),
     );
@@ -189,7 +189,7 @@ async function validatePatientAndVisit(
   }
 
   const patientQuery = transaction.patient.findFirst({
-    where: { id: input.patientId, clinicId },
+    where: { id: input.patientId, clinicId, archivedAt: null },
     select: {
       id: true,
       treatmentPlans: {
@@ -342,7 +342,7 @@ export async function getAppointmentPrefill(
 ) {
   const [patient, visit] = await Promise.all([
     prisma.patient.findFirst({
-      where: { id: patientId, clinicId },
+      where: { id: patientId, clinicId, archivedAt: null },
       select: { id: true, fullName: true },
     }),
     prisma.treatmentVisit.findFirst({
@@ -372,7 +372,7 @@ export async function getAppointmentPrefill(
 
 export async function listAppointmentPatients(clinicId: string) {
   return prisma.patient.findMany({
-    where: { clinicId },
+    where: { clinicId, archivedAt: null },
     orderBy: { fullName: "asc" },
     select: { id: true, fullName: true },
   });
