@@ -539,7 +539,6 @@ patient information in messages and logs. This software documentation is not
 legal advice or a substitute for verifying the applicable law and current
 regulations.
 
-
 ## Operational health and incident response
 
 `GET /api/health` is a public, uncached readiness probe that performs a
