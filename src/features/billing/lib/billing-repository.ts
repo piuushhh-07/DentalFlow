@@ -289,7 +289,7 @@ export async function cancelClinicSubscriptionAtPeriodEnd(
   );
   const isCancelled = providerResult.status === "cancelled";
   await prisma.clinicSubscription.updateMany({
-    where: { id: subscriptionId, clinicId },
+    where: { id: subscription.id, clinicId },
     data: {
       status: isCancelled
         ? BillingSubscriptionStatus.CANCELLED
