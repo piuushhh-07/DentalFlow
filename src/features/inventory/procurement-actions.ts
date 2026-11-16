@@ -89,7 +89,7 @@ export async function createInventoryPurchaseOrder(formData: FormData): Promise<
         expectedAt: parsed.data.expectedAt ? new Date(parsed.data.expectedAt) : null,
         notes: parsed.data.notes || null,
         lines: { create: [{
-          clinicId: membership.clinicId, itemId: item.id,
+          itemId: item.id,
           quantityOrdered: new Prisma.Decimal(parsed.data.quantity), unitCost: new Prisma.Decimal(parsed.data.unitCost),
         }] },
       }});
@@ -110,7 +110,7 @@ export async function receiveInventoryPurchaseOrderLine(formData: FormData): Pro
         where: { id: parsed.data.lineId, clinicId: membership.clinicId, orderId: parsed.data.orderId },
         include: { order: { select: { supplierId: true, status: true } } },
       });
-      if (!line || [InventoryPurchaseOrderStatus.CANCELLED, InventoryPurchaseOrderStatus.RECEIVED].includes(line.order.status)) throw new Error("ORDER_NOT_RECEIVABLE");
+      if (!line || line.order.status === InventoryPurchaseOrderStatus.CANCELLED || line.order.status === InventoryPurchaseOrderStatus.RECEIVED) throw new Error("ORDER_NOT_RECEIVABLE");
       const qty = new Prisma.Decimal(parsed.data.quantity);
       if (line.quantityReceived.plus(qty).greaterThan(line.quantityOrdered)) throw new Error("OVER_RECEIVED");
       const item = await tx.inventoryItem.findFirst({ where: { id: line.itemId, clinicId: membership.clinicId, active: true }, select: { id: true, currentStock: true } });
