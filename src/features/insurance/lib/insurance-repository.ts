@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { assertFeatureEnabled } from "@/features/billing/lib/billing-entitlements";
 import {
   insuranceClaimSummarySourcesSchema,
   insuranceDocumentExtractionSchema,
@@ -130,6 +131,7 @@ export async function saveInsuranceClaimSummaryDraft(
   },
 ) {
   return prisma.$transaction(async (transaction) => {
+    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockClaim(transaction, clinicId, claimId);
     const claim = await transaction.insuranceClaim.findFirst({
       where: { id: claimId, clinicId },
@@ -633,6 +635,7 @@ export async function createInsuranceClaim(
 ) {
   return prisma.$transaction(
     async (transaction) => {
+      await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
       const policy = await transaction.insurancePolicy.findFirst({
         where: {
           id: input.policyId,
@@ -879,6 +882,7 @@ export async function updateInsuranceClaimStatus(
 ) {
   await prisma.$transaction(
     async (transaction) => {
+      await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
       await lockClaim(transaction, clinicId, claimId);
       const claim = await transaction.insuranceClaim.findFirst({
         where: { id: claimId, clinicId },
@@ -1146,6 +1150,7 @@ export async function createInsurancePreAuthorization(
   },
 ) {
   return prisma.$transaction(async (transaction) => {
+    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     const policy = await transaction.insurancePolicy.findFirst({
       where: { id: input.policyId, clinicId, patientId: input.patientId },
       select: { id: true, validFrom: true, validUntil: true },
@@ -1576,6 +1581,7 @@ export async function createInsuranceDocumentRequirement(
   },
 ) {
   return prisma.$transaction(async (transaction) => {
+    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     const claim = await transaction.insuranceClaim.findFirst({
       where: { id: claimId, clinicId },
       select: { id: true },
