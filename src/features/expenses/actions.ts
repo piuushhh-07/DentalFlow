@@ -69,11 +69,11 @@ export async function createClinicExpense(formData: FormData): Promise<never> {
       });
     });
   } catch (error) {
-    if (
-      error instanceof BillingFeatureUnavailableError ||
-      error instanceof BillingAccessRestrictedError
-    ) {
+    if (error instanceof BillingFeatureUnavailableError) {
       redirect(expensePath(membership.clinicId, "upgrade-required"));
+    }
+    if (error instanceof BillingAccessRestrictedError) {
+      redirect(expensePath(membership.clinicId, "subscription-restricted"));
     }
     console.error("Clinic expense creation failed", {
       errorName: error instanceof Error ? error.name : "UnknownError",
