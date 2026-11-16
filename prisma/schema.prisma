@@ -406,7 +406,8 @@ model BillingPlanVersion {
   availableForSale   Boolean              @default(false)
   createdAt          DateTime             @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime             @updatedAt @db.Timestamptz(6)
-  subscriptions      ClinicSubscription[]
+  subscriptions       ClinicSubscription[]
+  pendingSubscriptions ClinicSubscription[] @relation("PendingSubscriptionPlan")
 
   @@unique([code, version])
   @@index([availableForSale, code])
@@ -434,7 +435,7 @@ model ClinicSubscription {
   updatedAt                  DateTime                  @updatedAt @db.Timestamptz(6)
   clinic                     Clinic                    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   planVersion                BillingPlanVersion        @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
-  pendingPlanVersion          BillingPlanVersion?       @relation("PendingSubscriptionPlan", fields: [pendingPlanVersionId], references: [id], onDelete: SetNull)
+  pendingPlanVersion         BillingPlanVersion?       @relation("PendingSubscriptionPlan", fields: [pendingPlanVersionId], references: [id], onDelete: SetNull)
   pendingPlanVersionId        String?                   @db.Uuid
   pendingPlanChangeAt         DateTime?                 @db.Timestamptz(6)
   payments                   BillingPayment[]
