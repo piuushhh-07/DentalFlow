@@ -3,6 +3,10 @@ import "server-only";
 import { ClinicInvitationStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import {
+  assertStaffCapacity,
+  BillingLimitReachedError,
+} from "@/features/billing/lib/billing-entitlements";
 
 export async function activatePendingClinicInvitations(
   userId: string,
@@ -20,6 +24,24 @@ export async function activatePendingClinicInvitations(
       select: { id: true, clinicId: true, role: true },
     });
     for (const invitation of invitations) {
+      const lockKey = `clinic-staff-seats:${invitation.clinicId}`;
+      await transaction.$queryRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
+      `;
+
+      if (invitation.role === "STAFF") {
+        try {
+          await assertStaffCapacity(transaction, invitation.clinicId);
+        } catch (error) {
+          // Keep the invitation pending so it can be activated after an
+          // upgrade or after the clinic frees a staff seat.
+          if (error instanceof BillingLimitReachedError && error.limit === "staff") {
+            continue;
+          }
+          throw error;
+        }
+      }
+
       const accepted = await transaction.clinicInvitation.updateMany({
         where: {
           id: invitation.id,
