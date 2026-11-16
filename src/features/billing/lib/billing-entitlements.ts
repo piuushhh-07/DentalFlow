@@ -6,10 +6,18 @@ import {
   billingEntitlementsSchema,
   canUsePaidEntitlements,
   type BillingEntitlements,
+  type BillingFeature,
 } from "@/features/billing/lib/billing-validation";
 
 export class BillingLimitReachedError extends Error {
-  constructor(readonly limit: "patients" | "monthlyAppointments") {
+  constructor(
+    readonly limit:
+      | "patients"
+      | "monthlyAppointments"
+      | "dentists"
+      | "staff"
+      | "branches",
+  ) {
     super("The clinic has reached the limit for its current subscription.");
     this.name = "BillingLimitReachedError";
   }
@@ -19,6 +27,13 @@ export class BillingAccessRestrictedError extends Error {
   constructor() {
     super("The clinic subscription does not currently allow new records.");
     this.name = "BillingAccessRestrictedError";
+  }
+}
+
+export class BillingFeatureUnavailableError extends Error {
+  constructor(readonly feature: BillingFeature) {
+    super("This feature is not included in the clinic's current subscription.");
+    this.name = "BillingFeatureUnavailableError";
   }
 }
 
@@ -57,6 +72,22 @@ async function getCurrentEntitlements(
   );
   if (!parsed.success) throw new InvalidBillingEntitlementsError();
   return parsed.data;
+}
+
+/**
+ * Enforce a module entitlement inside the same transaction as the operation.
+ * Existing records remain readable; callers should use this only to gate
+ * creation or mutation of the paid module's functionality.
+ */
+export async function assertFeatureEnabled(
+  transaction: TransactionClient,
+  clinicId: string,
+  feature: BillingFeature,
+): Promise<void> {
+  const entitlements = await getCurrentEntitlements(transaction, clinicId);
+  if (!entitlements?.features[feature]) {
+    throw new BillingFeatureUnavailableError(feature);
+  }
 }
 
 export async function assertPatientCapacity(
@@ -99,4 +130,4 @@ export async function assertMonthlyAppointmentCapacity(
   }
 }
 
-export type { BillingEntitlements };
+export type { BillingEntitlements, BillingFeature };
