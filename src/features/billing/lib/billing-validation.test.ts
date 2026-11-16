@@ -19,6 +19,7 @@ import {
   billingEntitlementsSchema,
   canApplyRazorpayEvent,
   canUsePaidEntitlements,
+  hasBillingGracePeriodExpired,
   isWebhookClaimAvailable,
   nextBillingSubscriptionState,
 } from "@/features/billing/lib/billing-validation";
@@ -212,6 +213,35 @@ test("payment failures begin a fixed grace window that is not extended by retrie
         graceUntil: retry.graceUntil,
       },
       retry.graceUntil!,
+    ),
+    false,
+  );
+});
+
+test("grace expiry is detected only after the configured deadline", () => {
+  const graceUntil = new Date(baseTime.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const pastDue = {
+    status: BillingSubscriptionStatus.PAST_DUE,
+    graceUntil,
+  };
+  const gracePeriod = {
+    status: BillingSubscriptionStatus.GRACE_PERIOD,
+    graceUntil,
+  };
+
+  assert.equal(hasBillingGracePeriodExpired(pastDue, baseTime), false);
+  assert.equal(hasBillingGracePeriodExpired(gracePeriod, graceUntil), true);
+  assert.equal(
+    hasBillingGracePeriodExpired(
+      { status: BillingSubscriptionStatus.ACTIVE, graceUntil },
+      new Date(graceUntil.getTime() + 1),
+    ),
+    false,
+  );
+  assert.equal(
+    hasBillingGracePeriodExpired(
+      { status: BillingSubscriptionStatus.GRACE_PERIOD, graceUntil: null },
+      new Date(graceUntil.getTime() + 1),
     ),
     false,
   );
