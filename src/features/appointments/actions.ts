@@ -84,7 +84,11 @@ function parseInput(formData: FormData) {
 
 function userFacingAppointmentError(error: unknown): string {
   if (error instanceof BillingLimitReachedError) {
-    return "This clinic has reached its monthly appointment limit. Review the subscription in Billing to continue scheduling.";
+    const limitMessage =
+      error.limit === "patients"
+        ? "patient limit"
+        : "monthly appointment limit";
+    return `This clinic has reached its ${limitMessage}. Review the subscription in Billing to continue.`;
   }
   if (error instanceof BillingAccessRestrictedError) {
     return "New appointments are paused for this subscription. Existing clinical records remain available.";
