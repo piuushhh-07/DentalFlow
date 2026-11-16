@@ -15,6 +15,10 @@ import { createSupabaseAdminClient } from "@/features/auth/lib/supabase-admin";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { revalidatePath } from "next/cache";
 import { activatePendingClinicInvitations } from "@/features/auth/lib/invitation-repository";
+import {
+  assertStaffInvitationCapacity,
+  BillingLimitReachedError,
+} from "@/features/billing/lib/billing-entitlements";
 
 const signInSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -163,16 +167,6 @@ export async function inviteClinicStaffAction(
   if (existingMembership) {
     return { error: "This person is already a member of the clinic." };
   }
-  await prisma.clinicInvitation.updateMany({
-    where: {
-      clinicId: owner.clinicId,
-      normalizedEmail,
-      status: ClinicInvitationStatus.PENDING,
-      expiresAt: { lte: new Date() },
-    },
-    data: { status: ClinicInvitationStatus.REVOKED },
-  });
-
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
   if (!siteUrl) {
     console.error("Staff invitation requires NEXT_PUBLIC_SITE_URL.");
@@ -191,19 +185,40 @@ export async function inviteClinicStaffAction(
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60_000);
   let invitationId: string;
   try {
-    const invitation = await prisma.clinicInvitation.create({
-      data: {
-        clinicId: owner.clinicId,
-        email: email.data,
-        normalizedEmail,
-        role: ClinicRole.STAFF,
-        invitedByUserId: owner.userId,
-        expiresAt,
-      },
-      select: { id: true },
+    const invitation = await prisma.$transaction(async (transaction) => {
+      const lockKey = `clinic-staff-seats:${owner.clinicId}`;
+      await transaction.$queryRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
+      `;
+      await transaction.clinicInvitation.updateMany({
+        where: {
+          clinicId: owner.clinicId,
+          normalizedEmail,
+          status: ClinicInvitationStatus.PENDING,
+          expiresAt: { lte: new Date() },
+        },
+        data: { status: ClinicInvitationStatus.REVOKED },
+      });
+      await assertStaffInvitationCapacity(transaction, owner.clinicId);
+      return transaction.clinicInvitation.create({
+        data: {
+          clinicId: owner.clinicId,
+          email: email.data,
+          normalizedEmail,
+          role: ClinicRole.STAFF,
+          invitedByUserId: owner.userId,
+          expiresAt,
+        },
+        select: { id: true },
+      });
     });
     invitationId = invitation.id;
   } catch (error) {
+    if (error instanceof BillingLimitReachedError && error.limit === "staff") {
+      return {
+        error: "Your plan's staff limit has been reached. Upgrade your plan or remove an existing staff seat before inviting someone new.",
+      };
+    }
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
