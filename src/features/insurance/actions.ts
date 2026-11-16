@@ -13,7 +13,10 @@ import {
   requireClinicMembership,
   requireClinicRole,
 } from "@/features/auth/lib/server-auth";
-import { BillingFeatureUnavailableError } from "@/features/billing/lib/billing-entitlements";
+import {
+  BillingAccessRestrictedError,
+  BillingFeatureUnavailableError,
+} from "@/features/billing/lib/billing-entitlements";
 import {
   archiveInsuranceProvider,
   authorizeInsuranceDocumentUpload,
@@ -82,7 +85,10 @@ function logInsuranceError(operation: string, error: unknown): void {
 }
 
 function redirectForInsuranceError(path: string, error: unknown): never {
-  if (error instanceof BillingFeatureUnavailableError) {
+  if (
+    error instanceof BillingFeatureUnavailableError ||
+    error instanceof BillingAccessRestrictedError
+  ) {
     errorRedirect(path, "upgrade-required");
   }
   if (error instanceof InsuranceRecordNotFoundError) {
