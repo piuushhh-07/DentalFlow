@@ -72,6 +72,8 @@ export async function getClinicBillingPortalData(clinicId: string) {
       currentPeriodEnd: true,
       graceUntil: true,
       cancelAtPeriodEnd: true,
+      pendingPlanChangeAt: true,
+      pendingPlanVersion: { select: { displayName: true } },
       createdAt: true,
       planVersion: {
         select: {
