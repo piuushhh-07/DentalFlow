@@ -69,7 +69,7 @@ export default async function DentalLabPage({
   const [clinic, patients, treatmentPlans, partners, orders] = await Promise.all([
     prisma.clinic.findUnique({
       where: { id: membership.clinicId },
-      select: { name: true },
+      select: { name: true, timeZone: true },
     }),
     prisma.patient.findMany({
       where: { clinicId: membership.clinicId, archivedAt: null },
@@ -111,6 +111,12 @@ export default async function DentalLabPage({
     }),
   ]);
   if (!clinic) notFound();
+  const todayInClinic = new Intl.DateTimeFormat("en-CA", {
+    timeZone: clinic.timeZone,
+  }).format(new Date());
+  const todayDate = new Date(`${todayInClinic}T00:00:00.000Z`);
+  const defaultDueDate = new Date(todayDate);
+  defaultDueDate.setUTCDate(defaultDueDate.getUTCDate() + 7);
   const canManage = membership.role === "OWNER";
   const message = searchParams?.status ? statusMessages[searchParams.status] : undefined;
 
@@ -134,7 +140,7 @@ export default async function DentalLabPage({
           </article>
           <article className="rounded-xl border border-slate-200 bg-white p-5">
             <p className="text-sm text-slate-500">Due / overdue</p>
-            <p className="mt-2 text-3xl font-semibold text-amber-700">{orders.filter((order) => !["FITTED", "CANCELLED"].includes(order.status) && order.dueDate < new Date(new Date().toISOString().slice(0, 10))).length}</p>
+            <p className="mt-2 text-3xl font-semibold text-amber-700">{orders.filter((order) => !["FITTED", "CANCELLED"].includes(order.status) && order.dueDate < todayDate).length}</p>
           </article>
           <article className="rounded-xl border border-slate-200 bg-white p-5">
             <p className="text-sm text-slate-500">Active lab partners</p>
@@ -173,7 +179,7 @@ export default async function DentalLabPage({
                   </select>
                 </label>
                 <label className="text-sm font-medium text-slate-700">Due date
-                  <input required type="date" name="dueDate" min={new Date().toISOString().slice(0, 10)} defaultValue={new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)} className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
+                  <input required type="date" name="dueDate" min={todayInClinic} defaultValue={defaultDueDate.toISOString().slice(0, 10)} className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
                 </label>
                 <label className="text-sm font-medium text-slate-700">Tooth number(s)
                   <input name="toothNumbers" maxLength={120} placeholder="e.g. 16, 17 or 11–21" className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
