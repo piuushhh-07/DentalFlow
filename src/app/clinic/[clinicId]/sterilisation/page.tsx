@@ -26,7 +26,7 @@ const messages: Record<string, string> = {
   "subscription-restricted": "Your subscription is inactive. Restore or renew it to make changes.",
   duplicate: "That load reference or pouch code is already in use.",
   "indicators-must-pass": "A cycle cannot pass unless both chemical and biological indicators pass.",
-  "failure-needs-indicator": "Mark at least one indicator as failed before recording a failed cycle.",
+  "failure-reason-required": "Add a reason or observation before recording a failed cycle.",
   "cycle-already-final": "This cycle has already been finalised and cannot be changed.",
   "cycle-not-passed": "Pouches can only be registered against a passed cycle and a valid expiry date.",
   "pouch-not-usable": "Only an unexpired sterile pouch can be marked as used. Quarantined or used pouches cannot be reused.",
@@ -138,6 +138,7 @@ export default async function SterilisationPage({
                   <label className="text-sm text-slate-700">Chemical indicator<select name="chemicalIndicatorPass" className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3"><option value="true">Pass</option><option value="false">Fail</option></select></label>
                   <label className="text-sm text-slate-700">Biological indicator<select name="biologicalIndicatorPass" className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3"><option value="true">Pass</option><option value="false">Fail</option></select></label>
                   <label className="text-sm text-slate-700">Cycle result<select name="result" className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3"><option value="PASS">Passed</option><option value="FAIL">Failed</option></select></label>
+                  <label className="text-sm text-slate-700 sm:col-span-2">Result notes / failure reason<input name="resultNotes" maxLength={1000} placeholder="Required for failed cycles" className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3" /></label>
                   <div className="flex items-end"><button type="submit" className="h-10 rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700">Save result</button></div>
                 </form>)}
               </div>
