@@ -8,7 +8,7 @@ import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { validateMembershipMutation } from "@/features/team/lib/team-management";
 import { prisma } from "@/lib/db/prisma";
 import {
-  assertStaffCapacity,
+  assertStaffInvitationCapacity,
   BillingAccessRestrictedError,
   BillingLimitReachedError,
 } from "@/features/billing/lib/billing-entitlements";
@@ -101,7 +101,7 @@ async function mutateMembership(
           await transaction.$queryRaw`
             SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
           `;
-          await assertStaffCapacity(transaction, clinicId);
+          await assertStaffInvitationCapacity(transaction, clinicId);
         }
 
         if (kind === "remove") {
