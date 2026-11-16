@@ -1,4 +1,4 @@
-import { ClinicEquipmentStatus, EquipmentMaintenanceType } from "@prisma/client";
+import { ClinicEquipmentStatus } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 
