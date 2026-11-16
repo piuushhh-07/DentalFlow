@@ -25,11 +25,9 @@ const orderSchema = z.object({
   orderNumber: z.string().trim().min(2).max(40),
   expectedAt: z.union([z.literal(""), z.coerce.date()]).optional(),
   notes: z.string().trim().max(1000).optional(),
-  lines: z.array(z.object({
-    itemId: uuid,
-    quantity: z.coerce.number().finite().positive().max(1000000),
-    unitCost: z.coerce.number().finite().min(0).max(1000000000),
-  })).min(1).max(100),
+  itemId: uuid,
+  quantity: z.coerce.number().finite().positive().max(1000000),
+  unitCost: z.coerce.number().finite().min(0).max(1000000000),
 });
 const receiveSchema = z.object({
   clinicId: uuid,
@@ -71,13 +69,11 @@ export async function createInventorySupplier(formData: FormData): Promise<never
 }
 
 export async function createInventoryPurchaseOrder(formData: FormData): Promise<never> {
-  const rawLines = formData.get("lines");
-  let lines: unknown = [];
-  try { lines = JSON.parse(String(rawLines ?? "[]")); } catch { redirect("/clinics"); }
   const parsed = orderSchema.safeParse({
     clinicId: formData.get("clinicId"), supplierId: formData.get("supplierId"),
     orderNumber: formData.get("orderNumber"), expectedAt: formData.get("expectedAt") || "",
-    notes: formData.get("notes") || "", lines,
+    notes: formData.get("notes") || "", itemId: formData.get("itemId"),
+    quantity: formData.get("quantity"), unitCost: formData.get("unitCost"),
   });
   if (!parsed.success) redirect("/clinics");
   const membership = await requireClinicRole(parsed.data.clinicId, [ClinicRole.OWNER]);
@@ -86,17 +82,16 @@ export async function createInventoryPurchaseOrder(formData: FormData): Promise<
       await assertFeatureEnabled(tx, membership.clinicId, "inventoryManagement");
       const supplier = await tx.inventorySupplier.findFirst({ where: { id: parsed.data.supplierId, clinicId: membership.clinicId, active: true }, select: { id: true } });
       if (!supplier) throw new Error("SUPPLIER_NOT_FOUND");
-      const itemIds = [...new Set(parsed.data.lines.map((line) => line.itemId))];
-      const count = await tx.inventoryItem.count({ where: { clinicId: membership.clinicId, active: true, id: { in: itemIds } } });
-      if (count !== itemIds.length) throw new Error("ITEM_NOT_FOUND");
+      const item = await tx.inventoryItem.findFirst({ where: { id: parsed.data.itemId, clinicId: membership.clinicId, active: true }, select: { id: true } });
+      if (!item) throw new Error("ITEM_NOT_FOUND");
       await tx.inventoryPurchaseOrder.create({ data: {
         clinicId: membership.clinicId, supplierId: supplier.id, orderNumber: parsed.data.orderNumber,
         expectedAt: parsed.data.expectedAt ? new Date(parsed.data.expectedAt) : null,
         notes: parsed.data.notes || null,
-        lines: { create: parsed.data.lines.map((line) => ({
-          clinicId: membership.clinicId, itemId: line.itemId,
-          quantityOrdered: new Prisma.Decimal(line.quantity), unitCost: new Prisma.Decimal(line.unitCost),
-        })) },
+        lines: { create: [{
+          clinicId: membership.clinicId, itemId: item.id,
+          quantityOrdered: new Prisma.Decimal(parsed.data.quantity), unitCost: new Prisma.Decimal(parsed.data.unitCost),
+        }] },
       }});
     });
   } catch (error) { handleError(membership.clinicId, error); }
