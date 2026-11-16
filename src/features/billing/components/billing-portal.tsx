@@ -340,7 +340,7 @@ export function BillingPortal({
 
           {subscription.pendingPlanVersion && subscription.pendingPlanChangeAt && (
             <p className="mt-4 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
-              Change to {subscription.pendingPlanVersion.displayName} scheduled for {formatDate(subscription.pendingPlanChangeAt)}. Your current plan remains active until then.
+              Change request for {subscription.pendingPlanVersion.displayName} is awaiting provider confirmation. Your current plan remains active until the change is verified.
             </p>
           )}
           <PlanEntitlementSummary entitlements={subscription.planVersion.entitlements} />
