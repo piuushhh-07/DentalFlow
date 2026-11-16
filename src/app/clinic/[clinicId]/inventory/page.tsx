@@ -103,6 +103,11 @@ export default async function ClinicInventoryPage({
             Keep dental materials and clinic supplies visible. Track stock
             received and used, and spot items that need reordering.
           </p>
+          <div className="mt-4">
+            <a href={`/clinic/${membership.clinicId}/inventory/procurement`} className="inline-flex h-9 items-center rounded-md border border-teal-700 px-3 text-sm font-semibold text-teal-800 hover:bg-teal-50">
+              Suppliers & procurement →
+            </a>
+          </div>
         </header>
 
         {status ? (
