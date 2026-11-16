@@ -33,8 +33,8 @@ function getRazorpayCredentials() {
 
 async function razorpayRequest(
   path: string,
-  method: "POST",
-  body: Record<string, unknown>,
+  method: "GET" | "POST" | "PATCH",
+  body?: Record<string, unknown>,
 ): Promise<unknown> {
   const { keyId, keySecret } = getRazorpayCredentials();
   const credentials = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
@@ -42,9 +42,9 @@ async function razorpayRequest(
     method,
     headers: {
       Authorization: `Basic ${credentials}`,
-      "Content-Type": "application/json",
+      ...(body ? { "Content-Type": "application/json" } : {}),
     },
-    body: JSON.stringify(body),
+    ...(body ? { body: JSON.stringify(body) } : {}),
     cache: "no-store",
   });
 
@@ -130,6 +130,46 @@ export async function cancelRazorpaySubscription(
     currentPeriodStart: epochDate(result.data.current_start),
     currentPeriodEnd: epochDate(result.data.current_end),
   };
+}
+
+
+const razorpaySubscriptionUpdateSchema = z.object({
+  id: z.string().min(1),
+  status: z.string().min(1),
+  plan_id: z.string().min(1),
+  payment_method: z.string().nullable().optional(),
+  current_start: z.number().int().nullable().optional(),
+  current_end: z.number().int().nullable().optional(),
+});
+
+export async function scheduleRazorpayPlanChange(input: {
+  providerSubscriptionId: string;
+  planId: string;
+}) {
+  const fetched = razorpaySubscriptionUpdateSchema.safeParse(
+    await razorpayRequest(
+      `subscriptions/${encodeURIComponent(input.providerSubscriptionId)}`,
+      "GET",
+    ),
+  );
+  if (!fetched.success) throw new Error("The billing provider returned an invalid subscription.");
+  if (!["authenticated", "active"].includes(fetched.data.status)) {
+    throw new Error("This provider subscription cannot be changed in its current state.");
+  }
+  if (fetched.data.payment_method !== "card") {
+    throw new Error("In-place plan changes are currently supported only for eligible card subscriptions.");
+  }
+  const updated = razorpaySubscriptionUpdateSchema.safeParse(
+    await razorpayRequest(
+      `subscriptions/${encodeURIComponent(input.providerSubscriptionId)}`,
+      "PATCH",
+      { plan_id: input.planId, schedule_change_at: "cycle_end", customer_notify: false },
+    ),
+  );
+  if (!updated.success || updated.data.id !== input.providerSubscriptionId || updated.data.plan_id !== input.planId) {
+    throw new Error("The billing provider could not confirm the scheduled plan change.");
+  }
+  return { providerPlanId: updated.data.plan_id, currentPeriodEnd: epochDate(updated.data.current_end) };
 }
 
 function epochDate(value: number | null | undefined): Date | null {
