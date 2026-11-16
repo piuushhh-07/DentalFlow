@@ -216,11 +216,15 @@ export async function inviteClinicStaffAction(
     invitationId = invitation.id;
   } catch (error) {
     if (error instanceof BillingAccessRestrictedError) {
-      return { error: "Your clinic subscription is inactive. Restore or upgrade the plan before inviting staff." };
+      return {
+        error:
+          "Your clinic subscription is inactive. Restore or upgrade the plan before inviting staff.",
+      };
     }
     if (error instanceof BillingLimitReachedError && error.limit === "staff") {
       return {
-        error: "Your plan's staff limit has been reached. Upgrade your plan or remove an existing staff seat before inviting someone new.",
+        error:
+          "Your plan's staff limit has been reached. Upgrade your plan or remove an existing staff seat before inviting someone new.",
       };
     }
     if (
