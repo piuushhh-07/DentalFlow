@@ -19,6 +19,7 @@ const statusMessages: Record<string, string> = {
   created: "Inventory item added.",
   updated: "Stock movement recorded.",
   "duplicate-sku": "That SKU is already used in this clinic.",
+  "upgrade-required": "This module is not included in your current plan. Upgrade your subscription to continue.",
   "insufficient-stock":
     "Stock cannot go below zero. Check the available quantity.",
   "item-not-found": "That inventory item is no longer available.",
