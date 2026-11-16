@@ -4,14 +4,49 @@ import {
 } from "@prisma/client";
 import { z } from "zod";
 
+export const billingFeaturesSchema = z
+  .object({
+    fullInsuranceClaims: z.boolean().default(false),
+    inventoryManagement: z.boolean().default(false),
+    dentalLabManagement: z.boolean().default(false),
+    expenseManagement: z.boolean().default(false),
+    advancedPermissions: z.boolean().default(false),
+    publicBooking: z.boolean().default(false),
+    advancedReports: z.boolean().default(false),
+    sterilisationTracking: z.boolean().default(false),
+    equipmentManagement: z.boolean().default(false),
+    multiBranchManagement: z.boolean().default(false),
+    consolidatedFinance: z.boolean().default(false),
+    interBranchTransfers: z.boolean().default(false),
+  })
+  .strict();
+
 export const billingEntitlementsSchema = z
   .object({
     maxPatients: z.number().int().positive().nullable().optional(),
     maxMonthlyAppointments: z.number().int().positive().nullable().optional(),
+    maxDentists: z.number().int().positive().nullable().optional(),
+    maxStaff: z.number().int().positive().nullable().optional(),
+    maxBranches: z.number().int().positive().nullable().optional(),
+    features: billingFeaturesSchema.default({
+      fullInsuranceClaims: false,
+      inventoryManagement: false,
+      dentalLabManagement: false,
+      expenseManagement: false,
+      advancedPermissions: false,
+      publicBooking: false,
+      advancedReports: false,
+      sterilisationTracking: false,
+      equipmentManagement: false,
+      multiBranchManagement: false,
+      consolidatedFinance: false,
+      interBranchTransfers: false,
+    }),
   })
   .strict();
 
 export type BillingEntitlements = z.infer<typeof billingEntitlementsSchema>;
+export type BillingFeature = keyof z.infer<typeof billingFeaturesSchema>;
 
 export type BillingStateSnapshot = Readonly<{
   status: BillingSubscriptionStatus;
