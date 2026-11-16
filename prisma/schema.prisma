@@ -633,6 +633,7 @@ model TreatmentPlan {
   insuranceClaims            InsuranceClaim[]
   insurancePreAuthorizations InsurancePreAuthorization[]
   odontogramEntries          OdontogramEntry[]
+  dentalLabOrders            DentalLabOrder[]
 
   @@unique([id, clinicId])
   @@unique([id, clinicId, patientId])
@@ -1601,6 +1602,7 @@ model DentalLabOrder {
   id                String               @id @default(uuid()) @db.Uuid
   clinicId          String               @db.Uuid
   patientId         String               @db.Uuid
+  treatmentPlanId   String?              @db.Uuid
   partnerId         String               @db.Uuid
   createdByUserId   String               @db.Uuid
   workType          String               @db.VarChar(100)
@@ -1622,12 +1624,14 @@ model DentalLabOrder {
   updatedAt         DateTime             @updatedAt @db.Timestamptz(6)
   clinic            Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   patient           Patient              @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  treatmentPlan     TreatmentPlan?       @relation(fields: [treatmentPlanId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Restrict)
   partner           DentalLabPartner     @relation(fields: [partnerId, clinicId], references: [id, clinicId], onDelete: Restrict)
   createdBy         ClinicMembership     @relation(fields: [createdByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
 
   @@unique([id, clinicId])
   @@index([clinicId, status, dueDate])
   @@index([clinicId, patientId, createdAt])
+  @@index([treatmentPlanId, clinicId, patientId], map: "dlo_treatment_plan_clinic_idx")
   @@index([clinicId, partnerId, status])
   @@index([patientId, clinicId], map: "dlo_patient_clinic_idx")
   @@index([partnerId, clinicId], map: "dlo_partner_clinic_idx")
