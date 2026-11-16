@@ -10,6 +10,7 @@ import {
 } from "@/features/auth/lib/server-auth";
 import {
   BillingAccessRestrictedError,
+  BillingFeatureUnavailableError,
   BillingLimitReachedError,
 } from "@/features/billing/lib/billing-entitlements";
 import {
@@ -83,7 +84,11 @@ function parseInput(formData: FormData) {
 
 function userFacingAppointmentError(error: unknown): string {
   if (error instanceof BillingLimitReachedError) {
-    return "This clinic has reached its monthly appointment limit. Review the subscription in Billing to continue scheduling.";
+    const limitMessage =
+      error.limit === "patients"
+        ? "patient limit"
+        : "monthly appointment limit";
+    return `This clinic has reached its ${limitMessage}. Review the subscription in Billing to continue.`;
   }
   if (error instanceof BillingAccessRestrictedError) {
     return "New appointments are paused for this subscription. Existing clinical records remain available.";
@@ -134,6 +139,15 @@ export async function createScheduleResourceAction(
     logAppointmentError(error);
     if (error instanceof ScheduleResourceDuplicateError) {
       return { error: error.message };
+    }
+    if (
+      error instanceof BillingLimitReachedError &&
+      error.limit === "dentists"
+    ) {
+      return {
+        error:
+          "Your subscription has reached its dentist limit. Upgrade your plan to add another dentist.",
+      };
     }
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -348,6 +362,18 @@ export async function createPublicBookingRequestAction(
       return {
         error:
           "That dentist or chair is no longer available. Reload and try again.",
+      };
+    }
+    if (error instanceof BillingFeatureUnavailableError) {
+      return {
+        error:
+          "Online booking is not included in this clinic's subscription. Upgrade the plan to enable it.",
+      };
+    }
+    if (error instanceof BillingAccessRestrictedError) {
+      return {
+        error:
+          "Online booking is paused because the subscription is not active.",
       };
     }
     logAppointmentError(error);

@@ -10,6 +10,8 @@ import {
 
 import { prisma } from "@/lib/db/prisma";
 import {
+  assertDentistCapacity,
+  assertFeatureEnabled,
   assertMonthlyAppointmentCapacity,
   assertPatientCapacity,
 } from "@/features/billing/lib/billing-entitlements";
@@ -588,6 +590,11 @@ export async function createPublicAppointmentRequest(
                 },
               }),
             createRequest: async () => {
+              await assertFeatureEnabled(
+                transaction,
+                clinicId,
+                "publicBooking",
+              );
               const recentRequestCount =
                 await transaction.appointmentRequest.count({
                   where: {
@@ -848,16 +855,23 @@ export async function createScheduleResource(
   name: string,
 ) {
   if (kind === "dentist") {
-    const duplicate = await prisma.clinicDentist.findFirst({
-      where: { clinicId, name: { equals: name, mode: "insensitive" } },
-      select: { id: true },
-    });
-    if (duplicate) throw new ScheduleResourceDuplicateError();
-    return prisma.clinicDentist.create({
-      data: { clinicId, name },
-      select: { id: true },
-    });
+    return prisma.$transaction(
+      async (transaction) => {
+        await assertDentistCapacity(transaction, clinicId);
+        const duplicate = await transaction.clinicDentist.findFirst({
+          where: { clinicId, name: { equals: name, mode: "insensitive" } },
+          select: { id: true },
+        });
+        if (duplicate) throw new ScheduleResourceDuplicateError();
+        return transaction.clinicDentist.create({
+          data: { clinicId, name },
+          select: { id: true },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
+
   const duplicate = await prisma.treatmentChair.findFirst({
     where: { clinicId, label: { equals: name, mode: "insensitive" } },
     select: { id: true },
