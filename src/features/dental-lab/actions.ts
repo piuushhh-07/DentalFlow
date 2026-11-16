@@ -206,6 +206,7 @@ export async function updateDentalLabOrderStatus(formData: FormData): Promise<ne
           ...(parsed.data.status === DentalLabOrderStatus.REMAKE_REQUESTED ? { remakeReason: parsed.data.remakeReason!.trim() } : {}),
         },
       });
+      if (updated.count !== 1) throw new Error("LAB_TRANSITION_CONFLICT");
     });
   } catch (error) {
     if (error instanceof BillingFeatureUnavailableError) redirect(labPath(membership.clinicId, "upgrade-required"));
