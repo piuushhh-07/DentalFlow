@@ -215,6 +215,7 @@ export async function reviewInsuranceClaimSummary(
   claimId: string,
 ) {
   return prisma.$transaction(async (transaction) => {
+    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockClaim(transaction, clinicId, claimId);
     const claim = await transaction.insuranceClaim.findFirst({
       where: { id: claimId, clinicId },
@@ -1637,6 +1638,7 @@ export async function authorizeInsuranceDocumentUpload(
     storagePath,
   );
   return prisma.$transaction(async (transaction) => {
+    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     const document = await transaction.insuranceDocument.findFirst({
       where: {
         id: documentId,
@@ -1679,6 +1681,7 @@ export async function registerInsuranceDocumentUpload(
   );
   return prisma.$transaction(
     async (transaction) => {
+      await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
       const document = await transaction.insuranceDocument.findFirst({
         where: { id: documentId, claimId, clinicId },
         select: { storagePath: true, status: true },
@@ -1985,6 +1988,7 @@ export async function updateInsuranceDocumentStatus(
   input: { status: "VERIFIED" | "REJECTED"; rejectionReason: string | null },
 ) {
   return prisma.$transaction(async (transaction) => {
+    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockDocument(transaction, clinicId, claimId, documentId);
     const document = await transaction.insuranceDocument.findFirst({
       where: {
