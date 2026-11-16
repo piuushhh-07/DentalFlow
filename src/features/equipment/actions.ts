@@ -107,7 +107,6 @@ export async function recordEquipmentMaintenance(formData: FormData): Promise<ne
       await tx.clinicEquipment.update({ where: { id: equipment.id }, data: {
         ...(nextServiceDue ? { nextServiceDue } : {}),
         ...(nextCalibrationDue ? { nextCalibrationDue } : {}),
-        ...(parsed.data.maintenanceType === EquipmentMaintenanceType.REPAIR ? { status: ClinicEquipmentStatus.ACTIVE } : {}),
       }});
     });
   } catch (error) {
