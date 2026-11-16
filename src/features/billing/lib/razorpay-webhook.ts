@@ -54,6 +54,7 @@ type ParsedRazorpayEvent = Readonly<{
   subscription: Readonly<{
     id: string;
     status: string;
+    planId: string | null;
     customerId: string | null;
     currentStart: Date | null;
     currentEnd: Date | null;
@@ -188,6 +189,7 @@ export function parseRazorpaySubscriptionEvent(
   const sanitizedSubscription = {
     id: subscriptionId,
     status: providerStatus,
+    planId: readString(subscriptionEntity, "plan_id"),
     customerId: readString(subscriptionEntity, "customer_id"),
     currentStart: readEpochDate(subscriptionEntity, "current_start"),
     currentEnd: readEpochDate(subscriptionEntity, "current_end"),
@@ -197,6 +199,7 @@ export function parseRazorpaySubscriptionEvent(
     subscription: {
       id: sanitizedSubscription.id,
       status: sanitizedSubscription.status,
+      planId: sanitizedSubscription.planId,
       customerId: sanitizedSubscription.customerId,
       currentStart: sanitizedSubscription.currentStart?.toISOString() ?? null,
       currentEnd: sanitizedSubscription.currentEnd?.toISOString() ?? null,
@@ -409,6 +412,9 @@ async function applySubscriptionEvent(
           cancelAtPeriodEnd: true,
           lastProviderEventCreatedAt: true,
           planVersion: { select: { graceDays: true } },
+          pendingPlanVersionId: true,
+          pendingPlanChangeAt: true,
+          pendingPlanVersion: { select: { providerPlanId: true } },
         },
       });
       if (!subscription) throw new UnknownRazorpaySubscriptionError();
@@ -441,6 +447,15 @@ async function applySubscriptionEvent(
         subscription.planVersion.graceDays,
       );
 
+      const planChangeEffective = Boolean(
+        subscription.pendingPlanVersionId &&
+        subscription.pendingPlanVersion &&
+        providerSubscription.planId === subscription.pendingPlanVersion.providerPlanId &&
+        subscription.currentPeriodEnd &&
+        providerSubscription.currentStart &&
+        providerSubscription.currentStart.getTime() >= subscription.currentPeriodEnd.getTime()
+      );
+
       await transaction.clinicSubscription.updateMany({
         where: {
           id: subscription.id,
@@ -452,6 +467,7 @@ async function applySubscriptionEvent(
         },
         data: {
           status: next.status,
+          ...(planChangeEffective ? { planVersionId: subscription.pendingPlanVersionId!, pendingPlanVersionId: null, pendingPlanChangeAt: null } : {}),
           lastProviderEventCreatedAt: event.eventCreatedAt,
           currentPeriodStart: providerSubscription.currentStart ?? undefined,
           currentPeriodEnd: providerSubscription.currentEnd ?? undefined,
