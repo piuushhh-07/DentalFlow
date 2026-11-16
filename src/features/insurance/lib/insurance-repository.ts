@@ -778,6 +778,7 @@ export async function updateInsuranceClaimDetails(
   },
 ) {
   return prisma.$transaction(async (transaction) => {
+    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockClaim(transaction, clinicId, claimId);
     const claim = await transaction.insuranceClaim.findFirst({
       where: { id: claimId, clinicId },
@@ -1027,6 +1028,7 @@ export async function createInsurancePayment(
 ) {
   return prisma.$transaction(
     async (transaction) => {
+      await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
       await lockClaim(transaction, clinicId, claimId);
       const claim = await transaction.insuranceClaim.findFirst({
         where: { id: claimId, clinicId },
@@ -1225,6 +1227,7 @@ export async function updateInsurancePreAuthorizationStatus(
   },
 ) {
   return prisma.$transaction(async (transaction) => {
+    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockPreAuthorization(transaction, clinicId, preAuthorizationId);
     const preAuthorization =
       await transaction.insurancePreAuthorization.findFirst({
