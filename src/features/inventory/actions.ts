@@ -9,6 +9,7 @@ import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { prisma } from "@/lib/db/prisma";
 import {
   assertFeatureEnabled,
+  BillingAccessRestrictedError,
   BillingFeatureUnavailableError,
 } from "@/features/billing/lib/billing-entitlements";
 
@@ -83,7 +84,10 @@ export async function createInventoryItem(formData: FormData): Promise<never> {
       });
     });
   } catch (error) {
-    if (error instanceof BillingFeatureUnavailableError) {
+    if (
+      error instanceof BillingFeatureUnavailableError ||
+      error instanceof BillingAccessRestrictedError
+    ) {
       redirect(inventoryPath(membership.clinicId, "upgrade-required"));
     }
     if (
