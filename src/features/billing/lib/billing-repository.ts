@@ -328,10 +328,9 @@ export async function scheduleClinicPlanChange(clinicId: string, targetPlanVersi
     await scheduleRazorpayPlanChange({ providerSubscriptionId: reservation.providerSubscriptionId, planId: targetPlan.providerPlanId });
     return { effectiveAt: reservation.effectiveAt };
   } catch (error) {
-    await prisma.clinicSubscription.updateMany({
-      where: { id: reservation.id, clinicId, pendingPlanVersionId: targetPlan.id },
-      data: { pendingPlanVersionId: null, pendingPlanChangeAt: null },
-    });
+    // The provider request may have succeeded even if the response was lost.
+    // Keep the local reservation for reconciliation instead of risking a second
+    // plan update or silently desynchronising provider and clinic entitlements.
     throw error;
   }
 }
