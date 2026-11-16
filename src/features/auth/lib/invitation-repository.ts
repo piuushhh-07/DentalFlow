@@ -5,6 +5,7 @@ import { ClinicInvitationStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import {
   assertStaffCapacity,
+  BillingAccessRestrictedError,
   BillingLimitReachedError,
 } from "@/features/billing/lib/billing-entitlements";
 
@@ -35,7 +36,10 @@ export async function activatePendingClinicInvitations(
         } catch (error) {
           // Keep the invitation pending so it can be activated after an
           // upgrade or after the clinic frees a staff seat.
-          if (error instanceof BillingLimitReachedError && error.limit === "staff") {
+          if (
+            error instanceof BillingAccessRestrictedError ||
+            (error instanceof BillingLimitReachedError && error.limit === "staff")
+          ) {
             continue;
           }
           throw error;
