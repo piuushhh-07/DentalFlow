@@ -313,6 +313,10 @@ export function BillingPortal({
             )}
           </dl>
 
+          <PlanEntitlementSummary
+            entitlements={subscription.planVersion.entitlements}
+          />
+
           {subscription.checkoutUrl &&
             !subscription.checkoutExpired &&
             [
@@ -486,23 +490,26 @@ export function BillingPortal({
             ) : (
               <div className="mt-4 flex flex-wrap gap-3">
                 {plans.map((plan) => (
-                  <div className="w-full rounded-lg border border-slate-200 p-4 sm:w-[calc(50%-0.5rem)]" key={plan.id}>
+                  <div
+                    className="w-full rounded-lg border border-slate-200 p-4 sm:w-[calc(50%-0.5rem)]"
+                    key={plan.id}
+                  >
                     <p className="font-semibold text-slate-900">{plan.displayName}</p>
                     <p className="mt-1 text-sm text-slate-600">
-                      {formatPrice(plan.amountMinor, plan.currency)} / {plan.intervalCount} {plan.interval.toLowerCase()}
+                      {formatPrice(plan.amountMinor, plan.currency)} /{" "}
+                      {plan.intervalCount} {plan.interval.toLowerCase()}
                       {plan.intervalCount > 1 ? "s" : ""}
                     </p>
                     <PlanEntitlementSummary entitlements={plan.entitlements} />
                     <button
-                    className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={isPending}
-                    key={plan.id}
-                    onClick={() => void beginCheckout(plan.id)}
-                    type="button"
-                  >
-                    {isPending
-                      ? "Preparing checkout…"
-                      : `Choose ${plan.displayName}`}
+                      className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={isPending}
+                      onClick={() => void beginCheckout(plan.id)}
+                      type="button"
+                    >
+                      {isPending
+                        ? "Preparing checkout…"
+                        : `Choose ${plan.displayName}`}
                     </button>
                   </div>
                 ))}
@@ -515,17 +522,23 @@ export function BillingPortal({
           aria-labelledby="available-plans-heading"
           className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
         >
-          <h2 id="available-plans-heading" className="text-xl font-semibold text-slate-900">
+          <h2
+            id="available-plans-heading"
+            className="text-xl font-semibold text-slate-900"
+          >
             Compare available plans
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Compare the limits and modules configured for sale. Changing an existing
-            subscription to another plan is not self-service yet; your current plan
-            remains active until a supported plan-change flow is introduced.
+            Compare the limits and modules configured for sale. Changing an
+            existing subscription to another plan is not self-service yet; your
+            current plan remains active until a supported plan-change flow is introduced.
           </p>
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
             {plans.map((plan) => (
-              <article className="rounded-lg border border-slate-200 p-5" key={plan.id}>
+              <article
+                className="rounded-lg border border-slate-200 p-5"
+                key={plan.id}
+              >
                 <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
                   {plan.code} · version {plan.version}
                 </p>
@@ -533,7 +546,9 @@ export function BillingPortal({
                   {plan.displayName}
                 </h3>
                 {plan.description && (
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{plan.description}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {plan.description}
+                  </p>
                 )}
                 <p className="mt-4 text-lg font-semibold text-slate-900">
                   {formatPrice(plan.amountMinor, plan.currency)}
