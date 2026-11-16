@@ -268,7 +268,6 @@ export default async function DentalLabPage({
                               order.status === "READY" ? ["DISPATCHED", "RECEIVED", "REMAKE_REQUESTED"] :
                               order.status === "DISPATCHED" ? ["RECEIVED", "REMAKE_REQUESTED"] :
                               order.status === "RECEIVED" ? ["FITTED", "REMAKE_REQUESTED"] :
-                              order.status === "FITTED" ? ["REMAKE_REQUESTED"] :
                               order.status === "REMAKE_REQUESTED" ? ["SENT_TO_LAB", "CANCELLED"] : []).map((status) => <option key={status} value={status}>{statusLabels[status as DentalLabOrderStatus]}</option>)}
                           </select>
                         </label>
