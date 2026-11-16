@@ -404,6 +404,8 @@ model Clinic {
   sterilisationCycles                  SterilisationCycle[]
   instrumentPouches                    InstrumentPouch[]
   infectionControlLogs                 InfectionControlLog[]
+  equipment                            ClinicEquipment[]
+  equipmentMaintenanceRecords          EquipmentMaintenanceRecord[]
 
   @@index([name])
   @@map("clinics")
@@ -541,6 +543,7 @@ model ClinicMembership {
   operatedSterilisationCycles        SterilisationCycle[] @relation("SterilisationCycleOperator")
   usedInstrumentPouches              InstrumentPouch[] @relation("InstrumentPouchUser")
   recordedInfectionControlLogs       InfectionControlLog[]
+  recordedEquipmentMaintenance       EquipmentMaintenanceRecord[]
   sentClinicInvitations             ClinicInvitation[]                  @relation("ClinicInvitationSender")
   staffProfile                      ClinicStaffProfile?
   permissionGrants                  ClinicPermissionGrant[]
@@ -1767,6 +1770,83 @@ model InfectionControlLog {
   @@index([clinicId, recordType, performedAt])
   @@index([recordedByUserId, clinicId], map: "icl_recorder_clinic_idx")
   @@map("infection_control_logs")
+}
+
+
+enum ClinicEquipmentType {
+  DENTAL_CHAIR
+  AUTOCLAVE
+  COMPRESSOR
+  X_RAY
+  INTRAORAL_SCANNER
+  ULTRASONIC_SCALER
+  OTHER
+}
+
+enum ClinicEquipmentStatus {
+  ACTIVE
+  OUT_OF_SERVICE
+  RETIRED
+}
+
+enum EquipmentMaintenanceType {
+  SERVICE
+  REPAIR
+  CALIBRATION
+  INSPECTION
+  AMC_RENEWAL
+}
+
+model ClinicEquipment {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  clinicId              String                 @db.Uuid
+  name                  String                 @db.VarChar(160)
+  equipmentType         ClinicEquipmentType
+  brand                 String?                @db.VarChar(120)
+  model                 String?                @db.VarChar(120)
+  serialNumber          String?                @db.VarChar(120)
+  location              String?                @db.VarChar(120)
+  purchaseDate          DateTime?              @db.Date
+  warrantyUntil         DateTime?              @db.Date
+  amcUntil              DateTime?              @db.Date
+  nextServiceDue        DateTime?              @db.Date
+  nextCalibrationDue    DateTime?              @db.Date
+  status                ClinicEquipmentStatus  @default(ACTIVE)
+  notes                 String?                @db.VarChar(1000)
+  createdAt             DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime               @updatedAt @db.Timestamptz(6)
+  clinic                Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  maintenanceRecords    EquipmentMaintenanceRecord[]
+
+  @@unique([id, clinicId])
+  @@unique([clinicId, serialNumber])
+  @@index([clinicId, status, name])
+  @@index([clinicId, nextServiceDue, nextCalibrationDue])
+  @@map("clinic_equipment")
+}
+
+model EquipmentMaintenanceRecord {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  clinicId              String                   @db.Uuid
+  equipmentId           String                   @db.Uuid
+  recordedByUserId      String                   @db.Uuid
+  maintenanceType       EquipmentMaintenanceType
+  serviceDate           DateTime                 @db.Date
+  vendor                String?                  @db.VarChar(160)
+  description           String                   @db.VarChar(2000)
+  cost                  Decimal?                 @db.Decimal(12, 2)
+  reference             String?                  @db.VarChar(120)
+  nextServiceDue        DateTime?                @db.Date
+  nextCalibrationDue    DateTime?                @db.Date
+  createdAt             DateTime                 @default(now()) @db.Timestamptz(6)
+  clinic                Clinic                   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  equipment             ClinicEquipment          @relation(fields: [equipmentId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  recordedBy            ClinicMembership         @relation(fields: [recordedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@index([clinicId, serviceDate])
+  @@index([clinicId, equipmentId, serviceDate])
+  @@index([recordedByUserId, clinicId], map: "emr_recorder_clinic_idx")
+  @@map("equipment_maintenance_records")
 }
 
 model DentalLabPartner {
