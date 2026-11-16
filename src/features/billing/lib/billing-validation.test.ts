@@ -267,6 +267,20 @@ test("validates only known server-side plan limits", () => {
     {
       maxPatients: 500,
       maxMonthlyAppointments: 1000,
+      features: {
+        fullInsuranceClaims: false,
+        inventoryManagement: false,
+        dentalLabManagement: false,
+        expenseManagement: false,
+        advancedPermissions: false,
+        publicBooking: false,
+        advancedReports: false,
+        sterilisationTracking: false,
+        equipmentManagement: false,
+        multiBranchManagement: false,
+        consolidatedFinance: false,
+        interBranchTransfers: false,
+      },
     },
   );
   assert.equal(
