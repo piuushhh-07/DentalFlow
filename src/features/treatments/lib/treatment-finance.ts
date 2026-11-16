@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   FinancialEntryType,
   PaymentMethod,
@@ -28,6 +28,7 @@ import {
   treatmentPlanFinanceSchema,
   type TreatmentFinancialEntryInput,
 } from "@/features/treatments/lib/treatment-finance-validation";
+import { createTreatmentFinancialEntryRequestHash } from "@/features/treatments/lib/treatment-finance-idempotency";
 
 export {
   financialEntryTypeLabels,
@@ -543,28 +544,6 @@ async function runTreatmentPlanFinancialEntryTransaction(
     recordTransactionPhase(diagnostic, "outer_rejected", error);
     throw error;
   }
-}
-
-function createTreatmentFinancialEntryRequestHash(
-  patientId: string,
-  treatmentPlanId: string,
-  createdByUserId: string,
-  input: TreatmentFinancialEntryInput,
-) {
-  return createHash("sha256")
-    .update(
-      JSON.stringify({
-        patientId,
-        treatmentPlanId,
-        createdByUserId,
-        entryType: input.entryType,
-        amount: input.amount,
-        discountMode: input.discountMode ?? null,
-        paymentMethod: input.paymentMethod ?? null,
-        paidAt: input.paidAt,
-      }),
-    )
-    .digest("hex");
 }
 
 export async function createTreatmentPlanFinancialEntry(
