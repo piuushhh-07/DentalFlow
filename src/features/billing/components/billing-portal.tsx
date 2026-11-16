@@ -18,6 +18,7 @@ type BillingPlan = Readonly<{
   interval: "MONTH" | "YEAR";
   intervalCount: number;
   trialDays: number;
+  entitlements: unknown;
 }>;
 
 type BillingPortalData = Readonly<{
@@ -36,6 +37,7 @@ type BillingPortalData = Readonly<{
     amountMinor: number;
     interval: "MONTH" | "YEAR";
     intervalCount: number;
+    entitlements: unknown;
   }>;
   payments: readonly Readonly<{
     id: string;
@@ -54,6 +56,129 @@ type BillingPortalProps = Readonly<{
   plans: readonly BillingPlan[];
   subscription: BillingPortalData | null;
 }>;
+
+type PlanEntitlements = Readonly<{
+  maxPatients?: number | null;
+  maxMonthlyAppointments?: number | null;
+  maxDentists?: number | null;
+  maxStaff?: number | null;
+  maxBranches?: number | null;
+  features?: Readonly<Record<string, boolean | undefined>>;
+}>;
+
+const FEATURE_LABELS = [
+  ["fullInsuranceClaims", "Insurance claims & pre-authorisation"],
+  ["inventoryManagement", "Inventory & procurement"],
+  ["dentalLabManagement", "Dental laboratory management"],
+  ["expenseManagement", "Clinic expense tracking"],
+  ["advancedPermissions", "Advanced staff permissions"],
+  ["publicBooking", "Online appointment booking"],
+  ["advancedReports", "Advanced clinic reports"],
+  ["sterilisationTracking", "Sterilisation & infection-control logs"],
+  ["equipmentManagement", "Equipment & maintenance records"],
+  ["multiBranchManagement", "Multi-branch management"],
+  ["consolidatedFinance", "Consolidated branch finances"],
+  ["interBranchTransfers", "Inter-branch stock transfers"],
+] as const;
+
+function readPlanEntitlements(value: unknown): PlanEntitlements {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const record = value as Record<string, unknown>;
+  const rawFeatures = record.features;
+  const features =
+    rawFeatures && typeof rawFeatures === "object" && !Array.isArray(rawFeatures)
+      ? (rawFeatures as Record<string, boolean | undefined>)
+      : undefined;
+
+  return {
+    maxPatients:
+      typeof record.maxPatients === "number" ? record.maxPatients : null,
+    maxMonthlyAppointments:
+      typeof record.maxMonthlyAppointments === "number"
+        ? record.maxMonthlyAppointments
+        : null,
+    maxDentists:
+      typeof record.maxDentists === "number" ? record.maxDentists : null,
+    maxStaff: typeof record.maxStaff === "number" ? record.maxStaff : null,
+    maxBranches:
+      typeof record.maxBranches === "number" ? record.maxBranches : null,
+    features,
+  };
+}
+
+function PlanEntitlementSummary({
+  entitlements,
+}: {
+  entitlements: unknown;
+}) {
+  const parsed = readPlanEntitlements(entitlements);
+  const limits = [
+    ["Patients", parsed.maxPatients],
+    ["Appointments / month", parsed.maxMonthlyAppointments],
+    ["Dentists", parsed.maxDentists],
+    ["Staff seats", parsed.maxStaff],
+    ["Branches", parsed.maxBranches],
+  ].filter((entry) => entry[1] !== null && entry[1] !== undefined);
+  const featureRows = FEATURE_LABELS.map(([key, label]) => ({
+    key,
+    label,
+    enabled: parsed.features?.[key] === true,
+  }));
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+      {limits.length > 0 && (
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Plan limits
+          </h4>
+          <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+            {limits.map(([label, value]) => (
+              <div className="flex justify-between gap-2" key={String(label)}>
+                <dt className="text-slate-600">{label}</dt>
+                <dd className="font-semibold tabular-nums text-slate-900">
+                  {Number(value).toLocaleString("en-IN")}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Additional modules
+        </h4>
+        <ul className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+          {featureRows.map((feature) => (
+            <li
+              className={
+                feature.enabled
+                  ? "flex items-start gap-2 text-slate-700"
+                  : "flex items-start gap-2 text-slate-400"
+              }
+              key={feature.key}
+            >
+              <span
+                aria-hidden="true"
+                className={
+                  feature.enabled
+                    ? "font-bold text-teal-700"
+                    : "font-medium text-slate-400"
+                }
+              >
+                {feature.enabled ? "✓" : "—"}
+              </span>
+              {feature.label}
+              <span className="sr-only">
+                {feature.enabled ? " included" : " not included"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
 
 function formatPrice(amountMinor: number, currency: string): string {
   return `${currency} ${(amountMinor / 100).toFixed(2)}`;
@@ -201,6 +326,10 @@ export function BillingPortal({
             )}
           </dl>
 
+          <PlanEntitlementSummary
+            entitlements={subscription.planVersion.entitlements}
+          />
+
           {subscription.checkoutUrl &&
             !subscription.checkoutExpired &&
             [
@@ -340,6 +469,7 @@ export function BillingPortal({
                       {plan.trialDays}-day trial if this clinic is eligible.
                     </p>
                   )}
+                  <PlanEntitlementSummary entitlements={plan.entitlements} />
                   <button
                     className="mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isPending}
@@ -373,22 +503,78 @@ export function BillingPortal({
             ) : (
               <div className="mt-4 flex flex-wrap gap-3">
                 {plans.map((plan) => (
-                  <button
-                    className="inline-flex min-h-10 items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={isPending}
+                  <div
+                    className="w-full rounded-lg border border-slate-200 p-4 sm:w-[calc(50%-0.5rem)]"
                     key={plan.id}
-                    onClick={() => void beginCheckout(plan.id)}
-                    type="button"
                   >
-                    {isPending
-                      ? "Preparing checkout…"
-                      : `Choose ${plan.displayName}`}
-                  </button>
+                    <p className="font-semibold text-slate-900">{plan.displayName}</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {formatPrice(plan.amountMinor, plan.currency)} /{" "}
+                      {plan.intervalCount} {plan.interval.toLowerCase()}
+                      {plan.intervalCount > 1 ? "s" : ""}
+                    </p>
+                    <PlanEntitlementSummary entitlements={plan.entitlements} />
+                    <button
+                      className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={isPending}
+                      onClick={() => void beginCheckout(plan.id)}
+                      type="button"
+                    >
+                      {isPending
+                        ? "Preparing checkout…"
+                        : `Choose ${plan.displayName}`}
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
           </section>
         )}
+      {subscription && plans.length > 0 && (
+        <section
+          aria-labelledby="available-plans-heading"
+          className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
+        >
+          <h2
+            id="available-plans-heading"
+            className="text-xl font-semibold text-slate-900"
+          >
+            Compare available plans
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Compare the limits and modules configured for sale. Subscription
+            changes are not self-service from this screen yet.
+          </p>
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {plans.map((plan) => (
+              <article
+                className="rounded-lg border border-slate-200 p-5"
+                key={plan.id}
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
+                  {plan.code} · version {plan.version}
+                </p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-900">
+                  {plan.displayName}
+                </h3>
+                {plan.description && (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {plan.description}
+                  </p>
+                )}
+                <p className="mt-4 text-lg font-semibold text-slate-900">
+                  {formatPrice(plan.amountMinor, plan.currency)}
+                  <span className="ml-1 text-sm font-normal text-slate-500">
+                    / {plan.intervalCount} {plan.interval.toLowerCase()}
+                    {plan.intervalCount > 1 ? "s" : ""}
+                  </span>
+                </p>
+                <PlanEntitlementSummary entitlements={plan.entitlements} />
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
       {checkoutUrl && (
         <a
           className="inline-flex min-h-10 items-center justify-center rounded-md border border-teal-700 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
