@@ -84,11 +84,11 @@ export async function createInventoryItem(formData: FormData): Promise<never> {
       });
     });
   } catch (error) {
-    if (
-      error instanceof BillingFeatureUnavailableError ||
-      error instanceof BillingAccessRestrictedError
-    ) {
+    if (error instanceof BillingFeatureUnavailableError) {
       redirect(inventoryPath(membership.clinicId, "upgrade-required"));
+    }
+    if (error instanceof BillingAccessRestrictedError) {
+      redirect(inventoryPath(membership.clinicId, "subscription-restricted"));
     }
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
