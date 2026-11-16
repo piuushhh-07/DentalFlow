@@ -490,7 +490,7 @@ export function BillingPortal({
             subscription.checkoutExpired) ||
           (["PAST_DUE", "GRACE_PERIOD"].includes(subscription.status) &&
             subscription.graceUntil !== null &&
-            new Date(subscription.graceUntil).getTime() <= Date.now())) && (
+            subscription.graceUntil.getTime() <= Date.now())) && (
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
             <h2 className="text-xl font-semibold text-slate-900">
               Start a new subscription
