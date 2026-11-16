@@ -434,11 +434,15 @@ model ClinicSubscription {
   updatedAt                  DateTime                  @updatedAt @db.Timestamptz(6)
   clinic                     Clinic                    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   planVersion                BillingPlanVersion        @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  pendingPlanVersion          BillingPlanVersion?       @relation("PendingSubscriptionPlan", fields: [pendingPlanVersionId], references: [id], onDelete: SetNull)
+  pendingPlanVersionId        String?                   @db.Uuid
+  pendingPlanChangeAt         DateTime?                 @db.Timestamptz(6)
   payments                   BillingPayment[]
 
   @@unique([id, clinicId])
   @@index([clinicId, status, createdAt])
   @@index([planVersionId], map: "cs_plan_version_idx")
+  @@index([pendingPlanVersionId], map: "cs_pending_plan_version_idx")
   @@map("clinic_subscriptions")
 }
 
