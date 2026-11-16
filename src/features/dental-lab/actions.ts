@@ -12,6 +12,7 @@ import {
   BillingFeatureUnavailableError,
 } from "@/features/billing/lib/billing-entitlements";
 import { prisma } from "@/lib/db/prisma";
+import { canTransitionDentalLabOrder } from "@/features/dental-lab/workflow";
 
 const uuid = z.string().uuid();
 const partnerSchema = z.object({
@@ -152,19 +153,6 @@ export async function createDentalLabOrder(formData: FormData): Promise<never> {
   redirect(labPath(membership.clinicId, "order-created"));
 }
 
-const allowedTransitions: Record<DentalLabOrderStatus, readonly DentalLabOrderStatus[]> = {
-  DRAFT: ["SENT_TO_LAB", "CANCELLED"],
-  SENT_TO_LAB: ["ACCEPTED", "IN_PROGRESS", "CANCELLED"],
-  ACCEPTED: ["IN_PROGRESS", "CANCELLED"],
-  IN_PROGRESS: ["READY", "REMAKE_REQUESTED", "CANCELLED"],
-  READY: ["DISPATCHED", "RECEIVED", "REMAKE_REQUESTED"],
-  DISPATCHED: ["RECEIVED", "REMAKE_REQUESTED"],
-  RECEIVED: ["FITTED", "REMAKE_REQUESTED"],
-  FITTED: ["REMAKE_REQUESTED"],
-  REMAKE_REQUESTED: ["SENT_TO_LAB", "CANCELLED"],
-  CANCELLED: [],
-};
-
 export async function updateDentalLabOrderStatus(formData: FormData): Promise<never> {
   const parsed = statusSchema.safeParse({
     clinicId: formData.get("clinicId"),
@@ -183,7 +171,7 @@ export async function updateDentalLabOrderStatus(formData: FormData): Promise<ne
         select: { id: true, status: true },
       });
       if (!current) throw new Error("LAB_ORDER_NOT_FOUND");
-      if (!allowedTransitions[current.status].includes(parsed.data.status)) {
+      if (!canTransitionDentalLabOrder(current.status, parsed.data.status)) {
         throw new Error("LAB_TRANSITION_NOT_ALLOWED");
       }
       if (parsed.data.status === DentalLabOrderStatus.REMAKE_REQUESTED && !parsed.data.remakeReason?.trim()) {
