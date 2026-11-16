@@ -7,6 +7,10 @@ import { z } from "zod";
 
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { prisma } from "@/lib/db/prisma";
+import {
+  assertFeatureEnabled,
+  BillingFeatureUnavailableError,
+} from "@/features/billing/lib/billing-entitlements";
 
 const expenseSchema = z.object({
   clinicId: z.string().uuid(),
@@ -42,21 +46,31 @@ export async function createClinicExpense(formData: FormData): Promise<never> {
     ClinicRole.OWNER,
   ]);
   try {
-    await prisma.clinicExpense.create({
-      data: {
-        clinicId: membership.clinicId,
-        recordedByUserId: membership.userId,
-        description: parsed.data.description,
-        category: parsed.data.category,
-        vendor: parsed.data.vendor || null,
-        amount: new Prisma.Decimal(parsed.data.amount),
-        expenseDate: new Date(`${parsed.data.expenseDate}T00:00:00.000Z`),
-        paymentMethod: parsed.data.paymentMethod,
-        reference: parsed.data.reference || null,
-        notes: parsed.data.notes || null,
-      },
+    await prisma.$transaction(async (transaction) => {
+      await assertFeatureEnabled(
+        transaction,
+        membership.clinicId,
+        "expenseManagement",
+      );
+      await transaction.clinicExpense.create({
+        data: {
+          clinicId: membership.clinicId,
+          recordedByUserId: membership.userId,
+          description: parsed.data.description,
+          category: parsed.data.category,
+          vendor: parsed.data.vendor || null,
+          amount: new Prisma.Decimal(parsed.data.amount),
+          expenseDate: new Date(`${parsed.data.expenseDate}T00:00:00.000Z`),
+          paymentMethod: parsed.data.paymentMethod,
+          reference: parsed.data.reference || null,
+          notes: parsed.data.notes || null,
+        },
+      });
     });
   } catch (error) {
+    if (error instanceof BillingFeatureUnavailableError) {
+      redirect(expensePath(membership.clinicId, "upgrade-required"));
+    }
     console.error("Clinic expense creation failed", {
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
