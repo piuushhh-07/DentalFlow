@@ -81,6 +81,9 @@ function logInsuranceError(operation: string, error: unknown): void {
 }
 
 function redirectForInsuranceError(path: string, error: unknown): never {
+  if (error instanceof BillingFeatureUnavailableError) {
+    errorRedirect(path, "upgrade-required");
+  }
   if (error instanceof InsuranceRecordNotFoundError) {
     errorRedirect(path, "not-found");
   }
