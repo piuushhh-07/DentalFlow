@@ -167,7 +167,7 @@ export async function startClinicSubscriptionCheckout(
       if (gracePeriodExpired && activeSubscription) {
         // Once the configured grace window has elapsed, allow a fresh checkout
         // instead of leaving the clinic permanently blocked in a past-due state.
-        await transaction.clinicSubscription.updateMany({
+        const expired = await transaction.clinicSubscription.updateMany({
           where: {
             id: activeSubscription.id,
             clinicId,
@@ -176,6 +176,11 @@ export async function startClinicSubscriptionCheckout(
           },
           data: { status: BillingSubscriptionStatus.EXPIRED },
         });
+        if (expired.count !== 1) {
+          // A successful payment webhook may have recovered the subscription
+          // while checkout was being prepared. Never create a second active one.
+          throw new BillingSubscriptionAlreadyExistsError();
+        }
       } else if (pendingCheckoutExpired && activeSubscription) {
         await transaction.clinicSubscription.updateMany({
           where: {
