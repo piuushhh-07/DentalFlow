@@ -132,8 +132,8 @@ export async function receiveInventoryPurchaseOrderLine(formData: FormData): Pro
         notes: `Received batch ${parsed.data.batchNumber}`,
       }});
       const updatedLine = await tx.inventoryPurchaseOrderLine.update({ where: { id: line.id }, data: { quantityReceived: line.quantityReceived.plus(qty) } });
-      const remaining = await tx.inventoryPurchaseOrderLine.count({ where: { orderId: parsed.data.orderId, clinicId: membership.clinicId, quantityReceived: { lt: tx.inventoryPurchaseOrderLine.fields.quantityOrdered } } });
-      const receivedAll = updatedLine.quantityReceived.equals(updatedLine.quantityOrdered) && remaining === 0;
+      const allLines = await tx.inventoryPurchaseOrderLine.findMany({ where: { orderId: parsed.data.orderId, clinicId: membership.clinicId }, select: { id: true, quantityOrdered: true, quantityReceived: true } });
+      const receivedAll = allLines.every((entry) => entry.id === updatedLine.id ? updatedLine.quantityReceived.greaterThanOrEqualTo(entry.quantityOrdered) : entry.quantityReceived.greaterThanOrEqualTo(entry.quantityOrdered));
       await tx.inventoryPurchaseOrder.update({ where: { id: parsed.data.orderId }, data: { status: receivedAll ? InventoryPurchaseOrderStatus.RECEIVED : InventoryPurchaseOrderStatus.PARTIALLY_RECEIVED } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
