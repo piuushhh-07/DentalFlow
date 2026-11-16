@@ -7,12 +7,15 @@ import { hasBillingGracePeriodExpired } from "@/features/billing/lib/billing-val
 import {
   cancelRazorpaySubscription,
   createRazorpaySubscription,
+  scheduleRazorpayPlanChange,
 } from "@/features/billing/lib/razorpay-client";
 
 export class BillingPlanUnavailableError extends Error {}
 export class BillingSubscriptionAlreadyExistsError extends Error {}
 export class BillingCheckoutConflictError extends Error {}
 export class BillingSubscriptionNotFoundError extends Error {}
+export class BillingPlanChangeUnavailableError extends Error {}
+export class BillingPlanChangeAlreadyScheduledError extends Error {}
 
 const CURRENT_STATUSES = [
   BillingSubscriptionStatus.CHECKOUT_PENDING,
@@ -69,6 +72,8 @@ export async function getClinicBillingPortalData(clinicId: string) {
       currentPeriodEnd: true,
       graceUntil: true,
       cancelAtPeriodEnd: true,
+      pendingPlanChangeAt: true,
+      pendingPlanVersion: { select: { displayName: true } },
       createdAt: true,
       planVersion: {
         select: {
@@ -288,6 +293,44 @@ export async function startClinicSubscriptionCheckout(
         trialEndsAt: null,
       },
     });
+    throw error;
+  }
+}
+
+
+export async function scheduleClinicPlanChange(clinicId: string, targetPlanVersionId: string): Promise<{ effectiveAt: Date }> {
+  const targetPlan = await prisma.billingPlanVersion.findFirst({
+    where: { id: targetPlanVersionId, availableForSale: true, providerPlanId: { not: null } },
+    select: { id: true, providerPlanId: true },
+  });
+  if (!targetPlan?.providerPlanId) throw new BillingPlanChangeUnavailableError();
+
+  const reservation = await prisma.$transaction(async (transaction) => {
+    const lockKey = `clinic-billing-checkout:${clinicId}`;
+    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+    const current = await transaction.clinicSubscription.findFirst({
+      where: { clinicId, status: BillingSubscriptionStatus.ACTIVE, providerSubscriptionId: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, planVersionId: true, providerSubscriptionId: true, currentPeriodEnd: true, cancelAtPeriodEnd: true, pendingPlanVersionId: true },
+    });
+    if (!current?.providerSubscriptionId || !current.currentPeriodEnd || current.cancelAtPeriodEnd) throw new BillingPlanChangeUnavailableError();
+    if (current.planVersionId === targetPlan.id) throw new BillingPlanChangeUnavailableError();
+    if (current.pendingPlanVersionId) throw new BillingPlanChangeAlreadyScheduledError();
+    const reserved = await transaction.clinicSubscription.updateMany({
+      where: { id: current.id, clinicId, status: BillingSubscriptionStatus.ACTIVE, pendingPlanVersionId: null },
+      data: { pendingPlanVersionId: targetPlan.id, pendingPlanChangeAt: current.currentPeriodEnd },
+    });
+    if (reserved.count !== 1) throw new BillingPlanChangeAlreadyScheduledError();
+    return { id: current.id, providerSubscriptionId: current.providerSubscriptionId, effectiveAt: current.currentPeriodEnd };
+  });
+
+  try {
+    await scheduleRazorpayPlanChange({ providerSubscriptionId: reservation.providerSubscriptionId, planId: targetPlan.providerPlanId });
+    return { effectiveAt: reservation.effectiveAt };
+  } catch (error) {
+    // The provider request may have succeeded even if the response was lost.
+    // Keep the local reservation for reconciliation instead of risking a second
+    // plan update or silently desynchronising provider and clinic entitlements.
     throw error;
   }
 }

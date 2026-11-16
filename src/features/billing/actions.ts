@@ -11,6 +11,9 @@ import {
   BillingSubscriptionAlreadyExistsError,
   BillingSubscriptionNotFoundError,
   cancelClinicSubscriptionAtPeriodEnd,
+  scheduleClinicPlanChange,
+  BillingPlanChangeUnavailableError,
+  BillingPlanChangeAlreadyScheduledError,
   startClinicSubscriptionCheckout,
 } from "@/features/billing/lib/billing-repository";
 
@@ -93,5 +96,22 @@ export async function cancelBillingSubscriptionAction(
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
     return { error: "We couldn't request cancellation. Please try again." };
+  }
+}
+
+export async function scheduleBillingPlanChangeAction(clinicIdInput: string, planVersionIdInput: string): Promise<BillingActionResult> {
+  const clinicId = uuidSchema.safeParse(clinicIdInput);
+  const planVersionId = uuidSchema.safeParse(planVersionIdInput);
+  if (!clinicId.success || !planVersionId.success) return { error: "Select a valid subscription plan." };
+  const membership = await requireClinicRole(clinicId.data, [ClinicRole.OWNER]);
+  try {
+    const result = await scheduleClinicPlanChange(membership.clinicId, planVersionId.data);
+    revalidatePath(`/clinic/${membership.clinicId}/billing`);
+    return { success: `Plan change scheduled for ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" }).format(result.effectiveAt)}. Your current access remains unchanged until then.` };
+  } catch (error) {
+    if (error instanceof BillingPlanChangeAlreadyScheduledError) return { error: "A plan change is already scheduled for this clinic." };
+    if (error instanceof BillingPlanChangeUnavailableError) return { error: "This subscription or plan is not eligible for an in-place plan change." };
+    console.error("Billing plan change failed", { errorName: error instanceof Error ? error.name : "UnknownError" });
+    return { error: "We couldn't schedule this plan change. Your current plan remains unchanged." };
   }
 }

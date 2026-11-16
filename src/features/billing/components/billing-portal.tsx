@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   cancelBillingSubscriptionAction,
   startBillingCheckoutAction,
+  scheduleBillingPlanChangeAction,
 } from "@/features/billing/actions";
 
 type BillingPlan = Readonly<{
@@ -29,6 +30,8 @@ type BillingPortalData = Readonly<{
   currentPeriodEnd: Date | null;
   graceUntil: Date | null;
   cancelAtPeriodEnd: boolean;
+  pendingPlanChangeAt: Date | null;
+  pendingPlanVersion: Readonly<{ displayName: string }> | null;
   planVersion: Readonly<{
     displayName: string;
     code: string;
@@ -225,6 +228,15 @@ export function BillingPortal({
     }
   }
 
+  async function schedulePlanChange(planVersionId: string) {
+    setIsPending(true); setNotice(null); setError(null);
+    try {
+      const result = await scheduleBillingPlanChangeAction(clinicId, planVersionId);
+      setError(result.error ?? null); setNotice(result.success ?? null);
+    } catch { setError("We couldn't schedule the plan change. Please try again."); }
+    finally { setIsPending(false); }
+  }
+
   async function cancelSubscription() {
     setIsPending(true);
     setNotice(null);
@@ -326,9 +338,12 @@ export function BillingPortal({
             )}
           </dl>
 
-          <PlanEntitlementSummary
-            entitlements={subscription.planVersion.entitlements}
-          />
+          {subscription.pendingPlanVersion && subscription.pendingPlanChangeAt && (
+            <p className="mt-4 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+              Change request for {subscription.pendingPlanVersion.displayName} is awaiting provider confirmation. Your current plan remains active until the change is verified.
+            </p>
+          )}
+          <PlanEntitlementSummary entitlements={subscription.planVersion.entitlements} />
 
           {subscription.checkoutUrl &&
             !subscription.checkoutExpired &&
@@ -574,6 +589,11 @@ export function BillingPortal({
                   </span>
                 </p>
                 <PlanEntitlementSummary entitlements={plan.entitlements} />
+                {subscription.status === "ACTIVE" && !subscription.cancelAtPeriodEnd && !subscription.pendingPlanVersion && plan.code !== subscription.planVersion.code && (
+                  <button className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-md border border-teal-700 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 disabled:opacity-60" disabled={isPending} onClick={() => void schedulePlanChange(plan.id)} type="button">
+                    {isPending ? "Scheduling…" : "Schedule plan change"}
+                  </button>
+                )}
               </article>
             ))}
           </div>
