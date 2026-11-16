@@ -958,11 +958,12 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         await prisma.clinicMembership.create({
           data: { clinicId: clinicAId, userId: userBId, role: ClinicRole.STAFF },
         });
+        const staffSeatEmail = `staff-seat-${randomUUID()}@example.test`;
         const staffSeatInvitation = await prisma.clinicInvitation.create({
           data: {
             clinicId: clinicAId,
-            email: `staff-seat-${randomUUID()}@example.test`,
-            normalizedEmail: `staff-seat-${randomUUID()}@example.test`,
+            email: staffSeatEmail,
+            normalizedEmail: staffSeatEmail,
             role: ClinicRole.STAFF,
             invitedByUserId: userAId,
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
