@@ -87,7 +87,6 @@ export async function createDentalLabPartner(formData: FormData): Promise<never>
           notes: optional(parsed.data.notes),
         },
       });
-      if (updated.count !== 1) throw new Error("LAB_TRANSITION_CONFLICT");
     });
   } catch (error) {
     if (error instanceof BillingFeatureUnavailableError) redirect(labPath(membership.clinicId, "upgrade-required"));
