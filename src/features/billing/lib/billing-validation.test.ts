@@ -14,6 +14,7 @@ import {
   ClinicAccessDeniedError,
   ClinicRoleDeniedError,
 } from "@/features/auth/lib/authorization";
+import { DENTALFLOW_PLAN_ENTITLEMENTS } from "@/features/billing/lib/billing-plan-catalog";
 import {
   billingEntitlementsSchema,
   canApplyRazorpayEvent,
@@ -311,4 +312,27 @@ test("billing ownership is bound to the authenticated clinic membership", () => 
     () => authorizeClinicRole(staff, [ClinicRole.OWNER]),
     ClinicRoleDeniedError,
   );
+});
+
+test("three-tier catalogue validates and progressively unlocks modules", () => {
+  const solo = billingEntitlementsSchema.parse(
+    DENTALFLOW_PLAN_ENTITLEMENTS.solo,
+  );
+  const professional = billingEntitlementsSchema.parse(
+    DENTALFLOW_PLAN_ENTITLEMENTS.professional,
+  );
+  const enterprise = billingEntitlementsSchema.parse(
+    DENTALFLOW_PLAN_ENTITLEMENTS.enterprise,
+  );
+
+  assert.equal(solo.maxDentists, 1);
+  assert.equal(solo.maxStaff, 2);
+  assert.equal(solo.features.fullInsuranceClaims, false);
+  assert.equal(professional.maxDentists, 5);
+  assert.equal(professional.features.fullInsuranceClaims, true);
+  assert.equal(professional.features.publicBooking, true);
+  assert.equal(professional.features.multiBranchManagement, false);
+  assert.equal(enterprise.maxBranches, 3);
+  assert.equal(enterprise.features.multiBranchManagement, true);
+  assert.equal(enterprise.features.interBranchTransfers, true);
 });
