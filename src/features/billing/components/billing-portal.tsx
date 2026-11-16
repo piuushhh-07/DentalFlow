@@ -151,12 +151,20 @@ function PlanEntitlementSummary({
         <ul className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
           {featureRows.map((feature) => (
             <li
-              className={feature.enabled ? "flex items-start gap-2 text-slate-700" : "flex items-start gap-2 text-slate-400"}
+              className={
+                feature.enabled
+                  ? "flex items-start gap-2 text-slate-700"
+                  : "flex items-start gap-2 text-slate-400"
+              }
               key={feature.key}
             >
               <span
                 aria-hidden="true"
-                className={feature.enabled ? "font-bold text-teal-700" : "font-medium text-slate-400"}
+                className={
+                  feature.enabled
+                    ? "font-bold text-teal-700"
+                    : "font-medium text-slate-400"
+                }
               >
                 {feature.enabled ? "✓" : "—"}
               </span>
@@ -534,9 +542,8 @@ export function BillingPortal({
             Compare available plans
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Compare the limits and modules configured for sale. Changing an
-            existing subscription to another plan is not self-service yet; your
-            current plan remains active until a supported plan-change flow is introduced.
+            Compare the limits and modules configured for sale. Subscription
+            changes are not self-service from this screen yet.
           </p>
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
             {plans.map((plan) => (
