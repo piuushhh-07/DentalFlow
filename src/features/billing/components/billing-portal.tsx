@@ -119,9 +119,11 @@ function PlanEntitlementSummary({
     ["Staff seats", parsed.maxStaff],
     ["Branches", parsed.maxBranches],
   ].filter((entry) => entry[1] !== null && entry[1] !== undefined);
-  const enabledFeatures = FEATURE_LABELS.filter(
-    ([key]) => parsed.features?.[key] === true,
-  );
+  const featureRows = FEATURE_LABELS.map(([key, label]) => ({
+    key,
+    label,
+    enabled: parsed.features?.[key] === true,
+  }));
 
   return (
     <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
@@ -146,22 +148,25 @@ function PlanEntitlementSummary({
         <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Additional modules
         </h4>
-        {enabledFeatures.length > 0 ? (
-          <ul className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
-            {enabledFeatures.map(([key, label]) => (
-              <li className="flex items-start gap-2 text-slate-700" key={key}>
-                <span aria-hidden="true" className="font-bold text-teal-700">
-                  ✓
-                </span>
-                {label}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 text-sm text-slate-500">
-            Core clinic workflows are included. Paid add-on modules are not enabled.
-          </p>
-        )}
+        <ul className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+          {featureRows.map((feature) => (
+            <li
+              className={feature.enabled ? "flex items-start gap-2 text-slate-700" : "flex items-start gap-2 text-slate-400"}
+              key={feature.key}
+            >
+              <span
+                aria-hidden="true"
+                className={feature.enabled ? "font-bold text-teal-700" : "font-medium text-slate-400"}
+              >
+                {feature.enabled ? "✓" : "—"}
+              </span>
+              {feature.label}
+              <span className="sr-only">
+                {feature.enabled ? " included" : " not included"}
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
