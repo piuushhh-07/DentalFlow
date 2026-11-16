@@ -2313,6 +2313,42 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
   await t.test(
     "insurance records, audit history and private Storage enforce clinic ownership",
     async () => {
+      const insurancePlan = await prisma.billingPlanVersion.create({
+        data: {
+          code: `insurance-integration-${randomUUID()}`,
+          version: 1,
+          displayName: `${marker} Insurance Plan`,
+          currency: "INR",
+          amountMinor: 50000,
+          interval: BillingInterval.MONTH,
+          intervalCount: 1,
+          totalBillingCycles: 12,
+          trialDays: 0,
+          graceDays: 7,
+          entitlements: { features: { fullInsuranceClaims: true } },
+          providerPlanId: `plan_${randomUUID().replaceAll("-", "")}`,
+        },
+      });
+      const insurancePeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const insuranceSubscriptions = await Promise.all([
+        prisma.clinicSubscription.create({
+          data: {
+            clinicId: clinicAId,
+            planVersionId: insurancePlan.id,
+            status: BillingSubscriptionStatus.ACTIVE,
+            currentPeriodEnd: insurancePeriodEnd,
+          },
+        }),
+        prisma.clinicSubscription.create({
+          data: {
+            clinicId: clinicBId,
+            planVersionId: insurancePlan.id,
+            status: BillingSubscriptionStatus.ACTIVE,
+            currentPeriodEnd: insurancePeriodEnd,
+          },
+        }),
+      ]);
+      try {
       const providerData = providerInputSchema.parse({
         name: `${marker} Synthetic TPA`,
         kind: "TPA",
@@ -3003,6 +3039,14 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.equal(resubmittedClaim.resubmissionCount, 1);
       assert.equal(resubmittedClaim.payments.length, 1);
       assert.equal(resubmittedClaim.payments[0].kind, "PATIENT_PAYMENT");
+      } finally {
+        await prisma.clinicSubscription.deleteMany({
+          where: { id: { in: insuranceSubscriptions.map((subscription) => subscription.id) } },
+        });
+        await prisma.billingPlanVersion.delete({
+          where: { id: insurancePlan.id },
+        });
+      }
     },
   );
 
