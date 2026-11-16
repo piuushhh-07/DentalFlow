@@ -7,6 +7,11 @@ import { redirect } from "next/navigation";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { validateMembershipMutation } from "@/features/team/lib/team-management";
 import { prisma } from "@/lib/db/prisma";
+import {
+  assertStaffCapacity,
+  BillingAccessRestrictedError,
+  BillingLimitReachedError,
+} from "@/features/billing/lib/billing-entitlements";
 
 type TeamActionStatus =
   | "updated"
@@ -15,6 +20,8 @@ type TeamActionStatus =
   | "not-found"
   | "last-owner"
   | "conflict"
+  | "staff-limit"
+  | "subscription-restricted"
   | "unavailable";
 
 function teamPath(clinicId: string, status: TeamActionStatus): string {
@@ -85,6 +92,18 @@ async function mutateMembership(
         if (invariantError === "LAST_OWNER") return "last-owner";
         if (invariantError) return "unavailable";
 
+        if (
+          kind === "change-role" &&
+          target.role !== ClinicRole.STAFF &&
+          requestedRole === ClinicRole.STAFF
+        ) {
+          const lockKey = `clinic-staff-seats:${clinicId}`;
+          await transaction.$queryRaw`
+            SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
+          `;
+          await assertStaffCapacity(transaction, clinicId);
+        }
+
         if (kind === "remove") {
           const result = await transaction.clinicMembership.updateMany({
             where: {
@@ -112,7 +131,11 @@ async function mutateMembership(
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   } catch (error) {
-    if (
+    if (error instanceof BillingLimitReachedError && error.limit === "staff") {
+      status = "staff-limit";
+    } else if (error instanceof BillingAccessRestrictedError) {
+      status = "subscription-restricted";
+    } else if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2034"
     ) {
