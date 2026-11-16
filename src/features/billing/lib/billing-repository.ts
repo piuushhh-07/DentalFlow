@@ -3,6 +3,7 @@ import "server-only";
 import { BillingSubscriptionStatus, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { hasBillingGracePeriodExpired } from "@/features/billing/lib/billing-validation";
 import {
   cancelRazorpaySubscription,
   createRazorpaySubscription,
@@ -145,6 +146,7 @@ export async function startClinicSubscriptionCheckout(
             status: true,
             checkoutUrl: true,
             checkoutExpiresAt: true,
+            graceUntil: true,
           },
         });
       const pendingCheckoutExpired =
@@ -152,8 +154,34 @@ export async function startClinicSubscriptionCheckout(
           BillingSubscriptionStatus.CHECKOUT_PENDING &&
         activeSubscription.checkoutExpiresAt !== null &&
         activeSubscription.checkoutExpiresAt <= now;
+      const gracePeriodExpired = activeSubscription
+        ? hasBillingGracePeriodExpired(
+            {
+              status: activeSubscription.status,
+              graceUntil: activeSubscription.graceUntil,
+            },
+            now,
+          )
+        : false;
 
-      if (pendingCheckoutExpired && activeSubscription) {
+      if (gracePeriodExpired && activeSubscription) {
+        // Once the configured grace window has elapsed, allow a fresh checkout
+        // instead of leaving the clinic permanently blocked in a past-due state.
+        const expired = await transaction.clinicSubscription.updateMany({
+          where: {
+            id: activeSubscription.id,
+            clinicId,
+            status: activeSubscription.status,
+            graceUntil: { lte: now },
+          },
+          data: { status: BillingSubscriptionStatus.EXPIRED },
+        });
+        if (expired.count !== 1) {
+          // A successful payment webhook may have recovered the subscription
+          // while checkout was being prepared. Never create a second active one.
+          throw new BillingSubscriptionAlreadyExistsError();
+        }
+      } else if (pendingCheckoutExpired && activeSubscription) {
         await transaction.clinicSubscription.updateMany({
           where: {
             id: activeSubscription.id,

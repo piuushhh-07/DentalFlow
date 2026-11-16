@@ -213,6 +213,18 @@ function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
+export function hasBillingGracePeriodExpired(
+  subscription: Pick<BillingStateSnapshot, "status" | "graceUntil">,
+  now = new Date(),
+): boolean {
+  return (
+    (subscription.status === BillingSubscriptionStatus.PAST_DUE ||
+      subscription.status === BillingSubscriptionStatus.GRACE_PERIOD) &&
+    subscription.graceUntil !== null &&
+    subscription.graceUntil <= now
+  );
+}
+
 export function canUsePaidEntitlements(
   subscription: Pick<
     BillingStateSnapshot,

@@ -487,14 +487,18 @@ export function BillingPortal({
       {subscription &&
         (["CANCELLED", "EXPIRED", "FAILED"].includes(subscription.status) ||
           (subscription.status === "CHECKOUT_PENDING" &&
-            subscription.checkoutExpired)) && (
+            subscription.checkoutExpired) ||
+          (["PAST_DUE", "GRACE_PERIOD"].includes(subscription.status) &&
+            subscription.graceUntil !== null &&
+            subscription.graceUntil.getTime() <= Date.now())) && (
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
             <h2 className="text-xl font-semibold text-slate-900">
               Start a new subscription
             </h2>
             <p className="mt-2 text-sm text-slate-600">
-              The previous provider subscription cannot be restarted. A new
-              checkout will use this clinic&apos;s remaining trial eligibility.
+              {["PAST_DUE", "GRACE_PERIOD"].includes(subscription.status)
+                ? "The payment grace period has ended. Start a new subscription to restore paid access. Existing clinical records remain available."
+                : "The previous provider subscription cannot be restarted. A new checkout will use this clinic&apos;s remaining trial eligibility."}
             </p>
             {plans.length === 0 ? (
               <p className="mt-4 text-sm text-slate-500">
