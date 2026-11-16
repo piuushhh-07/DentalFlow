@@ -7,12 +7,15 @@ import { hasBillingGracePeriodExpired } from "@/features/billing/lib/billing-val
 import {
   cancelRazorpaySubscription,
   createRazorpaySubscription,
+  scheduleRazorpayPlanChange,
 } from "@/features/billing/lib/razorpay-client";
 
 export class BillingPlanUnavailableError extends Error {}
 export class BillingSubscriptionAlreadyExistsError extends Error {}
 export class BillingCheckoutConflictError extends Error {}
 export class BillingSubscriptionNotFoundError extends Error {}
+export class BillingPlanChangeUnavailableError extends Error {}
+export class BillingPlanChangeAlreadyScheduledError extends Error {}
 
 const CURRENT_STATUSES = [
   BillingSubscriptionStatus.CHECKOUT_PENDING,
@@ -287,6 +290,45 @@ export async function startClinicSubscriptionCheckout(
         trialStartedAt: null,
         trialEndsAt: null,
       },
+    });
+    throw error;
+  }
+}
+
+
+export async function scheduleClinicPlanChange(clinicId: string, targetPlanVersionId: string): Promise<{ effectiveAt: Date }> {
+  const targetPlan = await prisma.billingPlanVersion.findFirst({
+    where: { id: targetPlanVersionId, availableForSale: true, providerPlanId: { not: null } },
+    select: { id: true, providerPlanId: true },
+  });
+  if (!targetPlan?.providerPlanId) throw new BillingPlanChangeUnavailableError();
+
+  const reservation = await prisma.$transaction(async (transaction) => {
+    const lockKey = `clinic-billing-checkout:${clinicId}`;
+    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+    const current = await transaction.clinicSubscription.findFirst({
+      where: { clinicId, status: BillingSubscriptionStatus.ACTIVE, providerSubscriptionId: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, planVersionId: true, providerSubscriptionId: true, currentPeriodEnd: true, cancelAtPeriodEnd: true, pendingPlanVersionId: true },
+    });
+    if (!current?.providerSubscriptionId || !current.currentPeriodEnd || current.cancelAtPeriodEnd) throw new BillingPlanChangeUnavailableError();
+    if (current.planVersionId === targetPlan.id) throw new BillingPlanChangeUnavailableError();
+    if (current.pendingPlanVersionId) throw new BillingPlanChangeAlreadyScheduledError();
+    const reserved = await transaction.clinicSubscription.updateMany({
+      where: { id: current.id, clinicId, status: BillingSubscriptionStatus.ACTIVE, pendingPlanVersionId: null },
+      data: { pendingPlanVersionId: targetPlan.id, pendingPlanChangeAt: current.currentPeriodEnd },
+    });
+    if (reserved.count !== 1) throw new BillingPlanChangeAlreadyScheduledError();
+    return { id: current.id, providerSubscriptionId: current.providerSubscriptionId, effectiveAt: current.currentPeriodEnd };
+  });
+
+  try {
+    await scheduleRazorpayPlanChange({ providerSubscriptionId: reservation.providerSubscriptionId, planId: targetPlan.providerPlanId });
+    return { effectiveAt: reservation.effectiveAt };
+  } catch (error) {
+    await prisma.clinicSubscription.updateMany({
+      where: { id: reservation.id, clinicId, pendingPlanVersionId: targetPlan.id },
+      data: { pendingPlanVersionId: null, pendingPlanChangeAt: null },
     });
     throw error;
   }
