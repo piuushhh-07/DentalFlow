@@ -130,7 +130,11 @@ import {
   processRazorpayWebhook,
   RazorpayWebhookProcessingBusyError,
 } from "@/features/billing/lib/razorpay-webhook";
-import { BillingLimitReachedError } from "@/features/billing/lib/billing-entitlements";
+import {
+  assertStaffCapacity,
+  assertStaffInvitationCapacity,
+  BillingLimitReachedError,
+} from "@/features/billing/lib/billing-entitlements";
 import {
   createDigitalPrescription,
   listClinicPrescriptionMedicineCatalogue,
@@ -913,7 +917,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           totalBillingCycles: 12,
           trialDays: 14,
           graceDays: 7,
-          entitlements: { maxPatients: 1, maxMonthlyAppointments: 1 },
+          entitlements: { maxPatients: 1, maxMonthlyAppointments: 1, maxStaff: 2 },
           providerPlanId: `plan_${randomUUID().replaceAll("-", "")}`,
         },
       });
@@ -948,8 +952,35 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       const paymentForB = `pay_${randomUUID().replaceAll("-", "")}`;
       const webhookEventIds: string[] = [];
       let capTestAppointmentId: string | undefined;
+      let staffSeatInvitationId: string | undefined;
 
       try {
+        await prisma.clinicMembership.create({
+          data: { clinicId: clinicAId, userId: userBId, role: ClinicRole.STAFF },
+        });
+        const staffSeatInvitation = await prisma.clinicInvitation.create({
+          data: {
+            clinicId: clinicAId,
+            email: `staff-seat-${randomUUID()}@example.test`,
+            normalizedEmail: `staff-seat-${randomUUID()}@example.test`,
+            role: ClinicRole.STAFF,
+            invitedByUserId: userAId,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+          select: { id: true },
+        });
+        staffSeatInvitationId = staffSeatInvitation.id;
+        await prisma.$transaction((transaction) =>
+          assertStaffCapacity(transaction, clinicAId),
+        );
+        await assert.rejects(
+          prisma.$transaction((transaction) =>
+            assertStaffInvitationCapacity(transaction, clinicAId),
+          ),
+          BillingLimitReachedError,
+          "An active staff member plus a pending invitation must reserve both available seats.",
+        );
+
         await assert.rejects(
           createClinicPatient(
             clinicAId,
@@ -1205,6 +1236,14 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           ClinicAccessDeniedError,
         );
       } finally {
+        if (staffSeatInvitationId) {
+          await prisma.clinicInvitation.deleteMany({
+            where: { id: staffSeatInvitationId, clinicId: clinicAId },
+          });
+        }
+        await prisma.clinicMembership.deleteMany({
+          where: { userId: userBId, clinicId: clinicAId },
+        });
         if (capTestAppointmentId) {
           await prisma.appointment.deleteMany({
             where: { id: capTestAppointmentId, clinicId: clinicAId },
