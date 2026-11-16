@@ -66,7 +66,7 @@ export default async function DentalLabPage({
     if (error instanceof ClinicAccessDeniedError) notFound();
     throw error;
   }
-  const [clinic, patients, partners, orders] = await Promise.all([
+  const [clinic, patients, treatmentPlans, partners, orders] = await Promise.all([
     prisma.clinic.findUnique({
       where: { id: membership.clinicId },
       select: { name: true },
@@ -75,6 +75,15 @@ export default async function DentalLabPage({
       where: { clinicId: membership.clinicId, archivedAt: null },
       orderBy: { fullName: "asc" },
       select: { id: true, fullName: true, phoneNumber: true },
+    }),
+    prisma.treatmentPlan.findMany({
+      where: { clinicId: membership.clinicId, status: "ACTIVE" },
+      orderBy: [{ patient: { fullName: "asc" } }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        name: true,
+        patient: { select: { fullName: true } },
+      },
     }),
     prisma.dentalLabPartner.findMany({
       where: { clinicId: membership.clinicId, active: true },
@@ -150,6 +159,12 @@ export default async function DentalLabPage({
                   <select required name="partnerId" defaultValue="" className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal">
                     <option value="" disabled>Select lab</option>
                     {partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-slate-700">Treatment plan (optional)
+                  <select name="treatmentPlanId" defaultValue="" className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal">
+                    <option value="">Not linked to a plan</option>
+                    {treatmentPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.patient.fullName} · {plan.name}</option>)}
                   </select>
                 </label>
                 <label className="text-sm font-medium text-slate-700">Work type
