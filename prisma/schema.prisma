@@ -401,6 +401,9 @@ model Clinic {
   expenses                             ClinicExpense[]
   dentalLabPartners                    DentalLabPartner[]
   dentalLabOrders                      DentalLabOrder[]
+  sterilisationCycles                  SterilisationCycle[]
+  instrumentPouches                    InstrumentPouch[]
+  infectionControlLogs                 InfectionControlLog[]
 
   @@index([name])
   @@map("clinics")
@@ -535,6 +538,9 @@ model ClinicMembership {
   inventoryTransactions             InventoryTransaction[]
   recordedExpenses                  ClinicExpense[]
   createdDentalLabOrders             DentalLabOrder[]
+  operatedSterilisationCycles        SterilisationCycle[] @relation("SterilisationCycleOperator")
+  usedInstrumentPouches              InstrumentPouch[] @relation("InstrumentPouchUser")
+  recordedInfectionControlLogs       InfectionControlLog[]
   sentClinicInvitations             ClinicInvitation[]                  @relation("ClinicInvitationSender")
   staffProfile                      ClinicStaffProfile?
   permissionGrants                  ClinicPermissionGrant[]
@@ -1668,6 +1674,99 @@ model InventoryBatch {
   @@index([clinicId, expiryDate, quantityRemaining])
   @@index([clinicId, itemId, receivedAt])
   @@map("inventory_batches")
+}
+
+
+enum SterilisationCycleResult {
+  PENDING
+  PASS
+  FAIL
+}
+
+enum InstrumentPouchStatus {
+  STERILE
+  USED
+  EXPIRED
+  QUARANTINED
+}
+
+enum InfectionControlRecordType {
+  SURFACE_DISINFECTION
+  HAND_HYGIENE
+  PPE_CHECK
+  BIOMEDICAL_WASTE
+  SHARPS_DISPOSAL
+  INCIDENT
+  OTHER
+}
+
+model SterilisationCycle {
+  id                      String                   @id @default(uuid()) @db.Uuid
+  clinicId                String                   @db.Uuid
+  operatorUserId          String                   @db.Uuid
+  loadReference           String                   @db.VarChar(80)
+  sterilizerName          String                   @db.VarChar(120)
+  loadDescription         String                   @db.VarChar(500)
+  startedAt               DateTime                 @default(now()) @db.Timestamptz(6)
+  completedAt             DateTime?                @db.Timestamptz(6)
+  temperatureC            Decimal?                 @db.Decimal(5, 2)
+  pressureBar             Decimal?                 @db.Decimal(5, 2)
+  durationMinutes         Int?
+  chemicalIndicatorPass   Boolean?
+  biologicalIndicatorPass Boolean?
+  result                  SterilisationCycleResult @default(PENDING)
+  notes                   String?                  @db.VarChar(1000)
+  createdAt               DateTime                 @default(now()) @db.Timestamptz(6)
+  clinic                  Clinic                   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  operator                ClinicMembership         @relation("SterilisationCycleOperator", fields: [operatorUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  pouches                 InstrumentPouch[]
+
+  @@unique([id, clinicId])
+  @@unique([clinicId, loadReference])
+  @@index([clinicId, result, startedAt])
+  @@index([operatorUserId, clinicId], map: "sc_operator_clinic_idx")
+  @@map("sterilisation_cycles")
+}
+
+model InstrumentPouch {
+  id           String                @id @default(uuid()) @db.Uuid
+  clinicId     String                @db.Uuid
+  cycleId      String                @db.Uuid
+  usedByUserId String?               @db.Uuid
+  pouchCode    String                @db.VarChar(80)
+  contents     String                @db.VarChar(500)
+  sterilisedAt DateTime              @default(now()) @db.Timestamptz(6)
+  expiresAt    DateTime              @db.Date
+  status       InstrumentPouchStatus @default(STERILE)
+  usedAt       DateTime?             @db.Timestamptz(6)
+  createdAt    DateTime              @default(now()) @db.Timestamptz(6)
+  clinic       Clinic                @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  cycle        SterilisationCycle    @relation(fields: [cycleId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  usedBy       ClinicMembership?     @relation("InstrumentPouchUser", fields: [usedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@unique([clinicId, pouchCode])
+  @@index([clinicId, status, expiresAt])
+  @@index([cycleId, clinicId], map: "ip_cycle_clinic_idx")
+  @@index([usedByUserId, clinicId], map: "ip_user_clinic_idx")
+  @@map("instrument_pouches")
+}
+
+model InfectionControlLog {
+  id               String                      @id @default(uuid()) @db.Uuid
+  clinicId         String                      @db.Uuid
+  recordedByUserId String                      @db.Uuid
+  recordType       InfectionControlRecordType
+  area             String                      @db.VarChar(120)
+  details          String                      @db.VarChar(2000)
+  outcome          String?                     @db.VarChar(500)
+  performedAt      DateTime                    @default(now()) @db.Timestamptz(6)
+  createdAt        DateTime                    @default(now()) @db.Timestamptz(6)
+  clinic           Clinic                      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  recordedBy       ClinicMembership            @relation(fields: [recordedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@index([clinicId, recordType, performedAt])
+  @@index([recordedByUserId, clinicId], map: "icl_recorder_clinic_idx")
+  @@map("infection_control_logs")
 }
 
 model DentalLabPartner {
