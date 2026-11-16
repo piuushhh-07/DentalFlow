@@ -377,6 +377,19 @@ after(async () => {
         "Could not remove the clinic B synthetic private test file.",
       );
   }
+  const markerPlans = await prisma.billingPlanVersion.findMany({
+    where: { displayName: { contains: marker } },
+    select: { id: true },
+  });
+  if (markerPlans.length > 0) {
+    const markerPlanIds = markerPlans.map((plan) => plan.id);
+    await prisma.clinicSubscription.deleteMany({
+      where: { planVersionId: { in: markerPlanIds } },
+    });
+    await prisma.billingPlanVersion.deleteMany({
+      where: { id: { in: markerPlanIds } },
+    });
+  }
   await freshReader.$disconnect();
   await prisma.$disconnect();
   if (cleanupErrors.length > 0) {
@@ -2388,705 +2401,696 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           },
         }),
       ]);
-      try {
-        const providerData = providerInputSchema.parse({
-          name: `${marker} Synthetic TPA`,
-          kind: "TPA",
-          phoneNumber: "",
-          email: "",
-          website: "",
-          claimInstructions: "",
-          notes: "Synthetic integration-test provider.",
-        });
-        const provider = await createInsuranceProvider(clinicAId, providerData);
-        await assert.rejects(
-          createInsuranceProvider(clinicAId, providerData),
-          (error: unknown) =>
-            error instanceof Error && "code" in error && error.code === "P2002",
-        );
-  
-        const policyData = policyInputSchema.parse({
+      const providerData = providerInputSchema.parse({
+        name: `${marker} Synthetic TPA`,
+        kind: "TPA",
+        phoneNumber: "",
+        email: "",
+        website: "",
+        claimInstructions: "",
+        notes: "Synthetic integration-test provider.",
+      });
+      const provider = await createInsuranceProvider(clinicAId, providerData);
+      await assert.rejects(
+        createInsuranceProvider(clinicAId, providerData),
+        (error: unknown) =>
+          error instanceof Error && "code" in error && error.code === "P2002",
+      );
+
+      const policyData = policyInputSchema.parse({
+        patientId: patientA.id,
+        providerId: provider.id,
+        policyNumber: `TEST-${randomUUID()}`,
+        memberReference: "",
+        validFrom: "2020-01-01",
+        validUntil: "2100-12-31",
+        coverageLimit: "50000",
+        deductible: "1000",
+        coPaymentPercent: "10",
+        exclusions: "",
+        coverageNotes: "Synthetic test policy only.",
+      });
+      const policy = await createInsurancePolicy(clinicAId, policyData);
+      assert.ok(
+        await freshReader.insurancePolicy.findFirst({
+          where: { id: policy.id, clinicId: clinicAId, patientId: patientA.id },
+        }),
+      );
+
+      const preAuthorization = await createInsurancePreAuthorization(
+        clinicAId,
+        userAId,
+        {
           patientId: patientA.id,
-          providerId: provider.id,
-          policyNumber: `TEST-${randomUUID()}`,
-          memberReference: "",
-          validFrom: "2020-01-01",
-          validUntil: "2100-12-31",
-          coverageLimit: "50000",
-          deductible: "1000",
-          coPaymentPercent: "10",
-          exclusions: "",
-          coverageNotes: "Synthetic test policy only.",
-        });
-        const policy = await createInsurancePolicy(clinicAId, policyData);
-        assert.ok(
-          await freshReader.insurancePolicy.findFirst({
-            where: { id: policy.id, clinicId: clinicAId, patientId: patientA.id },
-          }),
-        );
-  
-        const preAuthorization = await createInsurancePreAuthorization(
-          clinicAId,
-          userAId,
-          {
-            patientId: patientA.id,
-            policyId: policy.id,
-            treatmentPlanId: plan.id,
-            proposedTreatment: "Synthetic dental procedure",
-            estimatedCost: "10000.00",
-            requestReference: `PRE-${randomUUID()}`,
-          },
-        );
-        await assert.rejects(
-          updateInsurancePreAuthorizationStatus(
-            clinicAId,
-            userAId,
-            preAuthorization.id,
-            {
-              status: InsurancePreAuthorizationStatus.APPROVED,
-              approvedAmount: "7000.00",
-              conditions: null,
-              expiresAt: null,
-              rejectionReason: null,
-            },
-          ),
-          InsuranceValidationError,
-        );
-        await updateInsurancePreAuthorizationStatus(
+          policyId: policy.id,
+          treatmentPlanId: plan.id,
+          proposedTreatment: "Synthetic dental procedure",
+          estimatedCost: "10000.00",
+          requestReference: `PRE-${randomUUID()}`,
+        },
+      );
+      await assert.rejects(
+        updateInsurancePreAuthorizationStatus(
           clinicAId,
           userAId,
           preAuthorization.id,
           {
-            status: InsurancePreAuthorizationStatus.SUBMITTED,
-            approvedAmount: null,
+            status: InsurancePreAuthorizationStatus.APPROVED,
+            approvedAmount: "7000.00",
             conditions: null,
             expiresAt: null,
             rejectionReason: null,
           },
-        );
-        await updateInsurancePreAuthorizationStatus(
-          clinicAId,
-          userAId,
-          preAuthorization.id,
-          {
-            status: InsurancePreAuthorizationStatus.PARTIALLY_APPROVED,
-            approvedAmount: "7000.00",
-            conditions: "Synthetic approval conditions.",
-            expiresAt: new Date("2099-12-31T23:59:59.999Z"),
-            rejectionReason: null,
-          },
-        );
-        assert.equal(
-          (
-            await freshReader.insurancePreAuthorization.findUniqueOrThrow({
-              where: { id: preAuthorization.id },
-            })
-          ).status,
-          InsurancePreAuthorizationStatus.PARTIALLY_APPROVED,
-        );
-  
-        const claimData = claimInputSchema.parse({
-          patientId: patientA.id,
-          policyId: policy.id,
-          treatmentPlanId: plan.id,
-          preAuthorizationId: preAuthorization.id,
-          type: InsuranceClaimType.CASHLESS,
-          treatmentDetails: "Synthetic dental procedure",
-          treatmentDate: "2099-01-10",
-          estimatedCost: "10000",
-          amountClaimed: "8000",
-          claimReference: "",
-          notes: "Synthetic integration-test claim.",
-        });
-        const claim = await createInsuranceClaim(clinicAId, userAId, claimData);
-        const storedClaim = await freshReader.insuranceClaim.findFirst({
-          where: { id: claim.id, clinicId: clinicAId },
-          include: { documents: true, activities: true },
-        });
-        assert.ok(storedClaim);
-        assert.equal(storedClaim.status, InsuranceClaimStatus.DRAFT);
-        assert.equal(storedClaim.documents.length, 3);
-        assert.ok(storedClaim.activities.length >= 4);
-        assert.equal(await getInsuranceClaim(clinicBId, claim.id), null);
-        const { data: browserVisibleClaims, error: browserClaimReadError } =
-          await supabaseB
-            .from("insurance_claims")
-            .select("id")
-            .eq("id", claim.id);
-        assert.ok(browserClaimReadError || !browserVisibleClaims?.length);
-        assert.equal(
-          claimInputSchema.safeParse({
-            ...claimData,
-            amountClaimed: "not-a-currency-amount",
-          }).success,
-          false,
-        );
-  
-        await assert.rejects(
-          createInsuranceClaim(clinicAId, userAId, {
-            ...claimData,
-            policyId: randomUUID(),
-          }),
-          InsuranceRecordNotFoundError,
-        );
-        await assert.rejects(
-          updateInsuranceClaimStatus(clinicAId, userAId, claim.id, {
-            status: InsuranceClaimStatus.PAID,
-            approvedAmount: null,
-            rejectionReason: null,
-          }),
-          InsuranceValidationError,
-        );
-  
-        await assert.rejects(
-          createInsuranceDocumentRequirement(clinicBId, userBId, claim.id, {
-            type: InsuranceDocumentType.OTHER,
-            name: `${marker} cross-clinic document`,
-          }),
-          InsuranceRecordNotFoundError,
-        );
-  
-        const clinicADocument = storedClaim.documents[0];
-        assert.ok(clinicADocument);
-        await assert.rejects(
-          updateInsuranceDocumentStatus(
-            clinicBId,
-            userBId,
-            claim.id,
-            clinicADocument.id,
-            { status: "REJECTED", rejectionReason: "Cross-clinic test." },
-          ),
-          InsuranceRecordNotFoundError,
-          "Clinic B cannot change the status of Clinic A's insurance document.",
-        );
-        await assert.rejects(
-          authorizeInsuranceDocumentUpload(
-            clinicBId,
-            claim.id,
-            clinicADocument.id,
-            `${clinicBId}/${claim.id}/${clinicADocument.id}/${randomUUID()}.pdf`,
-          ),
-          InsuranceRecordNotFoundError,
-          "Clinic B cannot authorize uploads against Clinic A's claim or document.",
-        );
-  
-        for (const document of storedClaim.documents) {
-          await uploadAndVerifyInsuranceDocument(claim.id, document.id);
-        }
-  
-        await updateInsuranceClaimStatus(clinicAId, userAId, claim.id, {
-          status: InsuranceClaimStatus.SUBMITTED,
+        ),
+        InsuranceValidationError,
+      );
+      await updateInsurancePreAuthorizationStatus(
+        clinicAId,
+        userAId,
+        preAuthorization.id,
+        {
+          status: InsurancePreAuthorizationStatus.SUBMITTED,
+          approvedAmount: null,
+          conditions: null,
+          expiresAt: null,
+          rejectionReason: null,
+        },
+      );
+      await updateInsurancePreAuthorizationStatus(
+        clinicAId,
+        userAId,
+        preAuthorization.id,
+        {
+          status: InsurancePreAuthorizationStatus.PARTIALLY_APPROVED,
+          approvedAmount: "7000.00",
+          conditions: "Synthetic approval conditions.",
+          expiresAt: new Date("2099-12-31T23:59:59.999Z"),
+          rejectionReason: null,
+        },
+      );
+      assert.equal(
+        (
+          await freshReader.insurancePreAuthorization.findUniqueOrThrow({
+            where: { id: preAuthorization.id },
+          })
+        ).status,
+        InsurancePreAuthorizationStatus.PARTIALLY_APPROVED,
+      );
+
+      const claimData = claimInputSchema.parse({
+        patientId: patientA.id,
+        policyId: policy.id,
+        treatmentPlanId: plan.id,
+        preAuthorizationId: preAuthorization.id,
+        type: InsuranceClaimType.CASHLESS,
+        treatmentDetails: "Synthetic dental procedure",
+        treatmentDate: "2099-01-10",
+        estimatedCost: "10000",
+        amountClaimed: "8000",
+        claimReference: "",
+        notes: "Synthetic integration-test claim.",
+      });
+      const claim = await createInsuranceClaim(clinicAId, userAId, claimData);
+      const storedClaim = await freshReader.insuranceClaim.findFirst({
+        where: { id: claim.id, clinicId: clinicAId },
+        include: { documents: true, activities: true },
+      });
+      assert.ok(storedClaim);
+      assert.equal(storedClaim.status, InsuranceClaimStatus.DRAFT);
+      assert.equal(storedClaim.documents.length, 3);
+      assert.ok(storedClaim.activities.length >= 4);
+      assert.equal(await getInsuranceClaim(clinicBId, claim.id), null);
+      const { data: browserVisibleClaims, error: browserClaimReadError } =
+        await supabaseB
+          .from("insurance_claims")
+          .select("id")
+          .eq("id", claim.id);
+      assert.ok(browserClaimReadError || !browserVisibleClaims?.length);
+      assert.equal(
+        claimInputSchema.safeParse({
+          ...claimData,
+          amountClaimed: "not-a-currency-amount",
+        }).success,
+        false,
+      );
+
+      await assert.rejects(
+        createInsuranceClaim(clinicAId, userAId, {
+          ...claimData,
+          policyId: randomUUID(),
+        }),
+        InsuranceRecordNotFoundError,
+      );
+      await assert.rejects(
+        updateInsuranceClaimStatus(clinicAId, userAId, claim.id, {
+          status: InsuranceClaimStatus.PAID,
           approvedAmount: null,
           rejectionReason: null,
+        }),
+        InsuranceValidationError,
+      );
+
+      await assert.rejects(
+        createInsuranceDocumentRequirement(clinicBId, userBId, claim.id, {
+          type: InsuranceDocumentType.OTHER,
+          name: `${marker} cross-clinic document`,
+        }),
+        InsuranceRecordNotFoundError,
+      );
+
+      const clinicADocument = storedClaim.documents[0];
+      assert.ok(clinicADocument);
+      await assert.rejects(
+        updateInsuranceDocumentStatus(
+          clinicBId,
+          userBId,
+          claim.id,
+          clinicADocument.id,
+          { status: "REJECTED", rejectionReason: "Cross-clinic test." },
+        ),
+        InsuranceRecordNotFoundError,
+        "Clinic B cannot change the status of Clinic A's insurance document.",
+      );
+      await assert.rejects(
+        authorizeInsuranceDocumentUpload(
+          clinicBId,
+          claim.id,
+          clinicADocument.id,
+          `${clinicBId}/${claim.id}/${clinicADocument.id}/${randomUUID()}.pdf`,
+        ),
+        InsuranceRecordNotFoundError,
+        "Clinic B cannot authorize uploads against Clinic A's claim or document.",
+      );
+
+      for (const document of storedClaim.documents) {
+        await uploadAndVerifyInsuranceDocument(claim.id, document.id);
+      }
+
+      await updateInsuranceClaimStatus(clinicAId, userAId, claim.id, {
+        status: InsuranceClaimStatus.SUBMITTED,
+        approvedAmount: null,
+        rejectionReason: null,
+      });
+      await updateInsuranceClaimStatus(clinicAId, userAId, claim.id, {
+        status: InsuranceClaimStatus.UNDER_REVIEW,
+        approvedAmount: null,
+        rejectionReason: null,
+      });
+      await updateInsuranceClaimStatus(clinicAId, userAId, claim.id, {
+        status: InsuranceClaimStatus.PARTIALLY_APPROVED,
+        approvedAmount: "5000.00",
+        rejectionReason: null,
+      });
+      await createInsurancePayment(clinicAId, userAId, claim.id, {
+        kind: "INSURER_PAYMENT",
+        amount: "1000.00",
+        paidAt: new Date("2099-01-10T12:00:00.000Z"),
+        reference: `PAY-${randomUUID()}`,
+        notes: "Synthetic partial insurer payment.",
+      });
+      const finalClaim = await freshReader.insuranceClaim.findUniqueOrThrow({
+        where: { id: claim.id },
+        include: { payments: true },
+      });
+      assert.equal(finalClaim.status, InsuranceClaimStatus.PARTIALLY_APPROVED);
+      assert.equal(finalClaim.payments.length, 1);
+      assert.equal(finalClaim.payments[0].amount.toString(), "1000");
+      assert.equal(
+        (await getInsuranceDashboard(clinicAId)).outstandingInsurerPayments,
+        "4000.00",
+      );
+
+      const exportAuditCountBefore =
+        await freshReader.patientDataExportAudit.count({
+          where: { clinicId: clinicAId, patientId: patientA.id },
         });
-        await updateInsuranceClaimStatus(clinicAId, userAId, claim.id, {
-          status: InsuranceClaimStatus.UNDER_REVIEW,
-          approvedAmount: null,
-          rejectionReason: null,
-        });
-        await updateInsuranceClaimStatus(clinicAId, userAId, claim.id, {
-          status: InsuranceClaimStatus.PARTIALLY_APPROVED,
-          approvedAmount: "5000.00",
-          rejectionReason: null,
-        });
-        await createInsurancePayment(clinicAId, userAId, claim.id, {
-          kind: "INSURER_PAYMENT",
-          amount: "1000.00",
-          paidAt: new Date("2099-01-10T12:00:00.000Z"),
-          reference: `PAY-${randomUUID()}`,
-          notes: "Synthetic partial insurer payment.",
-        });
-        const finalClaim = await freshReader.insuranceClaim.findUniqueOrThrow({
-          where: { id: claim.id },
-          include: { payments: true },
-        });
-        assert.equal(finalClaim.status, InsuranceClaimStatus.PARTIALLY_APPROVED);
-        assert.equal(finalClaim.payments.length, 1);
-        assert.equal(finalClaim.payments[0].amount.toString(), "1000");
+      const patientExport = await exportClinicPatientData(
+        clinicAId,
+        patientA.id,
+        userAId,
+      );
+      assert.ok(patientExport);
+      assert.equal(patientExport.formatVersion, 2);
+      assert.equal(
+        patientExport.scope.includesPrivateStorageFileContents,
+        false,
+      );
+      assert.equal(patientExport.scope.excludesPrivateStoragePaths, true);
+      assert.equal(patientExport.patient.insurancePolicies.length, 1);
+      assert.equal(
+        patientExport.patient.insurancePolicies[0].provider.id,
+        provider.id,
+      );
+      assert.equal(patientExport.patient.insurancePreAuthorizations.length, 1);
+      assert.ok(
+        patientExport.patient.insurancePreAuthorizations[0].activities.length >=
+          2,
+      );
+      assert.equal(patientExport.patient.insuranceClaims.length, 1);
+      assert.equal(patientExport.patient.insuranceClaims[0].payments.length, 1);
+      assert.ok(
+        patientExport.patient.insuranceClaims[0].activities.length >= 4,
+      );
+      assert.ok(patientExport.patient.insuranceClaims[0].documents.length >= 3);
+      const serializedPatientExport = JSON.stringify(patientExport);
+      for (const privateStoragePath of uploadedStoragePaths) {
         assert.equal(
-          (await getInsuranceDashboard(clinicAId)).outstandingInsurerPayments,
-          "4000.00",
-        );
-  
-        const exportAuditCountBefore =
-          await freshReader.patientDataExportAudit.count({
-            where: { clinicId: clinicAId, patientId: patientA.id },
-          });
-        const patientExport = await exportClinicPatientData(
-          clinicAId,
-          patientA.id,
-          userAId,
-        );
-        assert.ok(patientExport);
-        assert.equal(patientExport.formatVersion, 2);
-        assert.equal(
-          patientExport.scope.includesPrivateStorageFileContents,
+          serializedPatientExport.includes(privateStoragePath),
           false,
+          "Patient export must not expose private Storage object paths.",
         );
-        assert.equal(patientExport.scope.excludesPrivateStoragePaths, true);
-        assert.equal(patientExport.patient.insurancePolicies.length, 1);
-        assert.equal(
-          patientExport.patient.insurancePolicies[0].provider.id,
-          provider.id,
-        );
-        assert.equal(patientExport.patient.insurancePreAuthorizations.length, 1);
-        assert.ok(
-          patientExport.patient.insurancePreAuthorizations[0].activities.length >=
-            2,
-        );
-        assert.equal(patientExport.patient.insuranceClaims.length, 1);
-        assert.equal(patientExport.patient.insuranceClaims[0].payments.length, 1);
-        assert.ok(
-          patientExport.patient.insuranceClaims[0].activities.length >= 4,
-        );
-        assert.ok(patientExport.patient.insuranceClaims[0].documents.length >= 3);
-        const serializedPatientExport = JSON.stringify(patientExport);
-        for (const privateStoragePath of uploadedStoragePaths) {
-          assert.equal(
-            serializedPatientExport.includes(privateStoragePath),
-            false,
-            "Patient export must not expose private Storage object paths.",
-          );
-        }
-        assert.equal(
-          await exportClinicPatientData(clinicBId, patientA.id, userBId),
-          null,
-          "A different clinic must not export another clinic's patient.",
-        );
-        assert.equal(
-          await freshReader.patientDataExportAudit.count({
-            where: { clinicId: clinicAId, patientId: patientA.id },
-          }),
-          exportAuditCountBefore + 1,
-          "Only the successful clinic-scoped export must create an audit event.",
-        );
-  
-        const uploadedPath =
-          uploadedStoragePaths[uploadedStoragePaths.length - 1];
-        assert.ok(uploadedPath);
-        const { data: allowedDownload, error: allowedDownloadError } =
-          await supabaseA.storage
-            .from("dentalflow-insurance-private")
-            .download(uploadedPath);
-        assert.equal(allowedDownloadError, null);
-        assert.ok(allowedDownload);
-        const { data: deniedDownload, error: deniedDownloadError } =
-          await supabaseB.storage
-            .from("dentalflow-insurance-private")
-            .download(uploadedPath);
-        assert.ok(deniedDownloadError || !deniedDownload);
-  
-        const replaceableDocument = await createInsuranceDocumentRequirement(
-          clinicAId,
-          userAId,
-          claim.id,
-          {
-            type: InsuranceDocumentType.OTHER,
-            name: `${marker} replaceable document`,
-          },
-        );
-        const originalPath = `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`;
-        uploadedStoragePaths.push(originalPath);
-        await authorizeInsuranceDocumentUpload(
-          clinicAId,
-          claim.id,
-          replaceableDocument.id,
-          originalPath,
-        );
-        await uploadInsuranceStorageObject(supabaseA, originalPath);
-        await registerInsuranceDocumentUpload(
-          clinicAId,
-          userAId,
-          claim.id,
-          replaceableDocument.id,
-          originalPath,
-        );
-        await updateInsuranceDocumentStatus(
-          clinicAId,
-          userAId,
-          claim.id,
-          replaceableDocument.id,
-          { status: "REJECTED", rejectionReason: "Synthetic test rejection." },
-        );
-  
-        const otherDocument = await createInsuranceDocumentRequirement(
-          clinicAId,
-          userAId,
-          claim.id,
-          {
-            type: InsuranceDocumentType.OTHER,
-            name: `${marker} other document`,
-          },
-        );
-        const arbitrarySiblingPath = `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`;
-        const arbitraryClinicPath = `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`;
-        const differentDocumentPath = `${clinicAId}/${claim.id}/${otherDocument.id}/${randomUUID()}.pdf`;
-        uploadedStoragePaths.push(
+      }
+      assert.equal(
+        await exportClinicPatientData(clinicBId, patientA.id, userBId),
+        null,
+        "A different clinic must not export another clinic's patient.",
+      );
+      assert.equal(
+        await freshReader.patientDataExportAudit.count({
+          where: { clinicId: clinicAId, patientId: patientA.id },
+        }),
+        exportAuditCountBefore + 1,
+        "Only the successful clinic-scoped export must create an audit event.",
+      );
+
+      const uploadedPath =
+        uploadedStoragePaths[uploadedStoragePaths.length - 1];
+      assert.ok(uploadedPath);
+      const { data: allowedDownload, error: allowedDownloadError } =
+        await supabaseA.storage
+          .from("dentalflow-insurance-private")
+          .download(uploadedPath);
+      assert.equal(allowedDownloadError, null);
+      assert.ok(allowedDownload);
+      const { data: deniedDownload, error: deniedDownloadError } =
+        await supabaseB.storage
+          .from("dentalflow-insurance-private")
+          .download(uploadedPath);
+      assert.ok(deniedDownloadError || !deniedDownload);
+
+      const replaceableDocument = await createInsuranceDocumentRequirement(
+        clinicAId,
+        userAId,
+        claim.id,
+        {
+          type: InsuranceDocumentType.OTHER,
+          name: `${marker} replaceable document`,
+        },
+      );
+      const originalPath = `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`;
+      uploadedStoragePaths.push(originalPath);
+      await authorizeInsuranceDocumentUpload(
+        clinicAId,
+        claim.id,
+        replaceableDocument.id,
+        originalPath,
+      );
+      await uploadInsuranceStorageObject(supabaseA, originalPath);
+      await registerInsuranceDocumentUpload(
+        clinicAId,
+        userAId,
+        claim.id,
+        replaceableDocument.id,
+        originalPath,
+      );
+      await updateInsuranceDocumentStatus(
+        clinicAId,
+        userAId,
+        claim.id,
+        replaceableDocument.id,
+        { status: "REJECTED", rejectionReason: "Synthetic test rejection." },
+      );
+
+      const otherDocument = await createInsuranceDocumentRequirement(
+        clinicAId,
+        userAId,
+        claim.id,
+        {
+          type: InsuranceDocumentType.OTHER,
+          name: `${marker} other document`,
+        },
+      );
+      const arbitrarySiblingPath = `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`;
+      const arbitraryClinicPath = `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`;
+      const differentDocumentPath = `${clinicAId}/${claim.id}/${otherDocument.id}/${randomUUID()}.pdf`;
+      uploadedStoragePaths.push(
+        arbitrarySiblingPath,
+        arbitraryClinicPath,
+        differentDocumentPath,
+      );
+      const unauthorizedUpload = await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .upload(
           arbitrarySiblingPath,
-          arbitraryClinicPath,
-          differentDocumentPath,
+          new Blob(["synthetic unauthorized upload"], {
+            type: "application/pdf",
+          }),
+          { contentType: "application/pdf", upsert: false },
         );
-        const unauthorizedUpload = await supabaseA.storage
-          .from("dentalflow-insurance-private")
-          .upload(
-            arbitrarySiblingPath,
-            new Blob(["synthetic unauthorized upload"], {
-              type: "application/pdf",
-            }),
-            { contentType: "application/pdf", upsert: false },
-          );
-        assert.ok(
-          unauthorizedUpload.error,
-          "A Storage upload without an exact-path intent must be denied.",
-        );
-        await authorizeInsuranceDocumentUpload(
+      assert.ok(
+        unauthorizedUpload.error,
+        "A Storage upload without an exact-path intent must be denied.",
+      );
+      await authorizeInsuranceDocumentUpload(
+        clinicAId,
+        claim.id,
+        otherDocument.id,
+        differentDocumentPath,
+      );
+      await uploadInsuranceStorageObject(supabaseA, differentDocumentPath);
+      await registerInsuranceDocumentUpload(
+        clinicAId,
+        userAId,
+        claim.id,
+        otherDocument.id,
+        differentDocumentPath,
+      );
+
+      const replacementPath = `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`;
+      const concurrentReplacementPath = `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`;
+      uploadedStoragePaths.push(replacementPath);
+      uploadedStoragePaths.push(concurrentReplacementPath);
+      await Promise.all([
+        authorizeInsuranceDocumentUpload(
           clinicAId,
           claim.id,
-          otherDocument.id,
-          differentDocumentPath,
-        );
-        await uploadInsuranceStorageObject(supabaseA, differentDocumentPath);
-        await registerInsuranceDocumentUpload(
+          replaceableDocument.id,
+          replacementPath,
+        ),
+        authorizeInsuranceDocumentUpload(
+          clinicAId,
+          claim.id,
+          replaceableDocument.id,
+          concurrentReplacementPath,
+        ),
+      ]);
+      await uploadInsuranceStorageObject(supabaseA, replacementPath);
+      await uploadInsuranceStorageObject(supabaseA, concurrentReplacementPath);
+      const concurrentRegistrations = await Promise.all([
+        registerInsuranceDocumentUpload(
           clinicAId,
           userAId,
           claim.id,
-          otherDocument.id,
-          differentDocumentPath,
-        );
-  
-        const replacementPath = `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`;
-        const concurrentReplacementPath = `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`;
-        uploadedStoragePaths.push(replacementPath);
-        uploadedStoragePaths.push(concurrentReplacementPath);
-        await Promise.all([
-          authorizeInsuranceDocumentUpload(
-            clinicAId,
-            claim.id,
-            replaceableDocument.id,
-            replacementPath,
-          ),
-          authorizeInsuranceDocumentUpload(
-            clinicAId,
-            claim.id,
-            replaceableDocument.id,
-            concurrentReplacementPath,
-          ),
-        ]);
-        await uploadInsuranceStorageObject(supabaseA, replacementPath);
-        await uploadInsuranceStorageObject(supabaseA, concurrentReplacementPath);
-        const concurrentRegistrations = await Promise.all([
-          registerInsuranceDocumentUpload(
-            clinicAId,
-            userAId,
-            claim.id,
-            replaceableDocument.id,
-            replacementPath,
-          ),
-          registerInsuranceDocumentUpload(
-            clinicAId,
-            userAId,
-            claim.id,
-            replaceableDocument.id,
-            concurrentReplacementPath,
-          ),
-        ]);
-        assert.equal(
-          concurrentRegistrations.filter(
-            (registration) => registration.registered,
-          ).length,
-          1,
-          "Only one concurrent replacement may become the current document.",
-        );
-        const winningReplacementPath = concurrentRegistrations[0].registered
-          ? replacementPath
-          : concurrentReplacementPath;
-        const losingReplacementPath = concurrentRegistrations[0].registered
-          ? concurrentReplacementPath
-          : replacementPath;
-        assert.ok(
-          concurrentRegistrations.some(
-            (registration) =>
-              !registration.registered && registration.cleanupAuthorized,
-          ),
-          "The losing upload must receive exact-path cleanup authorization.",
-        );
-        const queuedClaim = await getInsuranceClaim(clinicAId, claim.id);
-        const queuedDocument = queuedClaim?.documents.find(
-          (document) => document.id === replaceableDocument.id,
-        );
-        assert.deepEqual(
-          queuedDocument?.pendingCleanupPaths.sort(),
-          [originalPath, losingReplacementPath].sort(),
-          "Both superseded and losing-upload paths must remain available for retries.",
-        );
-  
-        const replacedFileCleanup = await supabaseA.storage
-          .from("dentalflow-insurance-private")
-          .remove([originalPath]);
-        assert.equal(
-          replacedFileCleanup.error,
-          null,
-          "The exact superseded path must remain deletable for replacement cleanup.",
-        );
-        assert.equal(
-          await completeInsuranceDocumentStorageCleanup(
-            clinicAId,
-            claim.id,
-            replaceableDocument.id,
-            originalPath,
-          ),
-          true,
-        );
-        const crossClinicCleanup = await supabaseB.storage
-          .from("dentalflow-insurance-private")
-          .remove([losingReplacementPath]);
-        assert.ok(
-          crossClinicCleanup.error || crossClinicCleanup.data.length === 0,
-          "A different clinic cannot retry another clinic's cleanup.",
-        );
-        const cleanupAfterDeniedRetry = await getInsuranceClaim(
+          replaceableDocument.id,
+          replacementPath,
+        ),
+        registerInsuranceDocumentUpload(
+          clinicAId,
+          userAId,
+          claim.id,
+          replaceableDocument.id,
+          concurrentReplacementPath,
+        ),
+      ]);
+      assert.equal(
+        concurrentRegistrations.filter(
+          (registration) => registration.registered,
+        ).length,
+        1,
+        "Only one concurrent replacement may become the current document.",
+      );
+      const winningReplacementPath = concurrentRegistrations[0].registered
+        ? replacementPath
+        : concurrentReplacementPath;
+      const losingReplacementPath = concurrentRegistrations[0].registered
+        ? concurrentReplacementPath
+        : replacementPath;
+      assert.ok(
+        concurrentRegistrations.some(
+          (registration) =>
+            !registration.registered && registration.cleanupAuthorized,
+        ),
+        "The losing upload must receive exact-path cleanup authorization.",
+      );
+      const queuedClaim = await getInsuranceClaim(clinicAId, claim.id);
+      const queuedDocument = queuedClaim?.documents.find(
+        (document) => document.id === replaceableDocument.id,
+      );
+      assert.deepEqual(
+        queuedDocument?.pendingCleanupPaths.sort(),
+        [originalPath, losingReplacementPath].sort(),
+        "Both superseded and losing-upload paths must remain available for retries.",
+      );
+
+      const replacedFileCleanup = await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .remove([originalPath]);
+      assert.equal(
+        replacedFileCleanup.error,
+        null,
+        "The exact superseded path must remain deletable for replacement cleanup.",
+      );
+      assert.equal(
+        await completeInsuranceDocumentStorageCleanup(
           clinicAId,
           claim.id,
-        );
-        assert.ok(
-          cleanupAfterDeniedRetry?.documents
-            .find((document) => document.id === replaceableDocument.id)
-            ?.pendingCleanupPaths.includes(losingReplacementPath),
-          "A failed unauthorized delete must not consume the cleanup authorization.",
-        );
-        const losingUploadCleanup = await supabaseA.storage
-          .from("dentalflow-insurance-private")
-          .remove([losingReplacementPath]);
-        assert.equal(losingUploadCleanup.error, null);
-        assert.equal(
-          await completeInsuranceDocumentStorageCleanup(
-            clinicAId,
-            claim.id,
-            replaceableDocument.id,
-            losingReplacementPath,
-          ),
-          true,
-          "The losing concurrent upload's cleanup authorization must be finalizable.",
-        );
-  
-        const arbitrarySiblingDelete = await supabaseA.storage
-          .from("dentalflow-insurance-private")
-          .remove([arbitrarySiblingPath]);
-        assert.ok(
-          arbitrarySiblingDelete.error ||
-            arbitrarySiblingDelete.data.length === 0,
-          "An unregistered sibling object must not be deleted.",
-        );
-        const arbitraryClinicDelete = await supabaseA.storage
-          .from("dentalflow-insurance-private")
-          .remove([arbitraryClinicPath]);
-        assert.ok(
-          arbitraryClinicDelete.error || arbitraryClinicDelete.data.length === 0,
-          "An arbitrary object under a member clinic prefix must not be deletable.",
-        );
-  
-        const differentDocumentStillExists = await supabaseA.storage
-          .from("dentalflow-insurance-private")
-          .download(differentDocumentPath);
-        assert.equal(differentDocumentStillExists.error, null);
-        assert.ok(
-          differentDocumentStillExists.data,
-          "A registered current document remains accessible.",
-        );
-        const differentDocumentCleanup = await supabaseA.storage
-          .from("dentalflow-insurance-private")
-          .remove([differentDocumentPath]);
-        assert.ok(
-          differentDocumentCleanup.error ||
-            differentDocumentCleanup.data.length === 0,
-          "A registered current document must not be directly deletable.",
-        );
-  
-        const registeredDocumentDelete = await supabaseA.storage
-          .from("dentalflow-insurance-private")
-          .remove([winningReplacementPath]);
-        assert.ok(
-          registeredDocumentDelete.error ||
-            registeredDocumentDelete.data.length === 0,
-          "A current document must be deletable only through replacement cleanup.",
-        );
-        const currentDocumentStillExists = await supabaseA.storage
-          .from("dentalflow-insurance-private")
-          .download(winningReplacementPath);
-        assert.equal(currentDocumentStillExists.error, null);
-        assert.ok(
-          currentDocumentStillExists.data,
-          "Denied direct deletion must preserve the current document object.",
-        );
-        assert.equal(
-          await completeInsuranceDocumentStorageCleanup(
-            clinicAId,
-            claim.id,
-            replaceableDocument.id,
-            winningReplacementPath,
-          ),
-          false,
-          "A current object cannot have its cleanup authorization finalized.",
-        );
-        const interruptedUploadPath = `${clinicAId}/${claim.id}/${otherDocument.id}/${randomUUID()}.pdf`;
-        await authorizeInsuranceDocumentUpload(
+          replaceableDocument.id,
+          originalPath,
+        ),
+        true,
+      );
+      const crossClinicCleanup = await supabaseB.storage
+        .from("dentalflow-insurance-private")
+        .remove([losingReplacementPath]);
+      assert.ok(
+        crossClinicCleanup.error || crossClinicCleanup.data.length === 0,
+        "A different clinic cannot retry another clinic's cleanup.",
+      );
+      const cleanupAfterDeniedRetry = await getInsuranceClaim(
+        clinicAId,
+        claim.id,
+      );
+      assert.ok(
+        cleanupAfterDeniedRetry?.documents
+          .find((document) => document.id === replaceableDocument.id)
+          ?.pendingCleanupPaths.includes(losingReplacementPath),
+        "A failed unauthorized delete must not consume the cleanup authorization.",
+      );
+      const losingUploadCleanup = await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .remove([losingReplacementPath]);
+      assert.equal(losingUploadCleanup.error, null);
+      assert.equal(
+        await completeInsuranceDocumentStorageCleanup(
+          clinicAId,
+          claim.id,
+          replaceableDocument.id,
+          losingReplacementPath,
+        ),
+        true,
+        "The losing concurrent upload's cleanup authorization must be finalizable.",
+      );
+
+      const arbitrarySiblingDelete = await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .remove([arbitrarySiblingPath]);
+      assert.ok(
+        arbitrarySiblingDelete.error ||
+          arbitrarySiblingDelete.data.length === 0,
+        "An unregistered sibling object must not be deleted.",
+      );
+      const arbitraryClinicDelete = await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .remove([arbitraryClinicPath]);
+      assert.ok(
+        arbitraryClinicDelete.error || arbitraryClinicDelete.data.length === 0,
+        "An arbitrary object under a member clinic prefix must not be deletable.",
+      );
+
+      const differentDocumentStillExists = await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .download(differentDocumentPath);
+      assert.equal(differentDocumentStillExists.error, null);
+      assert.ok(
+        differentDocumentStillExists.data,
+        "A registered current document remains accessible.",
+      );
+      const differentDocumentCleanup = await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .remove([differentDocumentPath]);
+      assert.ok(
+        differentDocumentCleanup.error ||
+          differentDocumentCleanup.data.length === 0,
+        "A registered current document must not be directly deletable.",
+      );
+
+      const registeredDocumentDelete = await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .remove([winningReplacementPath]);
+      assert.ok(
+        registeredDocumentDelete.error ||
+          registeredDocumentDelete.data.length === 0,
+        "A current document must be deletable only through replacement cleanup.",
+      );
+      const currentDocumentStillExists = await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .download(winningReplacementPath);
+      assert.equal(currentDocumentStillExists.error, null);
+      assert.ok(
+        currentDocumentStillExists.data,
+        "Denied direct deletion must preserve the current document object.",
+      );
+      assert.equal(
+        await completeInsuranceDocumentStorageCleanup(
+          clinicAId,
+          claim.id,
+          replaceableDocument.id,
+          winningReplacementPath,
+        ),
+        false,
+        "A current object cannot have its cleanup authorization finalized.",
+      );
+      const interruptedUploadPath = `${clinicAId}/${claim.id}/${otherDocument.id}/${randomUUID()}.pdf`;
+      await authorizeInsuranceDocumentUpload(
+        clinicAId,
+        claim.id,
+        otherDocument.id,
+        interruptedUploadPath,
+      );
+      await uploadInsuranceStorageObject(supabaseA, interruptedUploadPath);
+      const pendingUploadClaim = await getInsuranceClaim(clinicAId, claim.id);
+      assert.ok(
+        pendingUploadClaim?.documents
+          .find((document) => document.id === otherDocument.id)
+          ?.pendingCleanupPaths.includes(interruptedUploadPath),
+        "An upload interrupted before document registration must remain tracked.",
+      );
+      const failedUploadCleanup = await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .remove([interruptedUploadPath]);
+      assert.equal(failedUploadCleanup.error, null);
+      const cleanupBeforeFinalization = await getInsuranceClaim(
+        clinicAId,
+        claim.id,
+      );
+      assert.ok(
+        cleanupBeforeFinalization?.documents
+          .find((document) => document.id === otherDocument.id)
+          ?.pendingCleanupPaths.includes(interruptedUploadPath),
+        "A deleted object remains queued until cleanup finalization succeeds.",
+      );
+      assert.equal(
+        await completeInsuranceDocumentStorageCleanup(
           clinicAId,
           claim.id,
           otherDocument.id,
           interruptedUploadPath,
-        );
-        await uploadInsuranceStorageObject(supabaseA, interruptedUploadPath);
-        const pendingUploadClaim = await getInsuranceClaim(clinicAId, claim.id);
-        assert.ok(
-          pendingUploadClaim?.documents
-            .find((document) => document.id === otherDocument.id)
-            ?.pendingCleanupPaths.includes(interruptedUploadPath),
-          "An upload interrupted before document registration must remain tracked.",
-        );
-        const failedUploadCleanup = await supabaseA.storage
-          .from("dentalflow-insurance-private")
-          .remove([interruptedUploadPath]);
-        assert.equal(failedUploadCleanup.error, null);
-        const cleanupBeforeFinalization = await getInsuranceClaim(
-          clinicAId,
-          claim.id,
-        );
-        assert.ok(
-          cleanupBeforeFinalization?.documents
-            .find((document) => document.id === otherDocument.id)
-            ?.pendingCleanupPaths.includes(interruptedUploadPath),
-          "A deleted object remains queued until cleanup finalization succeeds.",
-        );
-        assert.equal(
-          await completeInsuranceDocumentStorageCleanup(
-            clinicAId,
-            claim.id,
-            otherDocument.id,
-            interruptedUploadPath,
-          ),
-          true,
-          "The upload intent can be finalized after Storage deletion.",
-        );
-  
-        const clinicBPatient = await createClinicPatient(
-          clinicBId,
-          patientInputSchema.parse({
-            fullName: `${marker} Insurance Patient B`,
-            phoneNumber: syntheticPhone(),
-            whatsappOptIn: false,
-            notes: "",
-          }),
-        );
-        const clinicBProvider = await createInsuranceProvider(
-          clinicBId,
-          providerData,
-        );
-        const clinicBPolicy = await createInsurancePolicy(clinicBId, {
-          ...policyData,
-          patientId: clinicBPatient.id,
-          providerId: clinicBProvider.id,
-          policyNumber: `TEST-${randomUUID()}`,
+        ),
+        true,
+        "The upload intent can be finalized after Storage deletion.",
+      );
+
+      const clinicBPatient = await createClinicPatient(
+        clinicBId,
+        patientInputSchema.parse({
+          fullName: `${marker} Insurance Patient B`,
+          phoneNumber: syntheticPhone(),
+          whatsappOptIn: false,
+          notes: "",
+        }),
+      );
+      const clinicBProvider = await createInsuranceProvider(
+        clinicBId,
+        providerData,
+      );
+      const clinicBPolicy = await createInsurancePolicy(clinicBId, {
+        ...policyData,
+        patientId: clinicBPatient.id,
+        providerId: clinicBProvider.id,
+        policyNumber: `TEST-${randomUUID()}`,
+      });
+      const clinicBClaim = await createInsuranceClaim(clinicBId, userBId, {
+        ...claimData,
+        patientId: clinicBPatient.id,
+        policyId: clinicBPolicy.id,
+        treatmentPlanId: null,
+        preAuthorizationId: null,
+        type: InsuranceClaimType.REIMBURSEMENT,
+      });
+      const clinicBDocument = await createInsuranceDocumentRequirement(
+        clinicBId,
+        userBId,
+        clinicBClaim.id,
+        {
+          type: InsuranceDocumentType.OTHER,
+          name: `${marker} clinic B document`,
+        },
+      );
+      const clinicBStoragePath = `${clinicBId}/${clinicBClaim.id}/${clinicBDocument.id}/${randomUUID()}.pdf`;
+      uploadedStoragePathsB.push(clinicBStoragePath);
+      await authorizeInsuranceDocumentUpload(
+        clinicBId,
+        clinicBClaim.id,
+        clinicBDocument.id,
+        clinicBStoragePath,
+      );
+      await uploadInsuranceStorageObject(supabaseB, clinicBStoragePath);
+      await registerInsuranceDocumentUpload(
+        clinicBId,
+        userBId,
+        clinicBClaim.id,
+        clinicBDocument.id,
+        clinicBStoragePath,
+      );
+      await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .remove([clinicBStoragePath]);
+      const clinicBFileStillExists = await supabaseB.storage
+        .from("dentalflow-insurance-private")
+        .download(clinicBStoragePath);
+      assert.equal(clinicBFileStillExists.error, null);
+      assert.ok(clinicBFileStillExists.data);
+      const clinicBCleanup = await supabaseB.storage
+        .from("dentalflow-insurance-private")
+        .remove([clinicBStoragePath]);
+      assert.equal(clinicBCleanup.error, null);
+
+      const reimbursement = await createInsuranceClaim(clinicAId, userAId, {
+        ...claimData,
+        treatmentPlanId: null,
+        preAuthorizationId: null,
+        type: InsuranceClaimType.REIMBURSEMENT,
+        treatmentDetails: "Synthetic reimbursement procedure",
+        amountClaimed: "3000.00",
+      });
+      await createInsurancePayment(clinicAId, userAId, reimbursement.id, {
+        kind: "PATIENT_PAYMENT",
+        amount: "3000.00",
+        paidAt: new Date("2099-01-10T12:00:00.000Z"),
+        reference: `PAT-${randomUUID()}`,
+        notes: "Synthetic patient payment.",
+      });
+      const reimbursementDocuments =
+        await freshReader.insuranceDocument.findMany({
+          where: { claimId: reimbursement.id, clinicId: clinicAId },
         });
-        const clinicBClaim = await createInsuranceClaim(clinicBId, userBId, {
-          ...claimData,
-          patientId: clinicBPatient.id,
-          policyId: clinicBPolicy.id,
-          treatmentPlanId: null,
-          preAuthorizationId: null,
-          type: InsuranceClaimType.REIMBURSEMENT,
-        });
-        const clinicBDocument = await createInsuranceDocumentRequirement(
-          clinicBId,
-          userBId,
-          clinicBClaim.id,
-          {
-            type: InsuranceDocumentType.OTHER,
-            name: `${marker} clinic B document`,
-          },
-        );
-        const clinicBStoragePath = `${clinicBId}/${clinicBClaim.id}/${clinicBDocument.id}/${randomUUID()}.pdf`;
-        uploadedStoragePathsB.push(clinicBStoragePath);
-        await authorizeInsuranceDocumentUpload(
-          clinicBId,
-          clinicBClaim.id,
-          clinicBDocument.id,
-          clinicBStoragePath,
-        );
-        await uploadInsuranceStorageObject(supabaseB, clinicBStoragePath);
-        await registerInsuranceDocumentUpload(
-          clinicBId,
-          userBId,
-          clinicBClaim.id,
-          clinicBDocument.id,
-          clinicBStoragePath,
-        );
-        await supabaseA.storage
-          .from("dentalflow-insurance-private")
-          .remove([clinicBStoragePath]);
-        const clinicBFileStillExists = await supabaseB.storage
-          .from("dentalflow-insurance-private")
-          .download(clinicBStoragePath);
-        assert.equal(clinicBFileStillExists.error, null);
-        assert.ok(clinicBFileStillExists.data);
-        const clinicBCleanup = await supabaseB.storage
-          .from("dentalflow-insurance-private")
-          .remove([clinicBStoragePath]);
-        assert.equal(clinicBCleanup.error, null);
-  
-        const reimbursement = await createInsuranceClaim(clinicAId, userAId, {
-          ...claimData,
-          treatmentPlanId: null,
-          preAuthorizationId: null,
-          type: InsuranceClaimType.REIMBURSEMENT,
-          treatmentDetails: "Synthetic reimbursement procedure",
-          amountClaimed: "3000.00",
-        });
-        await createInsurancePayment(clinicAId, userAId, reimbursement.id, {
-          kind: "PATIENT_PAYMENT",
-          amount: "3000.00",
-          paidAt: new Date("2099-01-10T12:00:00.000Z"),
-          reference: `PAT-${randomUUID()}`,
-          notes: "Synthetic patient payment.",
-        });
-        const reimbursementDocuments =
-          await freshReader.insuranceDocument.findMany({
-            where: { claimId: reimbursement.id, clinicId: clinicAId },
-          });
-        assert.equal(reimbursementDocuments.length, 3);
-        for (const document of reimbursementDocuments) {
-          await uploadAndVerifyInsuranceDocument(reimbursement.id, document.id);
-        }
-        await updateInsuranceClaimStatus(clinicAId, userAId, reimbursement.id, {
-          status: InsuranceClaimStatus.SUBMITTED,
-          approvedAmount: null,
-          rejectionReason: null,
-        });
-        await updateInsuranceClaimStatus(clinicAId, userAId, reimbursement.id, {
-          status: InsuranceClaimStatus.REJECTED,
-          approvedAmount: null,
-          rejectionReason: "Synthetic test rejection.",
-        });
-        await updateInsuranceClaimStatus(clinicAId, userAId, reimbursement.id, {
-          status: InsuranceClaimStatus.SUBMITTED,
-          approvedAmount: null,
-          rejectionReason: null,
-        });
-        const resubmittedClaim =
-          await freshReader.insuranceClaim.findUniqueOrThrow({
-            where: { id: reimbursement.id },
-            include: { payments: true },
-          });
-        assert.equal(resubmittedClaim.resubmissionCount, 1);
-        assert.equal(resubmittedClaim.payments.length, 1);
-        assert.equal(resubmittedClaim.payments[0].kind, "PATIENT_PAYMENT");
-      } finally {
-        await prisma.clinicSubscription.deleteMany({
-          where: { id: { in: insuranceSubscriptions.map((subscription) => subscription.id) } },
-        });
-        await prisma.billingPlanVersion.delete({
-          where: { id: insurancePlan.id },
-        });
+      assert.equal(reimbursementDocuments.length, 3);
+      for (const document of reimbursementDocuments) {
+        await uploadAndVerifyInsuranceDocument(reimbursement.id, document.id);
       }
+      await updateInsuranceClaimStatus(clinicAId, userAId, reimbursement.id, {
+        status: InsuranceClaimStatus.SUBMITTED,
+        approvedAmount: null,
+        rejectionReason: null,
+      });
+      await updateInsuranceClaimStatus(clinicAId, userAId, reimbursement.id, {
+        status: InsuranceClaimStatus.REJECTED,
+        approvedAmount: null,
+        rejectionReason: "Synthetic test rejection.",
+      });
+      await updateInsuranceClaimStatus(clinicAId, userAId, reimbursement.id, {
+        status: InsuranceClaimStatus.SUBMITTED,
+        approvedAmount: null,
+        rejectionReason: null,
+      });
+      const resubmittedClaim =
+        await freshReader.insuranceClaim.findUniqueOrThrow({
+          where: { id: reimbursement.id },
+          include: { payments: true },
+        });
+      assert.equal(resubmittedClaim.resubmissionCount, 1);
+      assert.equal(resubmittedClaim.payments.length, 1);
+      assert.equal(resubmittedClaim.payments[0].kind, "PATIENT_PAYMENT");
     },
   );
 
