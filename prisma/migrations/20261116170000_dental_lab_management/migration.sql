@@ -30,6 +30,7 @@ CREATE TABLE "dental_lab_orders" (
   "id" UUID NOT NULL,
   "clinicId" UUID NOT NULL,
   "patientId" UUID NOT NULL,
+  "treatmentPlanId" UUID,
   "partnerId" UUID NOT NULL,
   "createdByUserId" UUID NOT NULL,
   "workType" VARCHAR(100) NOT NULL,
@@ -61,6 +62,7 @@ CREATE INDEX "dental_lab_orders_clinicId_patientId_createdAt_idx" ON "dental_lab
 CREATE INDEX "dental_lab_orders_clinicId_partnerId_status_idx" ON "dental_lab_orders"("clinicId", "partnerId", "status");
 CREATE INDEX "dlo_patient_clinic_idx" ON "dental_lab_orders"("patientId", "clinicId");
 CREATE INDEX "dlo_partner_clinic_idx" ON "dental_lab_orders"("partnerId", "clinicId");
+CREATE INDEX "dlo_treatment_plan_clinic_idx" ON "dental_lab_orders"("treatmentPlanId", "clinicId", "patientId");
 CREATE INDEX "dlo_creator_clinic_idx" ON "dental_lab_orders"("createdByUserId", "clinicId");
 
 ALTER TABLE "dental_lab_partners"
@@ -72,6 +74,8 @@ ALTER TABLE "dental_lab_orders"
   FOREIGN KEY ("clinicId") REFERENCES "clinics"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT "dental_lab_orders_patientId_clinicId_fkey"
   FOREIGN KEY ("patientId", "clinicId") REFERENCES "patients"("id", "clinicId") ON DELETE RESTRICT ON UPDATE CASCADE,
+  ADD CONSTRAINT "dental_lab_orders_treatmentPlanId_clinicId_patientId_fkey"
+  FOREIGN KEY ("treatmentPlanId", "clinicId", "patientId") REFERENCES "treatment_plans"("id", "clinicId", "patientId") ON DELETE RESTRICT ON UPDATE CASCADE,
   ADD CONSTRAINT "dental_lab_orders_partnerId_clinicId_fkey"
   FOREIGN KEY ("partnerId", "clinicId") REFERENCES "dental_lab_partners"("id", "clinicId") ON DELETE RESTRICT ON UPDATE CASCADE,
   ADD CONSTRAINT "dental_lab_orders_createdByUserId_clinicId_fkey"
