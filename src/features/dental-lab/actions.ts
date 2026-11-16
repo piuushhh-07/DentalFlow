@@ -27,13 +27,17 @@ const partnerSchema = z.object({
 const orderSchema = z.object({
   clinicId: uuid,
   patientId: uuid,
+  treatmentPlanId: uuid.optional().or(z.literal("")),
   partnerId: uuid,
   workType: z.string().trim().min(2).max(100),
   toothNumbers: z.string().trim().max(120).optional(),
   material: z.string().trim().max(120).optional(),
   shade: z.string().trim().max(40).optional(),
   instructions: z.string().trim().max(2000).optional(),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  }),
   quotedAmount: z.preprocess(
     (value) => (value === "" || value === undefined ? undefined : value),
     z.coerce.number().finite().min(0).max(1_000_000_000).optional(),
@@ -83,6 +87,7 @@ export async function createDentalLabPartner(formData: FormData): Promise<never>
           notes: optional(parsed.data.notes),
         },
       });
+      if (updated.count !== 1) throw new Error("LAB_TRANSITION_CONFLICT");
     });
   } catch (error) {
     if (error instanceof BillingFeatureUnavailableError) redirect(labPath(membership.clinicId, "upgrade-required"));
@@ -101,6 +106,7 @@ export async function createDentalLabOrder(formData: FormData): Promise<never> {
   const parsed = orderSchema.safeParse({
     clinicId: formData.get("clinicId"),
     patientId: formData.get("patientId"),
+    treatmentPlanId: formData.get("treatmentPlanId") ?? "",
     partnerId: formData.get("partnerId"),
     workType: formData.get("workType"),
     toothNumbers: formData.get("toothNumbers") ?? "",
@@ -115,7 +121,7 @@ export async function createDentalLabOrder(formData: FormData): Promise<never> {
   try {
     await prisma.$transaction(async (tx) => {
       await assertFeatureEnabled(tx, membership.clinicId, "dentalLabManagement");
-      const [patient, partner] = await Promise.all([
+      const [patient, partner, treatmentPlan] = await Promise.all([
         tx.patient.findFirst({
           where: { id: parsed.data.patientId, clinicId: membership.clinicId, archivedAt: null },
           select: { id: true },
@@ -124,12 +130,26 @@ export async function createDentalLabOrder(formData: FormData): Promise<never> {
           where: { id: parsed.data.partnerId, clinicId: membership.clinicId, active: true },
           select: { id: true },
         }),
+        parsed.data.treatmentPlanId
+          ? tx.treatmentPlan.findFirst({
+              where: {
+                id: parsed.data.treatmentPlanId,
+                clinicId: membership.clinicId,
+                patientId: parsed.data.patientId,
+                status: "ACTIVE",
+              },
+              select: { id: true },
+            })
+          : Promise.resolve(null),
       ]);
-      if (!patient || !partner) throw new Error("LAB_RELATION_NOT_FOUND");
+      if (!patient || !partner || (parsed.data.treatmentPlanId && !treatmentPlan)) {
+        throw new Error("LAB_RELATION_NOT_FOUND");
+      }
       await tx.dentalLabOrder.create({
         data: {
           clinicId: membership.clinicId,
           patientId: patient.id,
+          treatmentPlanId: treatmentPlan?.id ?? null,
           partnerId: partner.id,
           createdByUserId: membership.userId,
           workType: parsed.data.workType,
@@ -177,8 +197,8 @@ export async function updateDentalLabOrderStatus(formData: FormData): Promise<ne
       if (parsed.data.status === DentalLabOrderStatus.REMAKE_REQUESTED && !parsed.data.remakeReason?.trim()) {
         throw new Error("REMAKE_REASON_REQUIRED");
       }
-      await tx.dentalLabOrder.update({
-        where: { id: current.id },
+      const updated = await tx.dentalLabOrder.updateMany({
+        where: { id: current.id, clinicId: membership.clinicId, status: current.status },
         data: {
           status: parsed.data.status,
           ...(parsed.data.status === DentalLabOrderStatus.SENT_TO_LAB ? { sentAt: new Date() } : {}),
@@ -192,7 +212,7 @@ export async function updateDentalLabOrderStatus(formData: FormData): Promise<ne
     if (error instanceof BillingFeatureUnavailableError) redirect(labPath(membership.clinicId, "upgrade-required"));
     if (error instanceof BillingAccessRestrictedError) redirect(labPath(membership.clinicId, "subscription-restricted"));
     if (error instanceof Error && error.message === "LAB_ORDER_NOT_FOUND") redirect(labPath(membership.clinicId, "order-not-found"));
-    if (error instanceof Error && error.message === "LAB_TRANSITION_NOT_ALLOWED") redirect(labPath(membership.clinicId, "invalid-transition"));
+    if (error instanceof Error && (error.message === "LAB_TRANSITION_NOT_ALLOWED" || error.message === "LAB_TRANSITION_CONFLICT")) redirect(labPath(membership.clinicId, "invalid-transition"));
     if (error instanceof Error && error.message === "REMAKE_REASON_REQUIRED") redirect(labPath(membership.clinicId, "remake-reason-required"));
     console.error("Dental lab order update failed", { errorName: error instanceof Error ? error.name : "UnknownError" });
     redirect(labPath(membership.clinicId, "error"));
