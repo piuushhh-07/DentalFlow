@@ -19,6 +19,7 @@ type AppShellProps = Readonly<{
     | "insurance"
     | "inventory"
     | "lab"
+    | "sterilisation"
     | "expenses"
     | "team";
 }>;
