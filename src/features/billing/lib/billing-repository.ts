@@ -78,6 +78,7 @@ export async function getClinicBillingPortalData(clinicId: string) {
           amountMinor: true,
           interval: true,
           intervalCount: true,
+          entitlements: true,
         },
       },
       payments: {
