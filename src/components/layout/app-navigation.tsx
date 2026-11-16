@@ -5,6 +5,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   Package,
+  FlaskConical,
   ReceiptText,
   MessageCircle,
   ShieldCheck,
@@ -32,6 +33,7 @@ const navigationGroups = [
       { label: "Reports", icon: ClipboardList, href: "reports" },
       { label: "Insurance", icon: ShieldCheck, href: "insurance" },
       { label: "Inventory", icon: Package, href: "inventory" },
+      { label: "Dental laboratory", icon: FlaskConical, href: "lab" },
       { label: "Expenses", icon: ReceiptText, href: "expenses" },
       { label: "Team", icon: UserRoundPlus, href: "settings/staff" },
     ],
@@ -52,6 +54,7 @@ type AppNavigationProps = Readonly<{
     | "reports"
     | "insurance"
     | "inventory"
+    | "lab"
     | "expenses"
     | "team";
 }>;
@@ -95,6 +98,7 @@ export function AppNavigation({
                 (label === "Reports" && activeSection === "reports") ||
                 (label === "Insurance" && activeSection === "insurance") ||
                 (label === "Inventory" && activeSection === "inventory") ||
+                (label === "Dental laboratory" && activeSection === "lab") ||
                 (label === "Expenses" && activeSection === "expenses") ||
                 (label === "Team" && activeSection === "team");
 
@@ -113,7 +117,9 @@ export function AppNavigation({
                             ? "/treatments/catalogue"
                             : label === "Patient billing"
                               ? "/billing/patient-ledger"
-                              : label === "Expenses"
+                              : label === "Dental laboratory"
+                                ? "/lab"
+                                : label === "Expenses"
                                 ? "/expenses"
                                 : label === "Team"
                                   ? "/settings/staff"
