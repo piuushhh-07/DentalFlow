@@ -104,6 +104,22 @@ export async function assertPatientCapacity(
   if (patientCount >= maximum) throw new BillingLimitReachedError("patients");
 }
 
+export async function assertDentistCapacity(
+  transaction: TransactionClient,
+  clinicId: string,
+): Promise<void> {
+  const entitlements = await getCurrentEntitlements(transaction, clinicId);
+  const maximum = entitlements?.maxDentists;
+  if (maximum === undefined || maximum === null) return;
+
+  const dentistCount = await transaction.clinicDentist.count({
+    where: { clinicId, active: true },
+  });
+  if (dentistCount >= maximum) {
+    throw new BillingLimitReachedError("dentists");
+  }
+}
+
 export async function assertMonthlyAppointmentCapacity(
   transaction: TransactionClient,
   clinicId: string,
