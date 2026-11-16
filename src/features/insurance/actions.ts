@@ -13,6 +13,7 @@ import {
   requireClinicMembership,
   requireClinicRole,
 } from "@/features/auth/lib/server-auth";
+import { BillingFeatureUnavailableError } from "@/features/billing/lib/billing-entitlements";
 import {
   archiveInsuranceProvider,
   authorizeInsuranceDocumentUpload,
