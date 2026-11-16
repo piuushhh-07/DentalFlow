@@ -992,6 +992,7 @@ export async function scheduleInsuranceFollowUp(
   followUpAt: Date | null,
 ) {
   return prisma.$transaction(async (transaction) => {
+    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     const result = await transaction.insuranceClaim.updateMany({
       where: {
         id: claimId,
@@ -1868,6 +1869,7 @@ export async function startInsuranceDocumentExtraction(
   documentId: string,
 ) {
   return prisma.$transaction(async (transaction) => {
+    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockDocument(transaction, clinicId, claimId, documentId);
     const document = await transaction.insuranceDocument.findFirst({
       where: {
