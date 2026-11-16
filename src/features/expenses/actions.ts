@@ -9,6 +9,7 @@ import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { prisma } from "@/lib/db/prisma";
 import {
   assertFeatureEnabled,
+  BillingAccessRestrictedError,
   BillingFeatureUnavailableError,
 } from "@/features/billing/lib/billing-entitlements";
 
@@ -68,7 +69,10 @@ export async function createClinicExpense(formData: FormData): Promise<never> {
       });
     });
   } catch (error) {
-    if (error instanceof BillingFeatureUnavailableError) {
+    if (
+      error instanceof BillingFeatureUnavailableError ||
+      error instanceof BillingAccessRestrictedError
+    ) {
       redirect(expensePath(membership.clinicId, "upgrade-required"));
     }
     console.error("Clinic expense creation failed", {
