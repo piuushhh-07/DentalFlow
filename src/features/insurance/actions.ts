@@ -85,11 +85,11 @@ function logInsuranceError(operation: string, error: unknown): void {
 }
 
 function redirectForInsuranceError(path: string, error: unknown): never {
-  if (
-    error instanceof BillingFeatureUnavailableError ||
-    error instanceof BillingAccessRestrictedError
-  ) {
+  if (error instanceof BillingFeatureUnavailableError) {
     errorRedirect(path, "upgrade-required");
+  }
+  if (error instanceof BillingAccessRestrictedError) {
+    errorRedirect(path, "subscription-restricted");
   }
   if (error instanceof InsuranceRecordNotFoundError) {
     errorRedirect(path, "not-found");
