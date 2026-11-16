@@ -27,6 +27,7 @@ const resultSchema = z.object({
   chemicalIndicatorPass: z.enum(["true", "false"]).transform((v) => v === "true"),
   biologicalIndicatorPass: z.enum(["true", "false"]).transform((v) => v === "true"),
   result: z.enum(["PASS", "FAIL"]),
+  resultNotes: z.string().trim().max(1000).optional(),
 });
 const pouchSchema = z.object({
   clinicId: uuid,
@@ -81,7 +82,7 @@ export async function recordSterilisationCycleResult(formData: FormData): Promis
   const parsed = resultSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect("/clinics");
   if (parsed.data.result === "PASS" && !canMarkCycleSuccessful(parsed.data)) redirect(pagePath(parsed.data.clinicId, "indicators-must-pass"));
-  if (parsed.data.result === "FAIL" && parsed.data.chemicalIndicatorPass && parsed.data.biologicalIndicatorPass) redirect(pagePath(parsed.data.clinicId, "failure-needs-indicator"));
+  if (parsed.data.result === "FAIL" && !parsed.data.resultNotes?.trim()) redirect(pagePath(parsed.data.clinicId, "failure-reason-required"));
   const membership = await requireClinicRole(parsed.data.clinicId, [ClinicRole.OWNER]);
   try {
     await prisma.$transaction(async (tx) => {
@@ -96,6 +97,7 @@ export async function recordSterilisationCycleResult(formData: FormData): Promis
           durationMinutes: parsed.data.durationMinutes,
           chemicalIndicatorPass: parsed.data.chemicalIndicatorPass,
           biologicalIndicatorPass: parsed.data.biologicalIndicatorPass,
+          ...(parsed.data.resultNotes?.trim() ? { notes: parsed.data.resultNotes.trim() } : {}),
         },
       });
       if (updated.count !== 1) throw new Error("CYCLE_NOT_PENDING");
