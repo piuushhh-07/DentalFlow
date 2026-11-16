@@ -33,7 +33,7 @@ const orderSchema = z.object({
   material: z.string().trim().max(120).optional(),
   shade: z.string().trim().max(40).optional(),
   instructions: z.string().trim().max(2000).optional(),
-  dueDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   quotedAmount: z.preprocess(
     (value) => (value === "" || value === undefined ? undefined : value),
     z.coerce.number().finite().min(0).max(1_000_000_000).optional(),
