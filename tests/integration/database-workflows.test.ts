@@ -130,7 +130,11 @@ import {
   processRazorpayWebhook,
   RazorpayWebhookProcessingBusyError,
 } from "@/features/billing/lib/razorpay-webhook";
-import { BillingLimitReachedError } from "@/features/billing/lib/billing-entitlements";
+import {
+  assertStaffCapacity,
+  assertStaffInvitationCapacity,
+  BillingLimitReachedError,
+} from "@/features/billing/lib/billing-entitlements";
 import {
   createDigitalPrescription,
   listClinicPrescriptionMedicineCatalogue,
@@ -372,6 +376,19 @@ after(async () => {
       cleanupErrors.push(
         "Could not remove the clinic B synthetic private test file.",
       );
+  }
+  const markerPlans = await prisma.billingPlanVersion.findMany({
+    where: { displayName: { contains: marker } },
+    select: { id: true },
+  });
+  if (markerPlans.length > 0) {
+    const markerPlanIds = markerPlans.map((plan) => plan.id);
+    await prisma.clinicSubscription.deleteMany({
+      where: { planVersionId: { in: markerPlanIds } },
+    });
+    await prisma.billingPlanVersion.deleteMany({
+      where: { id: { in: markerPlanIds } },
+    });
   }
   await freshReader.$disconnect();
   await prisma.$disconnect();
@@ -913,7 +930,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           totalBillingCycles: 12,
           trialDays: 14,
           graceDays: 7,
-          entitlements: { maxPatients: 1, maxMonthlyAppointments: 1 },
+          entitlements: { maxPatients: 1, maxMonthlyAppointments: 1, maxStaff: 2 },
           providerPlanId: `plan_${randomUUID().replaceAll("-", "")}`,
         },
       });
@@ -948,8 +965,36 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       const paymentForB = `pay_${randomUUID().replaceAll("-", "")}`;
       const webhookEventIds: string[] = [];
       let capTestAppointmentId: string | undefined;
+      let staffSeatInvitationId: string | undefined;
 
       try {
+        await prisma.clinicMembership.create({
+          data: { clinicId: clinicAId, userId: userBId, role: ClinicRole.STAFF },
+        });
+        const staffSeatEmail = `staff-seat-${randomUUID()}@example.test`;
+        const staffSeatInvitation = await prisma.clinicInvitation.create({
+          data: {
+            clinicId: clinicAId,
+            email: staffSeatEmail,
+            normalizedEmail: staffSeatEmail,
+            role: ClinicRole.STAFF,
+            invitedByUserId: userAId,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+          select: { id: true },
+        });
+        staffSeatInvitationId = staffSeatInvitation.id;
+        await prisma.$transaction((transaction) =>
+          assertStaffCapacity(transaction, clinicAId),
+        );
+        await assert.rejects(
+          prisma.$transaction((transaction) =>
+            assertStaffInvitationCapacity(transaction, clinicAId),
+          ),
+          BillingLimitReachedError,
+          "An active staff member plus a pending invitation must reserve both available seats.",
+        );
+
         await assert.rejects(
           createClinicPatient(
             clinicAId,
@@ -1205,6 +1250,14 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           ClinicAccessDeniedError,
         );
       } finally {
+        if (staffSeatInvitationId) {
+          await prisma.clinicInvitation.deleteMany({
+            where: { id: staffSeatInvitationId, clinicId: clinicAId },
+          });
+        }
+        await prisma.clinicMembership.deleteMany({
+          where: { userId: userBId, clinicId: clinicAId },
+        });
         if (capTestAppointmentId) {
           await prisma.appointment.deleteMany({
             where: { id: capTestAppointmentId, clinicId: clinicAId },
@@ -2313,6 +2366,41 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
   await t.test(
     "insurance records, audit history and private Storage enforce clinic ownership",
     async () => {
+      const insurancePlan = await prisma.billingPlanVersion.create({
+        data: {
+          code: `insurance-integration-${randomUUID()}`,
+          version: 1,
+          displayName: `${marker} Insurance Plan`,
+          currency: "INR",
+          amountMinor: 50000,
+          interval: BillingInterval.MONTH,
+          intervalCount: 1,
+          totalBillingCycles: 12,
+          trialDays: 0,
+          graceDays: 7,
+          entitlements: { features: { fullInsuranceClaims: true } },
+          providerPlanId: `plan_${randomUUID().replaceAll("-", "")}`,
+        },
+      });
+      const insurancePeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const insuranceSubscriptions = await Promise.all([
+        prisma.clinicSubscription.create({
+          data: {
+            clinicId: clinicAId,
+            planVersionId: insurancePlan.id,
+            status: BillingSubscriptionStatus.ACTIVE,
+            currentPeriodEnd: insurancePeriodEnd,
+          },
+        }),
+        prisma.clinicSubscription.create({
+          data: {
+            clinicId: clinicBId,
+            planVersionId: insurancePlan.id,
+            status: BillingSubscriptionStatus.ACTIVE,
+            currentPeriodEnd: insurancePeriodEnd,
+          },
+        }),
+      ]);
       const providerData = providerInputSchema.parse({
         name: `${marker} Synthetic TPA`,
         kind: "TPA",

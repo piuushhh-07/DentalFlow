@@ -35,6 +35,8 @@ const categories = [
 ] as const;
 const statusMessages: Record<string, string> = {
   created: "Clinic expense recorded.",
+  "upgrade-required": "This module is not included in your current plan. Upgrade your subscription to continue.",
+  "subscription-restricted": "Your clinic subscription is inactive. Restore or renew it to continue.",
   error: "We couldn't save this expense. Please try again.",
 };
 

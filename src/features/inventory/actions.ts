@@ -7,6 +7,11 @@ import { z } from "zod";
 
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { prisma } from "@/lib/db/prisma";
+import {
+  assertFeatureEnabled,
+  BillingAccessRestrictedError,
+  BillingFeatureUnavailableError,
+} from "@/features/billing/lib/billing-entitlements";
 
 const uuidSchema = z.string().uuid();
 const itemSchema = z.object({
@@ -57,21 +62,34 @@ export async function createInventoryItem(formData: FormData): Promise<never> {
     ClinicRole.OWNER,
   ]);
   try {
-    await prisma.inventoryItem.create({
-      data: {
-        clinicId: membership.clinicId,
-        name: parsed.data.name,
-        category: parsed.data.category || null,
-        sku: parsed.data.sku || null,
-        unit: parsed.data.unit,
-        reorderLevel: new Prisma.Decimal(parsed.data.reorderLevel),
-        unitCost:
-          parsed.data.unitCost === "" || parsed.data.unitCost === undefined
-            ? null
-            : new Prisma.Decimal(parsed.data.unitCost),
-      },
+    await prisma.$transaction(async (transaction) => {
+      await assertFeatureEnabled(
+        transaction,
+        membership.clinicId,
+        "inventoryManagement",
+      );
+      await transaction.inventoryItem.create({
+        data: {
+          clinicId: membership.clinicId,
+          name: parsed.data.name,
+          category: parsed.data.category || null,
+          sku: parsed.data.sku || null,
+          unit: parsed.data.unit,
+          reorderLevel: new Prisma.Decimal(parsed.data.reorderLevel),
+          unitCost:
+            parsed.data.unitCost === "" || parsed.data.unitCost === undefined
+              ? null
+              : new Prisma.Decimal(parsed.data.unitCost),
+        },
+      });
     });
   } catch (error) {
+    if (error instanceof BillingFeatureUnavailableError) {
+      redirect(inventoryPath(membership.clinicId, "upgrade-required"));
+    }
+    if (error instanceof BillingAccessRestrictedError) {
+      redirect(inventoryPath(membership.clinicId, "subscription-restricted"));
+    }
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
@@ -106,6 +124,11 @@ export async function recordInventoryMovement(
   try {
     await prisma.$transaction(
       async (transaction) => {
+        await assertFeatureEnabled(
+          transaction,
+          membership.clinicId,
+          "inventoryManagement",
+        );
         const item = await transaction.inventoryItem.findFirst({
           where: {
             id: parsed.data.itemId,
@@ -151,6 +174,9 @@ export async function recordInventoryMovement(
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   } catch (error) {
+    if (error instanceof BillingFeatureUnavailableError) {
+      redirect(inventoryPath(membership.clinicId, "upgrade-required"));
+    }
     if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") {
       redirect(inventoryPath(membership.clinicId, "insufficient-stock"));
     }

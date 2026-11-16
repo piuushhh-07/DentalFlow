@@ -1,6 +1,6 @@
 import "server-only";
 
-import { Prisma } from "@prisma/client";
+import { ClinicRole, Prisma } from "@prisma/client";
 
 import {
   billingEntitlementsSchema,
@@ -117,6 +117,53 @@ export async function assertDentistCapacity(
   });
   if (dentistCount >= maximum) {
     throw new BillingLimitReachedError("dentists");
+  }
+}
+
+export async function assertStaffCapacity(
+  transaction: TransactionClient,
+  clinicId: string,
+): Promise<void> {
+  const entitlements = await getCurrentEntitlements(transaction, clinicId);
+  const maximum = entitlements?.maxStaff;
+  if (maximum === undefined || maximum === null) return;
+
+  const staffCount = await transaction.clinicMembership.count({
+    where: { clinicId, role: ClinicRole.STAFF, revokedAt: null },
+  });
+  if (staffCount >= maximum) {
+    throw new BillingLimitReachedError("staff");
+  }
+}
+
+/**
+ * Pending staff invitations reserve seats so concurrent invitations cannot
+ * exceed the plan's staff allowance before invitees accept.
+ */
+export async function assertStaffInvitationCapacity(
+  transaction: TransactionClient,
+  clinicId: string,
+  now = new Date(),
+): Promise<void> {
+  const entitlements = await getCurrentEntitlements(transaction, clinicId);
+  const maximum = entitlements?.maxStaff;
+  if (maximum === undefined || maximum === null) return;
+
+  const [staffCount, pendingInvitationCount] = await Promise.all([
+    transaction.clinicMembership.count({
+      where: { clinicId, role: ClinicRole.STAFF, revokedAt: null },
+    }),
+    transaction.clinicInvitation.count({
+      where: {
+        clinicId,
+        role: ClinicRole.STAFF,
+        status: "PENDING",
+        expiresAt: { gt: now },
+      },
+    }),
+  ]);
+  if (staffCount + pendingInvitationCount >= maximum) {
+    throw new BillingLimitReachedError("staff");
   }
 }
 

@@ -28,6 +28,8 @@ const statusMessages: Record<string, string> = {
   "not-found": "That team membership could not be found.",
   "last-owner": "A clinic must always have at least one OWNER.",
   conflict: "The team changed during this request. Refresh and try again.",
+  "staff-limit": "Your current plan has reached its staff limit. Upgrade the plan or free a staff seat before changing this role.",
+  "subscription-restricted": "Your clinic subscription is inactive. Restore or upgrade the plan before changing staff roles.",
   unavailable: "We could not update clinic access. Please try again.",
 };
 

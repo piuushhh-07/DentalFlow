@@ -14,6 +14,10 @@ import {
   requireClinicRole,
 } from "@/features/auth/lib/server-auth";
 import {
+  BillingAccessRestrictedError,
+  BillingFeatureUnavailableError,
+} from "@/features/billing/lib/billing-entitlements";
+import {
   archiveInsuranceProvider,
   authorizeInsuranceDocumentUpload,
   completeInsuranceDocumentStorageCleanup,
@@ -81,6 +85,12 @@ function logInsuranceError(operation: string, error: unknown): void {
 }
 
 function redirectForInsuranceError(path: string, error: unknown): never {
+  if (error instanceof BillingFeatureUnavailableError) {
+    errorRedirect(path, "upgrade-required");
+  }
+  if (error instanceof BillingAccessRestrictedError) {
+    errorRedirect(path, "subscription-restricted");
+  }
   if (error instanceof InsuranceRecordNotFoundError) {
     errorRedirect(path, "not-found");
   }
