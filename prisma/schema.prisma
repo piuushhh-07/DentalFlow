@@ -1212,7 +1212,7 @@ model ClinicStaffLeaveRequest {
   updatedAt         DateTime                @updatedAt @db.Timestamptz(6)
   clinic            Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   membership        ClinicMembership        @relation("StaffLeaveRequester", fields: [userId, clinicId], references: [userId, clinicId], onDelete: Cascade)
-  reviewedBy        UserProfile?            @relation("StaffLeaveReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedBy        UserProfile?            @relation("StaffLeaveReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
 
   @@index([clinicId, status, startDate])
   @@index([clinicId, userId, startDate, endDate])
