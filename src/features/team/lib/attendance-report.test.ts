@@ -15,7 +15,7 @@ test("rejects malformed months", () => {
 });
 
 test("protects exported CSV cells against spreadsheet formulas", () => {
-  assert.equal(attendanceCsvCell("=1+1"), "'\u003d1+1");
+  assert.equal(attendanceCsvCell("=1+1"), "\"\'=1+1\"");
   assert.equal(attendanceCsvCell('A "quote"'), '"A ""quote"""');
 });
 
