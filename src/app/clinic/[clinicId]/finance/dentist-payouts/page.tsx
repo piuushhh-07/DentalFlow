@@ -111,6 +111,7 @@ export default async function DentistPayoutsPage({
             </p>
           </div>
           <Link className="text-sm font-semibold text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/finance/cashbook`}>Back to cashbook →</Link>
+          <Link className="text-sm font-semibold text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/finance/reports`}>Financial reports →</Link>
         </header>
 
         {message ? <p role="status" className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">{message}</p> : null}

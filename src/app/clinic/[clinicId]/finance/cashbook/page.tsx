@@ -87,6 +87,7 @@ export default async function CashbookPage({
         <div className="flex flex-wrap gap-5">
           <Link className="text-sm font-semibold text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/finance/payables`}>Open vendor payables →</Link>
           <Link className="text-sm font-semibold text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/finance/dentist-payouts`}>Dentist & consultant payouts →</Link>
+          <Link className="text-sm font-semibold text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/finance/reports`}>Financial reports →</Link>
         </div>\n\n        {status ? <p role="status" className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">{status}</p> : null}
 
         {canClose ? (
