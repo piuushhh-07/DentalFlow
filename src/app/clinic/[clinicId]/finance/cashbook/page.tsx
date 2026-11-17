@@ -27,6 +27,7 @@ function todayInZone(timeZone: string): string {
 const messages: Record<string, string> = {
   closed: "Day closed. The cash count and reconciliation snapshot have been saved.",
   "already-closed": "A cash register close already exists for that business date. Closed days cannot be overwritten.",
+  "future-date": "A future business date cannot be closed.",
   "upgrade-required": "Cash register management is not included in your current plan.",
   "subscription-restricted": "Your clinic subscription currently restricts finance changes.",
   error: "We couldn't close the cash register. Please check the details and try again.",
@@ -91,7 +92,7 @@ export default async function CashbookPage({
             <form action={closeCashRegister} className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <input type="hidden" name="clinicId" value={membership.clinicId} />
               <label className="text-sm font-medium text-slate-700">Business date
-                <input required type="date" name="businessDate" defaultValue={today} className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
+                <input required type="date" name="businessDate" defaultValue={today} max={today} className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
               </label>
               <label className="text-sm font-medium text-slate-700">Opening cash (₹)
                 <input required type="number" name="openingCash" min="0" max="1000000000" step="0.01" defaultValue="0" className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
