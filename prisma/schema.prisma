@@ -407,6 +407,8 @@ model Clinic {
   equipment                            ClinicEquipment[]
   equipmentMaintenanceRecords          EquipmentMaintenanceRecord[]
   cashRegisterCloses                    CashRegisterClose[]
+  vendorBills                            VendorBill[]
+  vendorBillPayments                     VendorBillPayment[]
 
   @@index([name])
   @@map("clinics")
@@ -546,6 +548,8 @@ model ClinicMembership {
   recordedInfectionControlLogs       InfectionControlLog[]
   recordedEquipmentMaintenance       EquipmentMaintenanceRecord[]
   recordedCashRegisterCloses         CashRegisterClose[]
+  recordedVendorBills                VendorBill[]
+  recordedVendorBillPayments         VendorBillPayment[]
   sentClinicInvitations             ClinicInvitation[]                  @relation("ClinicInvitationSender")
   staffProfile                      ClinicStaffProfile?
   permissionGrants                  ClinicPermissionGrant[]
@@ -1961,4 +1965,58 @@ model CashRegisterClose {
   @@index([clinicId, closedAt])
   @@index([closedByUserId, clinicId])
   @@map("cash_register_closes")
+}
+
+
+enum VendorBillStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+model VendorBill {
+  id               String           @id @default(uuid()) @db.Uuid
+  clinicId         String           @db.Uuid
+  recordedByUserId String           @db.Uuid
+  vendorName       String           @db.VarChar(160)
+  invoiceNumber    String?          @db.VarChar(80)
+  description      String           @db.VarChar(300)
+  category         String           @db.VarChar(80)
+  billDate         DateTime         @db.Date
+  dueDate          DateTime         @db.Date
+  amount            Decimal          @db.Decimal(12, 2)
+  status            VendorBillStatus @default(OPEN)
+  notes             String?          @db.VarChar(1000)
+  createdAt         DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @db.Timestamptz(6)
+  clinic            Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  recordedBy        ClinicMembership @relation(fields: [recordedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  payments          VendorBillPayment[]
+
+  @@unique([id, clinicId])
+  @@unique([clinicId, vendorName, invoiceNumber])
+  @@index([clinicId, status, dueDate])
+  @@index([clinicId, billDate])
+  @@map("vendor_bills")
+}
+
+model VendorBillPayment {
+  id               String           @id @default(uuid()) @db.Uuid
+  clinicId         String           @db.Uuid
+  billId           String           @db.Uuid
+  recordedByUserId String           @db.Uuid
+  amount            Decimal          @db.Decimal(12, 2)
+  paymentMethod     PaymentMethod
+  paidAt            DateTime         @default(now()) @db.Timestamptz(6)
+  reference         String?          @db.VarChar(120)
+  notes             String?          @db.VarChar(500)
+  createdAt         DateTime         @default(now()) @db.Timestamptz(6)
+  clinic            Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  bill              VendorBill       @relation(fields: [billId, clinicId], references: [id, clinicId], onDelete: Cascade)
+  recordedBy        ClinicMembership @relation(fields: [recordedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@index([clinicId, paidAt])
+  @@index([billId, clinicId, paidAt])
+  @@map("vendor_bill_payments")
 }

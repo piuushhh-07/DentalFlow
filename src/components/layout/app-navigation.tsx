@@ -136,7 +136,7 @@ export function AppNavigation({
                                   : label === "Equipment"
                                     ? "/equipment"
                                   : label === "Finance"
-                                ? "/finance/cashbook"
+                                    ? "/finance/cashbook"
                                 : label === "Expenses"
                                 ? "/expenses"
                                 : label === "Team"
