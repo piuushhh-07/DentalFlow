@@ -11,7 +11,11 @@ import { prisma } from "@/lib/db/prisma";
 export const dynamic = "force-dynamic";
 
 const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 });
-function todayInZone(timeZone: string): string {\n  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());\n  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));\n  return `${values.year}-${values.month}-${values.day}`;\n}
+function todayInZone(timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
 
 const statusMessages: Record<string, string> = {
   created: "Vendor bill saved.",
@@ -54,7 +58,9 @@ export default async function PayablesPage({
       payments: { select: { amount: true, paidAt: true, paymentMethod: true } },
     },
   });
-  const today = todayInZone(clinic.timeZone);\n  const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: clinic.timeZone });\n  const todayDate = new Date(`${today}T00:00:00.000Z`);
+  const today = todayInZone(clinic.timeZone);
+  const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: clinic.timeZone });
+  const todayDate = new Date(`${today}T00:00:00.000Z`);
   const rows = bills.map((bill) => {
     const paid = bill.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
     const balance = Math.max(0, Number(bill.amount) - paid);
@@ -120,7 +126,7 @@ export default async function PayablesPage({
                 <input required type="date" name="billDate" defaultValue={today} max={today} className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
               </label>
               <label className="text-sm font-medium text-slate-700">Due date
-                <input required type="date" name="dueDate" defaultValue={today()} className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
+                <input required type="date" name="dueDate" defaultValue={today} className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
               </label>
               <label className="text-sm font-medium text-slate-700">Bill amount (₹)
                 <input required type="number" name="amount" min="0.01" max="1000000000" step="0.01" className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
@@ -180,7 +186,7 @@ export default async function PayablesPage({
                         </select>
                       </label>
                       <label className="text-xs font-medium text-slate-600">Paid date
-                        <input required type="date" name="paidAt" defaultValue={today()} max={today()} className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm" />
+                        <input required type="date" name="paidAt" defaultValue={today} max={today()} className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm" />
                       </label>
                       <label className="text-xs font-medium text-slate-600">Reference
                         <input name="reference" maxLength={120} className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm" />
