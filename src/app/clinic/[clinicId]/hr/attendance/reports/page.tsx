@@ -83,7 +83,7 @@ export default async function StaffAttendanceReportPage({
     0,
   );
   const dateFormatter = new Intl.DateTimeFormat("en-IN", {
-    month: "long", year: "numeric", timeZone: clinic.timeZone,
+    month: "long", year: "numeric", timeZone: "UTC",
   });
   const monthLabel = dateFormatter.format(monthRange.startDate);
 
