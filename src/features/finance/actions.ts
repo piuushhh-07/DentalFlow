@@ -90,7 +90,7 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
 
       const startAt = startOfLocalDate(parsed.data.businessDate, clinic.timeZone);
       const endAt = startOfLocalDate(nextDate(parsed.data.businessDate), clinic.timeZone);
-      const [entries, expenses] = await Promise.all([
+      const [entries, expenses, dentistPayoutPayments] = await Promise.all([
         tx.treatmentFinancialEntry.findMany({
           where: { clinicId: membership.clinicId, paidAt: { gte: startAt, lt: endAt } },
           select: { entryType: true, paymentMethod: true, amount: true },
@@ -98,6 +98,14 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
         tx.clinicExpense.findMany({
           where: { clinicId: membership.clinicId, expenseDate: { gte: businessDate, lt: nextBusinessDate } },
           select: { paymentMethod: true, amount: true },
+        }),
+        tx.dentistPayoutPayment.findMany({
+          where: {
+            clinicId: membership.clinicId,
+            paymentMethod: PaymentMethod.CASH,
+            paidAt: { gte: startAt, lt: endAt },
+          },
+          select: { amount: true },
         }),
       ]);
 
@@ -107,8 +115,11 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
           .reduce((sum, entry) => sum.plus(entry.amount), zero);
       const cashCollections = sumEntries(PaymentMethod.CASH, FinancialEntryType.PAYMENT);
       const cashRefunds = sumEntries(PaymentMethod.CASH, FinancialEntryType.REFUND);
-      const cashExpenses = expenses.filter((expense) => expense.paymentMethod === PaymentMethod.CASH)
+      const recordedCashExpenses = expenses.filter((expense) => expense.paymentMethod === PaymentMethod.CASH)
         .reduce((sum, expense) => sum.plus(expense.amount), zero);
+      const cashDentistPayouts = dentistPayoutPayments
+        .reduce((sum, payment) => sum.plus(payment.amount), zero);
+      const cashExpenses = recordedCashExpenses.plus(cashDentistPayouts);
       const openingCash = new Prisma.Decimal(parsed.data.openingCash);
       const countedCash = new Prisma.Decimal(parsed.data.countedCash);
       const expectedCash = openingCash.plus(cashCollections).minus(cashRefunds).minus(cashExpenses);
