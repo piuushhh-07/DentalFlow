@@ -40,6 +40,7 @@ const navigationGroups = [
       { label: "Sterilisation", icon: ShieldAlert, href: "sterilisation" },
       { label: "Equipment", icon: Wrench, href: "equipment" },
       { label: "Finance", icon: Wallet, href: "finance/cashbook" },
+      { label: "Vendor payables", icon: ReceiptText, href: "finance/payables" },
       { label: "Expenses", icon: ReceiptText, href: "expenses" },
       { label: "Team", icon: UserRoundPlus, href: "settings/staff" },
     ],
@@ -112,6 +113,7 @@ export function AppNavigation({
                 (label === "Equipment" && activeSection === "equipment") ||
                 (label === "Expenses" && activeSection === "expenses") ||
                 (label === "Finance" && activeSection === "finance") ||
+                (label === "Vendor payables" && activeSection === "finance") ||
                 (label === "Team" && activeSection === "team");
 
               const destination =
@@ -135,8 +137,10 @@ export function AppNavigation({
                                   ? "/sterilisation"
                                   : label === "Equipment"
                                     ? "/equipment"
+                                  : label === "Vendor payables"
+                                  ? "/finance/payables"
                                   : label === "Finance"
-                                ? "/finance/cashbook"
+                                    ? "/finance/cashbook"
                                 : label === "Expenses"
                                 ? "/expenses"
                                 : label === "Team"
