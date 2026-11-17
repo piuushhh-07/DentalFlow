@@ -123,6 +123,12 @@ export default async function StaffAttendancePage({
               Owners can correct a record for the selected date; every update keeps its original attendance date.
             </p>
           </div>
+          <Link
+            href={`/clinic/${owner.clinicId}/hr/attendance/reports`}
+            className="inline-flex h-10 items-center rounded-md border border-teal-700 px-4 text-sm font-semibold text-teal-800 hover:bg-teal-50"
+          >
+            Monthly report
+          </Link>
           <form method="GET" className="flex items-end gap-2">
             <label className="text-sm font-medium text-slate-700">Attendance date
               <input type="date" name="date" max={today} defaultValue={date} className="mt-1 block h-10 rounded-md border border-slate-300 bg-white px-3" />
