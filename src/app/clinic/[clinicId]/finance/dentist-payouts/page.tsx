@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DentistPayoutStatus, PaymentMethod } from "@prisma/client";
+import { PaymentMethod } from "@prisma/client";
 import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
