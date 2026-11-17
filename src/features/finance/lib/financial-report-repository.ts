@@ -31,7 +31,7 @@ export async function getClinicReceivablesAging(
   now = new Date(),
 ): Promise<ReceivablesAgingSummary> {
   const asOfDate = new Date(`${localDateInZone(now, timeZone)}T00:00:00.000Z`);
-  const rows = await prisma.$queryRaw<ReceivablePlanRow[]>\`
+  const rows = await prisma.$queryRaw<ReceivablePlanRow[]>`
     SELECT
       tp."id",
       p."fullName" AS "patientName",
@@ -70,7 +70,7 @@ export async function getClinicReceivablesAging(
       ), 0)
     ) > 0
     ORDER BY tp."createdAt" ASC
-  \`;
+  `;
 
   return buildReceivablesAging(rows.map((row) => ({
     ...row,
