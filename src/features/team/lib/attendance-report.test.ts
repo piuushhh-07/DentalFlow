@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  attendanceCsvCell,
-  attendanceDurationMinutes,
-  getAttendanceMonthRange,
-} from "./attendance-report";
+import { attendanceCsvCell, attendanceDurationMinutes, getAttendanceMonthRange } from "./attendance-report";
 
 test("returns an inclusive month start and exclusive next-month boundary", () => {
   const range = getAttendanceMonthRange("2026-12");
@@ -19,17 +15,11 @@ test("rejects malformed months", () => {
 });
 
 test("protects exported CSV cells against spreadsheet formulas", () => {
-  assert.equal(attendanceCsvCell("=1+1"), "`'=1+1`");
+  assert.equal(attendanceCsvCell("=1+1"), "'\u003d1+1");
   assert.equal(attendanceCsvCell('A "quote"'), '"A ""quote"""');
 });
 
 test("calculates completed shift duration in whole minutes", () => {
-  assert.equal(
-    attendanceDurationMinutes(
-      new Date("2026-11-17T03:30:00.000Z"),
-      new Date("2026-11-17T12:00:00.000Z"),
-    ),
-    510,
-  );
+  assert.equal(attendanceDurationMinutes(new Date("2026-11-17T03:30:00.000Z"), new Date("2026-11-17T12:00:00.000Z")), 510);
   assert.equal(attendanceDurationMinutes(null, new Date()), 0);
 });
