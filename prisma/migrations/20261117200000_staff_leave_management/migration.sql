@@ -23,7 +23,7 @@ CREATE TABLE "clinic_staff_leave_requests" (
     ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "clinic_staff_leave_requests_reviewer_fkey"
     FOREIGN KEY ("reviewedByUserId") REFERENCES "user_profiles" ("id")
-    ON DELETE SET NULL ON UPDATE CASCADE,
+    ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "clinic_staff_leave_requests_date_check"
     CHECK ("endDate" >= "startDate"),
   CONSTRAINT "clinic_staff_leave_requests_review_check"
