@@ -39,3 +39,13 @@ CREATE INDEX "clinic_staff_leave_requests_clinic_user_dates_idx"
   ON "clinic_staff_leave_requests"("clinicId", "userId", "startDate", "endDate");
 CREATE INDEX "clinic_staff_leave_requests_reviewer_idx"
   ON "clinic_staff_leave_requests"("reviewedByUserId");
+
+-- These HR records are read and written only through server-side Prisma
+-- after clinic membership and role checks, never directly through Supabase Data API.
+ALTER TABLE public.clinic_staff_attendance ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.clinic_staff_attendance
+  FROM PUBLIC, anon, authenticated, service_role;
+
+ALTER TABLE public.clinic_staff_leave_requests ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.clinic_staff_leave_requests
+  FROM PUBLIC, anon, authenticated, service_role;
