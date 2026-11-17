@@ -39,6 +39,14 @@ function startOfLocalDate(date: string, timeZone: string): Date {
   return new Date(candidate);
 }
 
+function localDateInZone(timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function nextDate(date: string): string {
   const value = new Date(`${date}T00:00:00.000Z`);
   value.setUTCDate(value.getUTCDate() + 1);
@@ -76,6 +84,9 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
         select: { timeZone: true },
       });
       if (!clinic) throw new Error("CLINIC_NOT_FOUND");
+      if (parsed.data.businessDate > localDateInZone(clinic.timeZone)) {
+        throw new Error("CASH_REGISTER_FUTURE_DATE");
+      }
 
       const startAt = startOfLocalDate(parsed.data.businessDate, clinic.timeZone);
       const endAt = startOfLocalDate(nextDate(parsed.data.businessDate), clinic.timeZone);
