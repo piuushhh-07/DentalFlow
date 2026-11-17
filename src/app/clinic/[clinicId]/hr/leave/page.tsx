@@ -113,7 +113,7 @@ export default async function StaffLeavePage({
   const message = searchParams?.status ? messages[searchParams.status] : undefined;
 
   return (
-    <AppShell activeSection="team" clinicId={membership.clinicId}>
+    <AppShell activeSection="leave" clinicId={membership.clinicId}>
       <div className="mx-auto max-w-5xl space-y-7">
         <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
