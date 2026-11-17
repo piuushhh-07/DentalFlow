@@ -50,6 +50,14 @@ enum StaffJobTitle {
   BILLING_STAFF
 }
 
+enum StaffAttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  LEAVE
+  HOLIDAY
+}
+
 enum ClinicPermission {
   PATIENT_VIEW
   PATIENT_EDIT
@@ -373,6 +381,7 @@ model Clinic {
   treatmentVisits                    TreatmentVisit[]
   appointments                       Appointment[]
   dentists                           ClinicDentist[]
+  staffAttendanceRecords             ClinicStaffAttendance[]
   treatmentChairs                    TreatmentChair[]
   appointmentRequests                AppointmentRequest[]
   invitations                        ClinicInvitation[]
@@ -556,6 +565,8 @@ model ClinicMembership {
   recordedDentistPayoutPayments      DentistPayoutPayment[]
   sentClinicInvitations             ClinicInvitation[]                  @relation("ClinicInvitationSender")
   staffProfile                      ClinicStaffProfile?
+  attendanceRecords                 ClinicStaffAttendance[] @relation("StaffAttendanceMember")
+  recordedAttendance                ClinicStaffAttendance[] @relation("StaffAttendanceRecorder")
   permissionGrants                  ClinicPermissionGrant[]
   permissionChangesAuthored         ClinicStaffAudit[]                  @relation("ClinicStaffAuditActor")
   permissionChangesTargeted         ClinicStaffAudit[]                  @relation("ClinicStaffAuditTarget")
@@ -1153,6 +1164,28 @@ model ClinicStaffProfile {
   @@unique([userId, clinicId])
   @@index([clinicId, active, jobTitle])
   @@map("clinic_staff_profiles")
+}
+
+model ClinicStaffAttendance {
+  id                String                @id @default(uuid()) @db.Uuid
+  clinicId          String                @db.Uuid
+  userId            String                @db.Uuid
+  recordedByUserId  String                @db.Uuid
+  attendanceDate    DateTime              @db.Date
+  status            StaffAttendanceStatus
+  checkInAt         DateTime?             @db.Timestamptz(6)
+  checkOutAt        DateTime?             @db.Timestamptz(6)
+  notes             String?               @db.VarChar(500)
+  createdAt         DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime              @updatedAt @db.Timestamptz(6)
+  clinic            Clinic                @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  membership        ClinicMembership      @relation("StaffAttendanceMember", fields: [userId, clinicId], references: [userId, clinicId], onDelete: Cascade)
+  recordedBy        ClinicMembership      @relation("StaffAttendanceRecorder", fields: [recordedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@unique([userId, clinicId, attendanceDate])
+  @@index([clinicId, attendanceDate, status])
+  @@index([clinicId, userId, attendanceDate])
+  @@map("clinic_staff_attendance")
 }
 
 model ClinicPermissionGrant {

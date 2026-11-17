@@ -50,6 +50,12 @@ export default async function ClinicStaffSettingsPage({
           >
             Edit clinic profile
           </Link>
+          <Link
+            className="rounded-md border border-teal-700 bg-white px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50"
+            href={`/clinic/${owner.clinicId}/hr/attendance`}
+          >
+            Staff attendance
+          </Link>
         </div>
         <header className="mb-6 mt-4">
           <p className="text-sm font-medium text-teal-700">Clinic settings</p>
