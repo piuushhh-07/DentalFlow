@@ -7,6 +7,7 @@ import {
   Package,
   FlaskConical,
   ShieldAlert,
+  Wrench,
   ReceiptText,
   MessageCircle,
   ShieldCheck,
@@ -36,6 +37,7 @@ const navigationGroups = [
       { label: "Inventory", icon: Package, href: "inventory" },
       { label: "Dental laboratory", icon: FlaskConical, href: "lab" },
       { label: "Sterilisation", icon: ShieldAlert, href: "sterilisation" },
+      { label: "Equipment", icon: Wrench, href: "equipment" },
       { label: "Expenses", icon: ReceiptText, href: "expenses" },
       { label: "Team", icon: UserRoundPlus, href: "settings/staff" },
     ],
@@ -58,6 +60,7 @@ type AppNavigationProps = Readonly<{
     | "inventory"
     | "lab"
     | "sterilisation"
+    | "equipment"
     | "expenses"
     | "team";
 }>;
@@ -103,6 +106,7 @@ export function AppNavigation({
                 (label === "Inventory" && activeSection === "inventory") ||
                 (label === "Dental laboratory" && activeSection === "lab") ||
                 (label === "Sterilisation" && activeSection === "sterilisation") ||
+                (label === "Equipment" && activeSection === "equipment") ||
                 (label === "Expenses" && activeSection === "expenses") ||
                 (label === "Team" && activeSection === "team");
 
@@ -125,6 +129,8 @@ export function AppNavigation({
                                 ? "/lab"
                                 : label === "Sterilisation"
                                   ? "/sterilisation"
+                                  : label === "Equipment"
+                                    ? "/equipment"
                                   : label === "Expenses"
                                 ? "/expenses"
                                 : label === "Team"
