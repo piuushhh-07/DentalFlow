@@ -173,6 +173,158 @@ export default async function PatientPortalPage({
                         )}
                       </div>
                     </div>
+
+                    <div className="mt-7 border-t border-slate-100 pt-6">
+                      <h3 className="font-semibold text-slate-900">
+                        Treatment history
+                      </h3>
+                      {patient.treatmentPlans.length === 0 ? (
+                        <p className="mt-2 text-sm text-slate-500">
+                          No treatment plans are available yet.
+                        </p>
+                      ) : (
+                        <ul className="mt-3 space-y-3">
+                          {patient.treatmentPlans.map((plan, index) => {
+                            const completedVisits = plan.visits.filter(
+                              (visit) => visit.status === "COMPLETED",
+                            ).length;
+                            return (
+                              <li
+                                className="rounded-lg border border-slate-100 bg-slate-50 p-4"
+                                key={`${plan.name}-${plan.createdAt.toISOString()}-${index}`}
+                              >
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                  <div>
+                                    <p className="font-medium text-slate-900">
+                                      {plan.name}
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                      {plan.type.replaceAll("_", " ")}
+                                    </p>
+                                  </div>
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium capitalize text-slate-700">
+                                    {plan.status.toLowerCase()}
+                                  </span>
+                                </div>
+                                <p className="mt-2 text-sm text-slate-600">
+                                  {completedVisits} of {plan.totalVisits} visits
+                                  completed
+                                </p>
+                                {plan.visits.length > 0 && (
+                                  <ol className="mt-3 space-y-2 border-l-2 border-teal-100 pl-3">
+                                    {plan.visits.map((visit) => (
+                                      <li
+                                        className="text-xs text-slate-600"
+                                        key={visit.visitNumber}
+                                      >
+                                        Visit {visit.visitNumber} ·{" "}
+                                        {visit.status.replaceAll("_", " ").toLowerCase()}
+                                        {visit.completedAt
+                                          ? ` · Completed ${new Intl.DateTimeFormat("en-IN", {
+                                              dateStyle: "medium",
+                                              timeZone: "Asia/Kolkata",
+                                            }).format(visit.completedAt)}`
+                                          : ""}
+                                      </li>
+                                    ))}
+                                  </ol>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="mt-7 border-t border-slate-100 pt-6">
+                      <h3 className="font-semibold text-slate-900">
+                        Prescriptions
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Finalized prescriptions shared by your clinic.
+                      </p>
+                      {patient.digitalPrescriptions.length === 0 ? (
+                        <p className="mt-3 text-sm text-slate-500">
+                          No finalized prescriptions are available.
+                        </p>
+                      ) : (
+                        <ul className="mt-3 space-y-3">
+                          {patient.digitalPrescriptions.map((prescription, index) => (
+                            <li
+                              className="rounded-lg border border-slate-100 p-4"
+                              key={`${prescription.prescriptionDate.toISOString()}-${index}`}
+                            >
+                              <div className="flex flex-wrap justify-between gap-2">
+                                <p className="font-medium text-slate-900">
+                                  {new Intl.DateTimeFormat("en-IN", {
+                                    dateStyle: "medium",
+                                    timeZone: "Asia/Kolkata",
+                                  }).format(prescription.prescriptionDate)}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {prescription.authorNameSnapshot}
+                                  {prescription.authorRegistrationSnapshot
+                                    ? ` · Reg. ${prescription.authorRegistrationSnapshot}`
+                                    : ""}
+                                </p>
+                              </div>
+                              {prescription.diagnosisNotes && (
+                                <p className="mt-3 text-sm text-slate-700">
+                                  <span className="font-medium">Diagnosis: </span>
+                                  {prescription.diagnosisNotes}
+                                </p>
+                              )}
+                              {prescription.medicines.length > 0 && (
+                                <ul className="mt-3 space-y-2">
+                                  {prescription.medicines.map((medicine, medicineIndex) => (
+                                    <li
+                                      className="rounded-md bg-slate-50 p-3 text-sm"
+                                      key={`${medicine.medicineName}-${medicineIndex}`}
+                                    >
+                                      <p className="font-semibold text-slate-900">
+                                        {medicine.medicineName}
+                                      </p>
+                                      <p className="mt-1 text-slate-700">
+                                        {medicine.dosage} · {medicine.route} · {medicine.frequency}
+                                      </p>
+                                      <p className="mt-1 text-slate-600">
+                                        {medicine.duration} · Quantity: {medicine.quantity}
+                                      </p>
+                                      {medicine.instructions && (
+                                        <p className="mt-1 text-slate-600">
+                                          {medicine.instructions}
+                                        </p>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              {prescription.additionalAdvice && (
+                                <p className="mt-3 text-sm text-slate-700">
+                                  <span className="font-medium">Advice: </span>
+                                  {prescription.additionalAdvice}
+                                </p>
+                              )}
+                              {prescription.followUpDate && (
+                                <p className="mt-2 text-sm text-teal-800">
+                                  Follow-up:{" "}
+                                  {new Intl.DateTimeFormat("en-IN", {
+                                    dateStyle: "medium",
+                                    timeZone: "Asia/Kolkata",
+                                  }).format(prescription.followUpDate)}
+                                </p>
+                              )}
+                              <p className="mt-3 text-xs text-slate-500">
+                                {prescription.clinicNameSnapshot}
+                                {prescription.clinicPhoneSnapshot
+                                  ? ` · ${prescription.clinicPhoneSnapshot}`
+                                  : ""}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </section>
                 ))}
               </div>

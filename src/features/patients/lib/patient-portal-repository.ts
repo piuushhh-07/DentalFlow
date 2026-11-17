@@ -36,6 +36,55 @@ export async function listPatientPortalRecords(email: string) {
           clinic: { select: { timeZone: true } },
         },
       },
+      treatmentPlans: {
+        where: { status: { not: "CANCELLED" } },
+        orderBy: { createdAt: "desc" },
+        take: 15,
+        select: {
+          name: true,
+          type: true,
+          status: true,
+          totalVisits: true,
+          completedAt: true,
+          createdAt: true,
+          visits: {
+            orderBy: { visitNumber: "asc" },
+            select: {
+              visitNumber: true,
+              dueDate: true,
+              status: true,
+              completedAt: true,
+            },
+          },
+        },
+      },
+      digitalPrescriptions: {
+        where: { finalizedAt: { not: null } },
+        orderBy: [{ prescriptionDate: "desc" }, { createdAt: "desc" }],
+        take: 10,
+        select: {
+          prescriptionDate: true,
+          diagnosisNotes: true,
+          additionalAdvice: true,
+          followUpDate: true,
+          clinicNameSnapshot: true,
+          clinicPhoneSnapshot: true,
+          authorNameSnapshot: true,
+          authorRegistrationSnapshot: true,
+          medicines: {
+            orderBy: { position: "asc" },
+            select: {
+              medicineName: true,
+              dosage: true,
+              route: true,
+              frequency: true,
+              duration: true,
+              quantity: true,
+              instructions: true,
+            },
+          },
+        },
+      },
       treatmentEstimates: {
         where: {
           status: {
