@@ -406,6 +406,7 @@ model Clinic {
   infectionControlLogs                 InfectionControlLog[]
   equipment                            ClinicEquipment[]
   equipmentMaintenanceRecords          EquipmentMaintenanceRecord[]
+  cashRegisterCloses                    CashRegisterClose[]
 
   @@index([name])
   @@map("clinics")
@@ -544,6 +545,7 @@ model ClinicMembership {
   usedInstrumentPouches              InstrumentPouch[] @relation("InstrumentPouchUser")
   recordedInfectionControlLogs       InfectionControlLog[]
   recordedEquipmentMaintenance       EquipmentMaintenanceRecord[]
+  recordedCashRegisterCloses         CashRegisterClose[]
   sentClinicInvitations             ClinicInvitation[]                  @relation("ClinicInvitationSender")
   staffProfile                      ClinicStaffProfile?
   permissionGrants                  ClinicPermissionGrant[]
@@ -1931,4 +1933,32 @@ model ClinicExpense {
   @@index([clinicId, category, expenseDate])
   @@index([recordedByUserId, clinicId], map: "fk_clinic_expenses_recorder_2c")
   @@map("clinic_expenses")
+}
+
+
+model CashRegisterClose {
+  id                    String           @id @default(uuid()) @db.Uuid
+  clinicId              String           @db.Uuid
+  closedByUserId        String           @db.Uuid
+  businessDate          DateTime         @db.Date
+  openingCash           Decimal          @db.Decimal(12, 2)
+  cashCollections       Decimal          @default(0) @db.Decimal(12, 2)
+  cashRefunds           Decimal          @default(0) @db.Decimal(12, 2)
+  cashExpenses          Decimal          @default(0) @db.Decimal(12, 2)
+  expectedCash          Decimal          @db.Decimal(12, 2)
+  countedCash           Decimal          @db.Decimal(12, 2)
+  cashVariance          Decimal          @db.Decimal(12, 2)
+  upiCollections        Decimal          @default(0) @db.Decimal(12, 2)
+  cardCollections       Decimal          @default(0) @db.Decimal(12, 2)
+  bankTransferCollections Decimal        @default(0) @db.Decimal(12, 2)
+  otherCollections      Decimal          @default(0) @db.Decimal(12, 2)
+  notes                 String?          @db.VarChar(1000)
+  closedAt              DateTime         @default(now()) @db.Timestamptz(6)
+  clinic                Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  closedBy              ClinicMembership @relation(fields: [closedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@unique([clinicId, businessDate])
+  @@index([clinicId, closedAt])
+  @@index([closedByUserId, clinicId])
+  @@map("cash_register_closes")
 }
