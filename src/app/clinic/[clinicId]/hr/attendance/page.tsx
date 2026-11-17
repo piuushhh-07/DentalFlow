@@ -153,7 +153,7 @@ export default async function StaffAttendancePage({
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4">
             <h2 className="font-semibold text-slate-900">Daily register · {new Intl.DateTimeFormat("en-IN", { dateStyle: "full", timeZone: clinic.timeZone }).format(attendanceDate)}</h2>
-            <p className="mt-1 text-sm text-slate-500">Attendance is recorded in the clinic's {clinic.timeZone} timezone. No GPS or location tracking is collected.</p>
+            <p className="mt-1 text-sm text-slate-500">Attendance is recorded in the clinic&apos;s {clinic.timeZone} timezone. No GPS or location tracking is collected.</p>
           </div>
           {staff.length ? (
             <div className="divide-y divide-slate-100">
