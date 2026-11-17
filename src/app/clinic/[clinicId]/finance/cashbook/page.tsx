@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 
@@ -83,7 +84,7 @@ export default async function CashbookPage({
           </p>
         </header>
 
-        {status ? <p role="status" className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">{status}</p> : null}
+        <div><Link className="text-sm font-semibold text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/finance/payables`}>Open vendor payables →</Link></div>\n\n        {status ? <p role="status" className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">{status}</p> : null}
 
         {canClose ? (
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
