@@ -14,6 +14,7 @@ import {
   Stethoscope,
   UsersRound,
   UserRoundPlus,
+  Wallet,
 } from "lucide-react";
 
 const navigationGroups = [
@@ -38,6 +39,7 @@ const navigationGroups = [
       { label: "Dental laboratory", icon: FlaskConical, href: "lab" },
       { label: "Sterilisation", icon: ShieldAlert, href: "sterilisation" },
       { label: "Equipment", icon: Wrench, href: "equipment" },
+      { label: "Finance", icon: Wallet, href: "finance/cashbook" },
       { label: "Expenses", icon: ReceiptText, href: "expenses" },
       { label: "Team", icon: UserRoundPlus, href: "settings/staff" },
     ],
@@ -62,6 +64,7 @@ type AppNavigationProps = Readonly<{
     | "sterilisation"
     | "equipment"
     | "expenses"
+    | "finance"
     | "team";
 }>;
 
@@ -108,6 +111,7 @@ export function AppNavigation({
                 (label === "Sterilisation" && activeSection === "sterilisation") ||
                 (label === "Equipment" && activeSection === "equipment") ||
                 (label === "Expenses" && activeSection === "expenses") ||
+                (label === "Finance" && activeSection === "finance") ||
                 (label === "Team" && activeSection === "team");
 
               const destination =
@@ -131,7 +135,9 @@ export function AppNavigation({
                                   ? "/sterilisation"
                                   : label === "Equipment"
                                     ? "/equipment"
-                                  : label === "Expenses"
+                                  : label === "Finance"
+                                ? "/finance/cashbook"
+                                : label === "Expenses"
                                 ? "/expenses"
                                 : label === "Team"
                                   ? "/settings/staff"
