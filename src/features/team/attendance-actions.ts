@@ -64,9 +64,6 @@ export async function saveStaffAttendance(formData: FormData): Promise<never> {
   if (requiresTime && typeof checkOut === "string" && checkOut && checkOut < (checkIn as string)) {
     redirectStatus(clinicId, "invalid");
   }
-  if (!requiresTime && ((typeof checkIn === "string" && checkIn) || (typeof checkOut === "string" && checkOut))) {
-    redirectStatus(clinicId, "invalid");
-  }
 
   const target = await prisma.clinicMembership.findFirst({
     where: {
