@@ -15,7 +15,7 @@ import { prisma } from "@/lib/db/prisma";
 
 const schema = z.object({
   clinicId: z.string().uuid(),
-  businessDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/),
+  businessDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   openingCash: z.coerce.number().finite().min(0).max(1_000_000_000),
   countedCash: z.coerce.number().finite().min(0).max(1_000_000_000),
   notes: z.string().trim().max(1000).optional(),
@@ -145,6 +145,9 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
     }
     if (error instanceof Error && error.message === "CASH_REGISTER_ALREADY_CLOSED") {
       redirect(`/clinic/${membership.clinicId}/finance/cashbook?status=already-closed`);
+    }
+    if (error instanceof Error && error.message === "CASH_REGISTER_FUTURE_DATE") {
+      redirect(`/clinic/${membership.clinicId}/finance/cashbook?status=future-date`);
     }
     console.error("Cash register close failed", {
       errorName: error instanceof Error ? error.name : "UnknownError",
