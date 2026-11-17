@@ -1,6 +1,6 @@
 "use server";
 
-import { FinancialEntryType, PaymentMethod, Prisma } from "@prisma/client";
+import { ClinicRole, FinancialEntryType, PaymentMethod, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -55,7 +55,7 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
   });
   if (!parsed.success) redirect("/clinics");
 
-  const membership = await requireClinicRole(parsed.data.clinicId, ["OWNER"]);
+  const membership = await requireClinicRole(parsed.data.clinicId, [ClinicRole.OWNER]);
   const businessDate = new Date(`${parsed.data.businessDate}T00:00:00.000Z`);
   const nextBusinessDate = new Date(`${nextDate(parsed.data.businessDate)}T00:00:00.000Z`);
 
