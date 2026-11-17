@@ -186,7 +186,7 @@ export default async function PayablesPage({
                         </select>
                       </label>
                       <label className="text-xs font-medium text-slate-600">Paid date
-                        <input required type="date" name="paidAt" defaultValue={today} max={today()} className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm" />
+                        <input required type="date" name="paidAt" defaultValue={today} max={today} className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm" />
                       </label>
                       <label className="text-xs font-medium text-slate-600">Reference
                         <input name="reference" maxLength={120} className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm" />
