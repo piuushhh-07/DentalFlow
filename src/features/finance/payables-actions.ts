@@ -42,12 +42,6 @@ function financePath(clinicId: string, status: string): string {
   return `/clinic/${clinicId}/finance/payables?status=${status}`;
 }
 
-async function requireFinanceOwner(clinicId: string) {
-  const membership = await requireClinicRole(clinicId, [ClinicRole.OWNER]);
-  await assertFeatureEnabled(prisma, membership.clinicId, "expenseManagement");
-  return membership;
-}
-
 export async function createVendorBill(formData: FormData): Promise<never> {
   const parsed = billSchema.safeParse({
     clinicId: formData.get("clinicId"),
