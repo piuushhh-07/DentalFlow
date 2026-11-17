@@ -194,7 +194,7 @@ export default async function StaffAttendanceReportPage({
             <p className="px-5 py-10 text-center text-sm text-slate-500">No attendance entries recorded for {monthLabel} yet.</p>
           )}
         </section>
-        <p className="text-xs leading-5 text-slate-500">This report summarizes records entered in DentalFlow. It is not a statutory payroll statement. Please verify the clinic's official HR and record-retention requirements.</p>
+        <p className="text-xs leading-5 text-slate-500">This report summarizes records entered in DentalFlow. It is not a statutory payroll statement. Please verify the clinic&apos;s official HR and record-retention requirements.</p>
       </div>
     </AppShell>
   );
