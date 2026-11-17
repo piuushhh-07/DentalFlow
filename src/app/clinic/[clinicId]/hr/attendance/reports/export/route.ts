@@ -27,7 +27,7 @@ export async function GET(request: Request, { params }: { params: { clinicId: st
   }
   const url = new URL(request.url);
   const monthParam = url.searchParams.get("month");
-  let monthRange;
+  let monthRange: ReturnType<typeof getAttendanceMonthRange>;
   try {
     if (!monthParam) throw new Error("Missing month");
     monthRange = getAttendanceMonthRange(monthParam);
