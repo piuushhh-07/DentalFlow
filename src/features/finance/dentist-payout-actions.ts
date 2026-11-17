@@ -11,6 +11,11 @@ import {
   BillingAccessRestrictedError,
   BillingFeatureUnavailableError,
 } from "@/features/billing/lib/billing-entitlements";
+import {
+  getPayoutState,
+  isPayoutOverpayment,
+  toMinorUnits,
+} from "@/features/finance/lib/dentist-payouts";
 import { prisma } from "@/lib/db/prisma";
 
 const payoutSchema = z.object({
@@ -164,7 +169,10 @@ export async function recordDentistPayoutPayment(formData: FormData): Promise<ne
       });
       const alreadyPaid = paid._sum.amount ?? new Prisma.Decimal(0);
       const paymentAmount = new Prisma.Decimal(parsed.data.amount);
-      if (alreadyPaid.plus(paymentAmount).greaterThan(payout.amount)) {
+      const totalMinor = toMinorUnits(payout.amount.toString());
+      const alreadyPaidMinor = toMinorUnits(alreadyPaid.toString());
+      const paymentMinor = toMinorUnits(paymentAmount.toString());
+      if (isPayoutOverpayment(totalMinor, alreadyPaidMinor, paymentMinor)) {
         throw new Error("PAYOUT_OVERPAYMENT");
       }
 
@@ -181,14 +189,10 @@ export async function recordDentistPayoutPayment(formData: FormData): Promise<ne
         },
       });
 
-      const newPaid = alreadyPaid.plus(paymentAmount);
+      const newPaidMinor = alreadyPaidMinor + paymentMinor;
       await tx.dentistPayout.update({
         where: { id: payout.id },
-        data: {
-          status: newPaid.equals(payout.amount)
-            ? DentistPayoutStatus.PAID
-            : DentistPayoutStatus.PARTIALLY_PAID,
-        },
+        data: { status: getPayoutState(totalMinor, newPaidMinor) },
       });
     });
   } catch (error) {
