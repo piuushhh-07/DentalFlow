@@ -117,7 +117,7 @@ export default async function StaffLeavePage({
       <div className="mx-auto max-w-5xl space-y-7">
         <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <Link className="text-sm font-medium text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/hr/attendance`}>← Staff attendance</Link>
+            <Link className="text-sm font-medium text-teal-800 hover:underline" href={isOwner ? `/clinic/${membership.clinicId}/hr/attendance` : `/clinic/${membership.clinicId}`}>{isOwner ? "← Staff attendance" : "← Clinic dashboard"}</Link>
             <p className="mt-4 text-sm font-medium text-teal-700">{clinic.name} · HR</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">Staff leave requests</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
@@ -126,7 +126,7 @@ export default async function StaffLeavePage({
                 : "Submit planned leave for owner review and track the decision here."}
             </p>
           </div>
-          <Link className="text-sm font-semibold text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/settings/staff`}>Staff access →</Link>
+          {isOwner ? <Link className="text-sm font-semibold text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/settings/staff`}>Staff access →</Link> : null}
         </header>
 
         {message ? <p role="status" className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">{message}</p> : null}
