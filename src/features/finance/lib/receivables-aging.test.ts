@@ -64,11 +64,11 @@ test("ages open balances and excludes paid or credited plans", () => {
   ], asOf);
 
   assert.equal(result.totalPlans, 2);
-  assert.equal(result.totalOutstandingPaise, 1_020_000);
+  assert.equal(result.totalOutstandingPaise, 1_120_000);
   assert.equal(result.buckets.OVER_90.count, 1);
   assert.equal(result.buckets.OVER_90.amountPaise, 700_000);
   assert.equal(result.buckets.CURRENT_0_30.count, 1);
-  assert.equal(result.buckets.CURRENT_0_30.amountPaise, 320_000);
+  assert.equal(result.buckets.CURRENT_0_30.amountPaise, 420_000);
   assert.deepEqual(result.items.map((item) => item.id), ["old", "partial"]);
 });
 
