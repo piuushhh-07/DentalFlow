@@ -11,8 +11,7 @@ import { prisma } from "@/lib/db/prisma";
 export const dynamic = "force-dynamic";
 
 const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 });
-const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" });
-const today = () => new Date().toISOString().slice(0, 10);
+function todayInZone(timeZone: string): string {\n  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());\n  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));\n  return `${values.year}-${values.month}-${values.day}`;\n}
 
 const statusMessages: Record<string, string> = {
   created: "Vendor bill saved.",
@@ -55,7 +54,7 @@ export default async function PayablesPage({
       payments: { select: { amount: true, paidAt: true, paymentMethod: true } },
     },
   });
-  const todayDate = new Date(`${today()}T00:00:00.000Z`);
+  const today = todayInZone(clinic.timeZone);\n  const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: clinic.timeZone });\n  const todayDate = new Date(`${today}T00:00:00.000Z`);
   const rows = bills.map((bill) => {
     const paid = bill.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
     const balance = Math.max(0, Number(bill.amount) - paid);
@@ -118,7 +117,7 @@ export default async function PayablesPage({
                 <input required name="category" maxLength={80} placeholder="Lab, rent, utilities…" className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
               </label>
               <label className="text-sm font-medium text-slate-700">Bill date
-                <input required type="date" name="billDate" defaultValue={today()} max={today()} className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
+                <input required type="date" name="billDate" defaultValue={today} max={today} className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
               </label>
               <label className="text-sm font-medium text-slate-700">Due date
                 <input required type="date" name="dueDate" defaultValue={today()} className="mt-1 block h-10 w-full rounded-md border border-slate-300 px-3 font-normal" />
