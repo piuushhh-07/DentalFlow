@@ -409,6 +409,8 @@ model Clinic {
   cashRegisterCloses                    CashRegisterClose[]
   vendorBills                            VendorBill[]
   vendorBillPayments                     VendorBillPayment[]
+  dentistPayouts                         DentistPayout[]
+  dentistPayoutPayments                  DentistPayoutPayment[]
 
   @@index([name])
   @@map("clinics")
@@ -550,6 +552,8 @@ model ClinicMembership {
   recordedCashRegisterCloses         CashRegisterClose[]
   recordedVendorBills                VendorBill[]
   recordedVendorBillPayments         VendorBillPayment[]
+  recordedDentistPayouts             DentistPayout[]
+  recordedDentistPayoutPayments      DentistPayoutPayment[]
   sentClinicInvitations             ClinicInvitation[]                  @relation("ClinicInvitationSender")
   staffProfile                      ClinicStaffProfile?
   permissionGrants                  ClinicPermissionGrant[]
@@ -1126,6 +1130,7 @@ model ClinicDentist {
   clinic              Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   appointments        Appointment[]
   requests            AppointmentRequest[]
+  payouts             DentistPayout[]
 
   @@unique([id, clinicId])
   @@unique([clinicId, name])
@@ -1973,6 +1978,58 @@ enum VendorBillStatus {
   PARTIALLY_PAID
   PAID
   VOID
+}
+
+
+enum DentistPayoutStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+}
+
+model DentistPayout {
+  id               String              @id @default(uuid()) @db.Uuid
+  clinicId         String              @db.Uuid
+  dentistId        String              @db.Uuid
+  recordedByUserId String              @db.Uuid
+  periodStart      DateTime            @db.Date
+  periodEnd        DateTime            @db.Date
+  description      String              @db.VarChar(240)
+  amount           Decimal             @db.Decimal(12, 2)
+  status           DentistPayoutStatus @default(OPEN)
+  notes            String?             @db.VarChar(1000)
+  createdAt        DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime            @updatedAt @db.Timestamptz(6)
+  clinic           Clinic              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  dentist          ClinicDentist       @relation(fields: [dentistId, clinicId], references: [id, clinicId], onDelete: Restrict)
+  recordedBy       ClinicMembership    @relation(fields: [recordedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+  payments         DentistPayoutPayment[]
+
+  @@unique([id, clinicId])
+  @@unique([clinicId, dentistId, periodStart, periodEnd])
+  @@index([clinicId, status, periodEnd])
+  @@index([clinicId, periodStart, periodEnd])
+  @@map("dentist_payouts")
+}
+
+model DentistPayoutPayment {
+  id               String           @id @default(uuid()) @db.Uuid
+  clinicId         String           @db.Uuid
+  payoutId         String           @db.Uuid
+  recordedByUserId String           @db.Uuid
+  amount           Decimal          @db.Decimal(12, 2)
+  paymentMethod    PaymentMethod
+  paidAt           DateTime         @db.Timestamptz(6)
+  reference        String?          @db.VarChar(120)
+  notes            String?          @db.VarChar(500)
+  createdAt        DateTime         @default(now()) @db.Timestamptz(6)
+  clinic           Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  payout           DentistPayout    @relation(fields: [payoutId, clinicId], references: [id, clinicId], onDelete: Cascade)
+  recordedBy       ClinicMembership @relation(fields: [recordedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@index([clinicId, paidAt])
+  @@index([payoutId, clinicId, paidAt])
+  @@map("dentist_payout_payments")
 }
 
 model VendorBill {
