@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ClinicRole } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 
@@ -14,10 +15,6 @@ export const dynamic = "force-dynamic";
 const inr = new Intl.NumberFormat("en-IN", {
   style: "currency", currency: "INR", maximumFractionDigits: 2,
 });
-const dateFormat = new Intl.DateTimeFormat("en-IN", {
-  dateStyle: "medium", timeZone: "Asia/Kolkata",
-});
-
 const bucketLabels: Record<ReceivableAgeBucket, string> = {
   CURRENT_0_30: "0–30 days",
   DAYS_31_60: "31–60 days",
@@ -39,7 +36,7 @@ export default async function FinancialReportsPage({
 
   let membership;
   try {
-    membership = await requireClinicRole(parsed.data, ["OWNER"]);
+    membership = await requireClinicRole(parsed.data, [ClinicRole.OWNER]);
   } catch (error) {
     if (error instanceof ClinicAccessDeniedError) notFound();
     throw error;
@@ -55,6 +52,7 @@ export default async function FinancialReportsPage({
     membership.clinicId,
     clinic.timeZone,
   );
+  const dateFormat = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: clinic.timeZone });
   const today = new Intl.DateTimeFormat("en-IN", {
     dateStyle: "medium", timeZone: clinic.timeZone,
   }).format(new Date());
