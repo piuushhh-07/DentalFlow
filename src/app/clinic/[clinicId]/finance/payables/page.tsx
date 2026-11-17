@@ -85,6 +85,8 @@ export default async function PayablesPage({
           </p>
         </header>
 
+        <div><Link className="text-sm font-semibold text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/finance/dentist-payouts`}>Open dentist & consultant payouts →</Link></div>
+
         {message ? <p role="status" className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">{message}</p> : null}
 
         <section className="grid gap-4 sm:grid-cols-3">
