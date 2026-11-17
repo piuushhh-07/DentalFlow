@@ -64,12 +64,17 @@ export default async function StaffAttendancePage({
 
   const today = clinicToday(clinic.timeZone);
   const requestedDate = searchParams?.date;
-  const date = typeof requestedDate === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) &&
-    new Date(`${requestedDate}T00:00:00.000Z`).toISOString().slice(0, 10) === requestedDate &&
-    requestedDate <= today
-      ? requestedDate
-      : today;
+  const parsedRequestedDate =
+    typeof requestedDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)
+      ? new Date(`${requestedDate}T00:00:00.000Z`)
+      : null;
+  const isValidRequestedDate =
+    parsedRequestedDate !== null &&
+    Number.isFinite(parsedRequestedDate.getTime()) &&
+    parsedRequestedDate.toISOString().slice(0, 10) === requestedDate;
+  const date = isValidRequestedDate && requestedDate && requestedDate <= today
+    ? requestedDate
+    : today;
   const attendanceDate = new Date(`${date}T00:00:00.000Z`);
 
   const [staff, records] = await Promise.all([
