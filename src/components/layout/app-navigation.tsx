@@ -42,6 +42,7 @@ const navigationGroups = [
       { label: "Finance", icon: Wallet, href: "finance/cashbook" },
       { label: "Expenses", icon: ReceiptText, href: "expenses" },
       { label: "Team", icon: UserRoundPlus, href: "settings/staff" },
+      { label: "Leave", icon: CalendarClock, href: "hr/leave" },
     ],
   },
 ];
@@ -65,7 +66,8 @@ type AppNavigationProps = Readonly<{
     | "equipment"
     | "expenses"
     | "finance"
-    | "team";
+    | "team"
+    | "leave";
 }>;
 
 export function AppNavigation({
@@ -112,7 +114,8 @@ export function AppNavigation({
                 (label === "Equipment" && activeSection === "equipment") ||
                 (label === "Expenses" && activeSection === "expenses") ||
                 (label === "Finance" && activeSection === "finance") ||
-                (label === "Team" && activeSection === "team");
+                (label === "Team" && activeSection === "team") ||
+                (label === "Leave" && activeSection === "leave");
 
               const destination =
                 label === "Recalls"
@@ -141,7 +144,9 @@ export function AppNavigation({
                                 ? "/expenses"
                                 : label === "Team"
                                   ? "/settings/staff"
-                                  : "";
+                                  : label === "Leave"
+                                    ? "/hr/leave"
+                                    : "";
 
               return (
                 <li key={label}>
