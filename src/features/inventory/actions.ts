@@ -225,7 +225,9 @@ export async function recordInventoryMovement(
                 : new Prisma.Decimal(parsed.data.unitCost),
             reference: parsed.data.reference || null,
             notes: [
-              parsed.data.notes || null,
+              parsed.data.type === "WASTAGE" && parsed.data.notes
+                ? `Wastage reason: ${parsed.data.notes}`
+                : parsed.data.notes || null,
               batchUsage.length ? `FEFO batches: ${batchUsage.join(", ")}` : null,
             ].filter(Boolean).join(" · ").slice(0, 500) || null,
           },
