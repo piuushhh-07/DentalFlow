@@ -31,25 +31,35 @@ export function resolveBranchReportRange(
   const last30Days = getClinicReportDateRange(now, timeZone);
 
   if (preset === "custom") {
-    const validDates =
-      requestedStartDate !== undefined &&
-      requestedEndDate !== undefined &&
-      isValidReportDate(requestedStartDate) &&
-      isValidReportDate(requestedEndDate) &&
-      requestedStartDate <= requestedEndDate;
-    const dayCount = validDates
-      ? (Date.parse(`${requestedEndDate}T00:00:00.000Z`) -
-          Date.parse(`${requestedStartDate}T00:00:00.000Z`)) /
-        86_400_000 +
-        1
-      : 0;
+    const invalidDates =
+      requestedStartDate === undefined ||
+      requestedEndDate === undefined ||
+      !isValidReportDate(requestedStartDate) ||
+      !isValidReportDate(requestedEndDate) ||
+      requestedStartDate > requestedEndDate;
 
-    if (!validDates || dayCount > 366) {
+    if (invalidDates) {
       return {
         preset,
         range: last30Days,
         startDateInput: requestedStartDate ?? last30Days.startDate,
         endDateInput: requestedEndDate ?? last30Days.endDate,
+        error: "Choose a valid date range of no more than 366 days.",
+      };
+    }
+
+    const dayCount =
+      (Date.parse(`${requestedEndDate}T00:00:00.000Z`) -
+        Date.parse(`${requestedStartDate}T00:00:00.000Z`)) /
+        86_400_000 +
+      1;
+
+    if (dayCount > 366) {
+      return {
+        preset,
+        range: last30Days,
+        startDateInput: requestedStartDate,
+        endDateInput: requestedEndDate,
         error: "Choose a valid date range of no more than 366 days.",
       };
     }
@@ -78,8 +88,7 @@ export function resolveBranchReportRange(
     };
   }
 
-  const days = Number(preset);
-  const range = getClinicReportDateRange(now, timeZone, days);
+  const range = getClinicReportDateRange(now, timeZone, Number(preset));
   return {
     preset,
     range,
