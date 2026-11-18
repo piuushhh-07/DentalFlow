@@ -15,6 +15,7 @@ import {
   UsersRound,
   UserRoundPlus,
   Wallet,
+  Building2,
 } from "lucide-react";
 
 const navigationGroups = [
@@ -44,6 +45,7 @@ const navigationGroups = [
       { label: "Expenses", icon: ReceiptText, href: "expenses" },
       { label: "Team", icon: UserRoundPlus, href: "settings/staff" },
       { label: "Leave", icon: CalendarClock, href: "hr/leave" },
+      { label: "Branches", icon: Building2, href: "branches" },
     ],
   },
 ];
@@ -69,7 +71,8 @@ type AppNavigationProps = Readonly<{
     | "expenses"
     | "finance"
     | "team"
-    | "leave";
+    | "leave"
+    | "branches";
 }>;
 
 export function AppNavigation({
@@ -118,7 +121,8 @@ export function AppNavigation({
                 (label === "Expenses" && activeSection === "expenses") ||
                 (label === "Finance" && activeSection === "finance") ||
                 (label === "Team" && activeSection === "team") ||
-                (label === "Leave" && activeSection === "leave");
+                (label === "Leave" && activeSection === "leave") ||
+                (label === "Branches" && activeSection === "branches");
 
               const destination =
                 label === "Recalls"
