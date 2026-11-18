@@ -82,6 +82,7 @@ export default async function ClinicInventoryPage({
           quantity: true,
           createdAt: true,
           reference: true,
+          notes: true,
           item: { select: { name: true, unit: true } },
         },
       }),
@@ -394,7 +395,11 @@ export default async function ClinicInventoryPage({
                         timeStyle: "short",
                         timeZone: "Asia/Kolkata",
                       }).format(entry.createdAt)}
-                    </p>
+                    </p>                    {entry.notes ? (
+                      <p className="mt-1 max-w-xl text-xs text-slate-500">
+                        {entry.notes}
+                      </p>
+                    ) : null}
                   </div>
                   <p
                     className={
