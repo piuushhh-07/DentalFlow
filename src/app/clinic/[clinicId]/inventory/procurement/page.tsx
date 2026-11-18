@@ -46,7 +46,7 @@ export default async function InventoryProcurementPage({
     prisma.inventoryItem.findMany({ where: { clinicId: membership.clinicId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, unit: true, unitCost: true, currentStock: true } }),
     prisma.inventoryPurchaseOrder.findMany({ where: { clinicId: membership.clinicId }, orderBy: { orderedAt: "desc" }, take: 50, include: { supplier: { select: { name: true } }, lines: { include: { item: { select: { name: true, unit: true } } } } } }),
     prisma.inventoryBatch.findMany({
-      where: { clinicId: membership.clinicId, quantityRemaining: { gt: 0 }, supplierId: { not: null }, supplier: { active: true } },
+      where: { clinicId: membership.clinicId, quantityRemaining: { gt: 0 }, supplierId: { not: null }, supplier: { is: { active: true } } },
       orderBy: [{ expiryDate: { sort: "asc", nulls: "last" } }, { receivedAt: "asc" }],
       take: 100,
       include: { item: { select: { name: true, unit: true } }, supplier: { select: { name: true } } },
