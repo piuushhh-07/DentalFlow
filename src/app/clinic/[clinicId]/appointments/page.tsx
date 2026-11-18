@@ -9,10 +9,12 @@ import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { AppointmentCalendar } from "@/features/appointments/components/appointment-calendar";
 import { ScheduleResourceForm } from "@/features/appointments/components/schedule-resource-form";
 import { AppointmentRequestQueue } from "@/features/appointments/components/appointment-request-queue";
+import { PatientCancellationRequestQueue } from "@/features/appointments/components/patient-cancellation-request-queue";
 import { PublicBookingSettings } from "@/features/appointments/components/public-booking-settings";
 import {
   getPublicBookingSettings,
   listAppointmentRequests,
+  listPatientAppointmentCancellationRequests,
   listAppointmentResources,
   listClinicAppointmentsInRange,
   getAppointmentPrefill,
@@ -63,7 +65,7 @@ export default async function ClinicAppointmentsPage({
     selectedDate,
     selectedView,
   );
-  const [appointments, resourceData, requests, bookingSettings] =
+  const [appointments, resourceData, requests, cancellationRequests, bookingSettings] =
     await Promise.all([
       measureServerOperation("appointments.calendar_range", () =>
         listClinicAppointmentsInRange(
@@ -79,6 +81,9 @@ export default async function ClinicAppointmentsPage({
       ),
       measureServerOperation("appointments.pending_requests", () =>
         listAppointmentRequests(membership.clinicId),
+      ),
+      measureServerOperation("appointments.patient_cancellation_requests", () =>
+        listPatientAppointmentCancellationRequests(membership.clinicId),
       ),
       measureServerOperation("appointments.booking_settings", () =>
         getPublicBookingSettings(membership.clinicId),
@@ -220,6 +225,19 @@ export default async function ClinicAppointmentsPage({
               requests={requests}
             />
           </div>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="mb-3 text-lg font-semibold text-slate-900">
+            Patient cancellation requests
+          </h2>
+          <p className="mb-4 text-sm text-slate-600">
+            Review patient requests here. Approving a request cancels the linked appointment; declining leaves it scheduled.
+          </p>
+          <PatientCancellationRequestQueue
+            clinicId={membership.clinicId}
+            requests={cancellationRequests}
+          />
         </section>
 
         {membership.role === ClinicRole.OWNER && (
