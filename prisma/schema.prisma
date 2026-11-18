@@ -391,6 +391,7 @@ model UserProfile {
   memberships     ClinicMembership[]
   reviewedStaffLeaveRequests ClinicStaffLeaveRequest[] @relation("StaffLeaveReviewer")
   onboardedClinic Clinic?            @relation("ClinicOnboarding")
+  ownedClinicGroups ClinicGroup[]
 
   @@map("user_profiles")
 }
@@ -407,9 +408,11 @@ model Clinic {
   timeZone                           String                              @default("Asia/Kolkata") @db.VarChar(64)
   workingHours                       Json                                @default("[]") @db.JsonB
   onboardingUserId                   String?                             @unique @db.Uuid
+  clinicGroupId                       String?                             @db.Uuid
   createdAt                          DateTime                            @default(now()) @db.Timestamptz(6)
   updatedAt                          DateTime                            @updatedAt @db.Timestamptz(6)
   onboardingUser                     UserProfile?                        @relation("ClinicOnboarding", fields: [onboardingUserId], references: [id], onDelete: SetNull)
+  clinicGroup                         ClinicGroup?                        @relation(fields: [clinicGroupId], references: [id], onDelete: SetNull)
   memberships                        ClinicMembership[]
   patients                           Patient[]
   patientLeads                       PatientLead[]
@@ -463,7 +466,21 @@ model Clinic {
   dentistPayoutPayments                  DentistPayoutPayment[]
 
   @@index([name])
+  @@index([clinicGroupId])
   @@map("clinics")
+}
+
+model ClinicGroup {
+  id          String      @id @default(uuid()) @db.Uuid
+  name        String      @db.VarChar(120)
+  ownerUserId String      @db.Uuid
+  createdAt   DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime    @updatedAt @db.Timestamptz(6)
+  owner       UserProfile @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  clinics     Clinic[]
+
+  @@index([ownerUserId, createdAt])
+  @@map("clinic_groups")
 }
 
 model BillingPlanVersion {
