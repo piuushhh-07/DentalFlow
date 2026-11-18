@@ -5,18 +5,11 @@ import { z } from "zod";
 import { ClinicAccessDeniedError, ClinicRoleDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { buildBranchTrendPeriods } from "@/features/clinic-groups/lib/branch-trends";
+import { serializeBranchTrendCsv } from "@/features/clinic-groups/lib/branch-trend-csv";
 import { getClinicReportDateRangeForDates } from "@/features/reports/lib/report-validation";
 import { prisma } from "@/lib/db/prisma";
 
 export const dynamic = "force-dynamic";
-
-function csvCell(value: string | number): string {
-  const text = String(value);
-  const safeText = typeof value === "string" && /^[=+@\-\t\r]/.test(text)
-    ? `'${text}`
-    : text;
-  return `"${safeText.replaceAll('"', '""')}"`;
-}
 
 function safeAmount(value: unknown): number {
   const amount = Number(value ?? 0);
@@ -172,7 +165,7 @@ export async function GET(
     ["Notes", "Only aggregate values are exported. No patient-level or clinical information is included."],
   );
 
-  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+  const csv = serializeBranchTrendCsv(rows);
   const filenameDate = anchorPeriods[anchorPeriods.length - 1].key;
   return new Response(`\uFEFF${csv}\r\n`, {
     headers: {
