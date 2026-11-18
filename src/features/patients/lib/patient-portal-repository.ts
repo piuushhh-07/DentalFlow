@@ -19,6 +19,7 @@ export async function listPatientPortalRecords(email: string) {
     orderBy: [{ clinic: { name: "asc" } }, { fullName: "asc" }],
     select: {
       id: true,
+      clinicId: true,
       fullName: true,
       appointments: {
         where: {
