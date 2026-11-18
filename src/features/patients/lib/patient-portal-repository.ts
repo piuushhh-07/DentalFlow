@@ -36,6 +36,19 @@ export async function listPatientPortalRecords(email: string) {
           clinic: { select: { timeZone: true } },
         },
       },
+      recentAppointments: {
+        where: {
+          scheduledAt: { lt: now },
+          status: { not: AppointmentStatus.CANCELLED },
+        },
+        orderBy: { scheduledAt: "desc" },
+        take: 10,
+        select: {
+          scheduledAt: true,
+          type: true,
+          status: true,
+        },
+      },
       treatmentPlans: {
         where: { status: { not: "CANCELLED" } },
         orderBy: { createdAt: "desc" },
@@ -104,7 +117,6 @@ export async function listPatientPortalRecords(email: string) {
           status: true,
         },
       },
-      phoneNumber: true,
       clinic: {
         select: {
           name: true,
