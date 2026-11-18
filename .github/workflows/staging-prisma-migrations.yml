@@ -81,6 +81,13 @@ jobs:
         continue-on-error: true
         run: npx prisma migrate status
 
+      - name: Clear the interrupted patient archive migration state
+        # The prior attempt failed after creating the schema objects. The migration SQL is
+        # now idempotent, so allow Prisma to retry it. If already resolved, deploy and the
+        # final status check remain authoritative.
+        continue-on-error: true
+        run: npx prisma migrate resolve --rolled-back 20261114090000_patient_archive
+
       - name: Apply pending Prisma migrations
         run: npx prisma migrate deploy
 
