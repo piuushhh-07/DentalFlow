@@ -1,5 +1,6 @@
 import { signOutPatientPortal } from "@/features/patients/actions";
 import { PatientPortalSignInForm } from "@/features/patients/components/patient-portal-sign-in-form";
+import { PrintPatientPortalButton } from "@/features/patients/components/print-patient-portal-button";
 import { listPatientPortalRecords } from "@/features/patients/lib/patient-portal-repository";
 import {
   isExpectedUnauthenticatedAuthError,
@@ -30,7 +31,7 @@ export default async function PatientPortalPage({
     isVerified && email ? await listPatientPortalRecords(email) : [];
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 sm:px-6">
+    <main id="patient-portal-document" className="min-h-screen bg-slate-50 px-4 py-10 sm:px-6">
       <div className="mx-auto max-w-3xl">
         <header className="mb-6">
           <p className="text-sm font-semibold text-teal-800">DentalFlow</p>
@@ -60,10 +61,11 @@ export default async function PatientPortalPage({
           </section>
         ) : (
           <>
-            <div className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 print:hidden">
               <p className="break-all text-sm text-slate-600">
                 Signed in as {email}
               </p>
+              <PrintPatientPortalButton />
               <form action={signOutPatientPortal}>
                 <button
                   className="h-9 shrink-0 rounded-md border border-slate-300 px-3 text-sm font-medium hover:bg-slate-50"
