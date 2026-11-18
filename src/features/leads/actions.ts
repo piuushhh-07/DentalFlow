@@ -91,18 +91,28 @@ export async function updatePatientLead(formData: FormData): Promise<never> {
   });
   if (!parsed.success) redirect("/clinics");
   const membership = await requireClinicRole(parsed.data.clinicId, [ClinicRole.OWNER]);
-  const result = await prisma.patientLead.updateMany({
-    where: { id: parsed.data.leadId, clinicId: membership.clinicId },
-    data: {
-      status: parsed.data.status,
-      notes: parsed.data.notes || null,
-      nextFollowUpAt: parsed.data.nextFollowUpAt ? new Date(parsed.data.nextFollowUpAt) : null,
-      ...(parsed.data.status === PatientLeadStatus.CONTACTED || parsed.data.status === PatientLeadStatus.APPOINTMENT_BOOKED
-        ? { lastContactedAt: new Date() }
-        : {}),
-    },
-  });
-  if (result.count !== 1) redirect(leadsPath(membership.clinicId, "lead-not-found"));
+  const result = await prisma.$transaction(async (tx) => {
+    const existing = await tx.patientLead.findFirst({
+      where: { id: parsed.data.leadId, clinicId: membership.clinicId },
+      select: { status: true },
+    });
+    if (!existing) return 0;
+    const shouldMarkContacted =
+      parsed.data.status !== existing.status &&
+      (parsed.data.status === PatientLeadStatus.CONTACTED ||
+        parsed.data.status === PatientLeadStatus.APPOINTMENT_BOOKED);
+    const updated = await tx.patientLead.updateMany({
+      where: { id: parsed.data.leadId, clinicId: membership.clinicId },
+      data: {
+        status: parsed.data.status,
+        notes: parsed.data.notes || null,
+        nextFollowUpAt: parsed.data.nextFollowUpAt ? new Date(parsed.data.nextFollowUpAt) : null,
+        ...(shouldMarkContacted ? { lastContactedAt: new Date() } : {}),
+      },
+    });
+    return updated.count;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  if (result !== 1) redirect(leadsPath(membership.clinicId, "lead-not-found"));
   revalidatePath(`/clinic/${membership.clinicId}/leads`);
   redirect(leadsPath(membership.clinicId, "updated"));
 }
