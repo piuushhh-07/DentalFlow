@@ -178,9 +178,12 @@ export default async function BranchReportsPage({ params, searchParams = {} }: B
               <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">Branch performance</h1>
               <p className="mt-2 text-sm leading-6 text-slate-600">Compare aggregate clinic activity without sharing patient-level records between branches.</p>
             </div>
-            <a href={exportHref} download className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-800">
-              <Download aria-hidden="true" className="size-4" /> Export CSV
-            </a>
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/clinic/${owner.clinicId}/branches/trends`} className="inline-flex h-10 items-center justify-center rounded-lg border border-teal-700 px-4 text-sm font-semibold text-teal-800 hover:bg-teal-50">Financial trends</Link>
+              <a href={exportHref} download className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-800">
+                <Download aria-hidden="true" className="size-4" /> Export CSV
+              </a>
+            </div>
           </div>
         </div>
 
