@@ -24,6 +24,7 @@ const navigationGroups = [
       { label: "Dashboard", icon: LayoutDashboard, href: "" },
       { label: "Appointments", icon: CalendarClock, href: "appointments" },
       { label: "Patients", icon: UsersRound, href: "patients" },
+      { label: "Leads", icon: UserRoundPlus, href: "leads" },
       { label: "Treatments", icon: Stethoscope, href: "treatments/catalogue" },
       {
         label: "Patient billing",
@@ -54,6 +55,7 @@ type AppNavigationProps = Readonly<{
     | "dashboard"
     | "appointments"
     | "patients"
+    | "leads"
     | "treatments"
     | "billing"
     | "recalls"
@@ -102,6 +104,7 @@ export function AppNavigation({
                 (label === "Appointments" &&
                   activeSection === "appointments") ||
                 (label === "Patients" && activeSection === "patients") ||
+                (label === "Leads" && activeSection === "leads") ||
                 (label === "Treatments" && activeSection === "treatments") ||
                 (label === "Patient billing" && activeSection === "billing") ||
                 (label === "Recalls" && activeSection === "recalls") ||
@@ -128,7 +131,9 @@ export function AppNavigation({
                         ? "/reports"
                         : label === "Appointments"
                           ? "/appointments"
-                          : label === "Treatments"
+                          : label === "Leads"
+                            ? "/leads"
+                            : label === "Treatments"
                             ? "/treatments/catalogue"
                             : label === "Patient billing"
                               ? "/billing/patient-ledger"
