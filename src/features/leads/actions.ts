@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { requireClinicRole } from "@/features/auth/lib/server-auth";
+import { getAuthenticatedUser, requireClinicRole } from "@/features/auth/lib/server-auth";
 import { normalizeIndianPhoneNumber } from "@/features/onboarding/lib/validation";
 import { createClinicPatient } from "@/features/patients/lib/patient-repository";
 import { patientInputSchema } from "@/features/patients/lib/patient-validation";
@@ -185,4 +185,59 @@ export async function convertPatientLeadToPatient(formData: FormData): Promise<n
   revalidatePath(`/clinic/${membership.clinicId}/patients`);
   revalidatePath(`/clinic/${membership.clinicId}/patients/${patient.id}`);
   redirect(leadsPath(membership.clinicId, "converted"));
+}
+
+
+const leadActivitySchema = z.object({
+  clinicId: uuid,
+  leadId: uuid,
+  type: z.enum(["CALL", "WHATSAPP", "NOTE", "APPOINTMENT", "OTHER"]),
+  summary: z.string().trim().min(2).max(240),
+  details: z.string().trim().max(3000).optional(),
+});
+
+export async function addPatientLeadActivity(formData: FormData): Promise<never> {
+  const parsed = leadActivitySchema.safeParse({
+    clinicId: formData.get("clinicId"),
+    leadId: formData.get("leadId"),
+    type: formData.get("type"),
+    summary: formData.get("summary"),
+    details: formData.get("details") ?? "",
+  });
+  if (!parsed.success) redirect("/clinics");
+  const membership = await requireClinicRole(parsed.data.clinicId, [ClinicRole.OWNER]);
+  const user = await getAuthenticatedUser();
+  try {
+    await prisma.$transaction(async (tx) => {
+      const lead = await tx.patientLead.findFirst({
+        where: { id: parsed.data.leadId, clinicId: membership.clinicId },
+        select: { id: true, convertedPatientId: true },
+      });
+      if (!lead) throw new Error("LEAD_NOT_FOUND");
+      await tx.patientLeadActivity.create({
+        data: {
+          clinicId: membership.clinicId,
+          leadId: lead.id,
+          actorUserId: user.id,
+          type: parsed.data.type,
+          summary: parsed.data.summary,
+          details: parsed.data.details || null,
+        },
+      });
+      if (parsed.data.type === "CALL" || parsed.data.type === "WHATSAPP") {
+        await tx.patientLead.updateMany({
+          where: { id: lead.id, clinicId: membership.clinicId },
+          data: { lastContactedAt: new Date() },
+        });
+      }
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "LEAD_NOT_FOUND") {
+      redirect(leadsPath(membership.clinicId, "lead-not-found"));
+    }
+    console.error("Patient lead activity creation failed", { errorName: error instanceof Error ? error.name : "UnknownError" });
+    redirect(leadsPath(membership.clinicId, "activity-error"));
+  }
+  revalidatePath(`/clinic/${membership.clinicId}/leads`);
+  redirect(leadsPath(membership.clinicId, "activity-added"));
 }

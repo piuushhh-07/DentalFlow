@@ -219,6 +219,14 @@ enum PatientLeadSource {
   OTHER
 }
 
+enum PatientLeadActivityType {
+  CALL
+  WHATSAPP
+  NOTE
+  APPOINTMENT
+  OTHER
+}
+
 enum PreventiveRecallType {
   SIX_MONTH_CHECKUP
   CLEANING
@@ -655,12 +663,30 @@ model PatientLead {
   createdAt          DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime         @updatedAt @db.Timestamptz(6)
   clinic             Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  activities         PatientLeadActivity[]
 
+  @@unique([id, clinicId])
   @@unique([clinicId, normalizedPhone])
   @@index([clinicId, status, nextFollowUpAt])
   @@index([clinicId, nextFollowUpAt])
   @@index([clinicId, convertedPatientId])
   @@map("patient_leads")
+}
+
+model PatientLeadActivity {
+  id          String                 @id @default(uuid()) @db.Uuid
+  clinicId    String                 @db.Uuid
+  leadId      String                 @db.Uuid
+  actorUserId String                 @db.Uuid
+  type        PatientLeadActivityType
+  summary     String                 @db.VarChar(240)
+  details     String?                @db.Text
+  createdAt   DateTime               @default(now()) @db.Timestamptz(6)
+  lead        PatientLead            @relation(fields: [leadId, clinicId], references: [id, clinicId], onDelete: Cascade)
+
+  @@index([clinicId, leadId, createdAt])
+  @@index([clinicId, actorUserId, createdAt])
+  @@map("patient_lead_activities")
 }
 
 model Patient {
