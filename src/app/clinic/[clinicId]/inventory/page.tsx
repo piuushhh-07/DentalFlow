@@ -26,7 +26,8 @@ const statusMessages: Record<string, string> = {
   "insufficient-batch-stock":
     "There is not enough unexpired batch stock. Expired stock cannot be used.",
   "use-procurement":
-    "This item uses batch tracking. Receive additional stock through Suppliers & procurement so its batch and expiry are recorded.",
+    "This item uses batch tracking. Receive additional stock through Suppliers & procurement so its batch and expiry are recorded.",  "wastage-reason-required":
+    "Add a reason before recording inventory wastage.",
   "item-not-found": "That inventory item is no longer available.",
   error: "We couldn't save the inventory change. Please try again.",
 };
@@ -324,6 +325,15 @@ export default async function ClinicInventoryPage({
                           />
                         </label>
                         <label className="text-xs text-slate-500">
+                          Reason / note
+                          <input
+                            name="notes"
+                            maxLength={500}
+                            placeholder="Required for wastage"
+                            className="mt-1 block h-9 w-36 rounded-md border border-slate-300 px-2 text-sm text-slate-900"
+                          />
+                        </label>
+                        <label className="text-xs text-slate-500">
                           Action
                           <select
                             name="type"
@@ -331,6 +341,7 @@ export default async function ClinicInventoryPage({
                           >
                             <option value="STOCK_IN">Stock in</option>
                             <option value="STOCK_OUT">Stock used</option>
+                            <option value="WASTAGE">Wastage / damaged / expired</option>
                           </select>
                         </label>
                         <button
@@ -374,7 +385,9 @@ export default async function ClinicInventoryPage({
                         ? "Stock received"
                         : entry.type === "STOCK_OUT"
                           ? "Stock used"
-                          : "Adjustment"}{" "}
+                          : entry.type === "WASTAGE"
+                            ? "Wastage recorded"
+                            : "Adjustment"}{" "}
                       ·{" "}
                       {new Intl.DateTimeFormat("en-IN", {
                         dateStyle: "medium",
