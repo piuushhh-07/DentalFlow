@@ -19,6 +19,7 @@ export async function listPatientPortalRecords(email: string) {
     orderBy: [{ clinic: { name: "asc" } }, { fullName: "asc" }],
     select: {
       id: true,
+      clinicId: true,
       fullName: true,
       appointments: {
         where: {
@@ -108,9 +109,35 @@ export async function listPatientPortalRecords(email: string) {
         select: {
           name: true,
           phoneNumber: true,
+          publicBookingEnabled: true,
+          publicBookingSlug: true,
         },
       },
     },
   });
-  return patients;
+
+  const recentAppointments = await Promise.all(
+    patients.map((patient) =>
+      prisma.appointment.findMany({
+        where: {
+          clinicId: patient.clinicId,
+          patientId: patient.id,
+          scheduledAt: { lt: now },
+          status: { not: AppointmentStatus.CANCELLED },
+        },
+        orderBy: { scheduledAt: "desc" },
+        take: 10,
+        select: {
+          scheduledAt: true,
+          type: true,
+          status: true,
+        },
+      }),
+    ),
+  );
+
+  return patients.map((patient, index) => ({
+    ...patient,
+    recentAppointments: recentAppointments[index] ?? [],
+  }));
 }

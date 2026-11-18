@@ -99,6 +99,24 @@ export default async function PatientPortalPage({
                         ? ` · ${patient.clinic.phoneNumber}`
                         : ""}
                     </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {patient.clinic.publicBookingEnabled && (
+                        <a
+                          className="inline-flex min-h-10 items-center rounded-md bg-teal-800 px-4 text-sm font-semibold text-white hover:bg-teal-900"
+                          href={`/book/${patient.clinic.publicBookingSlug}`}
+                        >
+                          Request an appointment
+                        </a>
+                      )}
+                      {patient.clinic.phoneNumber && (
+                        <a
+                          className="inline-flex min-h-10 items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                          href={`tel:${patient.clinic.phoneNumber}`}
+                        >
+                          Call clinic
+                        </a>
+                      )}
+                    </div>
                     <div className="mt-6 grid gap-5 md:grid-cols-2">
                       <div>
                         <h3 className="font-semibold text-slate-900">
@@ -172,6 +190,40 @@ export default async function PatientPortalPage({
                           </ul>
                         )}
                       </div>
+                    </div>
+
+                    <div className="mt-7 border-t border-slate-100 pt-6">
+                      <h3 className="font-semibold text-slate-900">
+                        Recent appointments
+                      </h3>
+                      {patient.recentAppointments.length === 0 ? (
+                        <p className="mt-2 text-sm text-slate-500">
+                          No previous appointments are available.
+                        </p>
+                      ) : (
+                        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                          {patient.recentAppointments.map((appointment, index) => (
+                            <li
+                              className="rounded-lg bg-slate-50 p-3 text-sm"
+                              key={`${appointment.scheduledAt.toISOString()}-${index}`}
+                            >
+                              <p className="font-medium text-slate-900">
+                                {appointment.type}
+                              </p>
+                              <p className="mt-1 text-slate-600">
+                                {new Intl.DateTimeFormat("en-IN", {
+                                  dateStyle: "medium",
+                                  timeStyle: "short",
+                                  timeZone: "Asia/Kolkata",
+                                }).format(appointment.scheduledAt)}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {appointment.status.replaceAll("_", " ").toLowerCase()}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
 
                     <div className="mt-7 border-t border-slate-100 pt-6">
