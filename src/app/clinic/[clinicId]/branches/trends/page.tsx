@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError, ClinicRoleDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { buildBranchTrendPeriods } from "@/features/clinic-groups/lib/branch-trends";
+import { getClinicReportDateRangeForDates } from "@/features/reports/lib/report-validation";
 import { prisma } from "@/lib/db/prisma";
 
 export const dynamic = "force-dynamic";
@@ -81,8 +82,13 @@ export default async function BranchTrendsPage({ params }: BranchTrendsPageProps
   if (!group || group.clinics.length < 2 || !group.clinics.some((clinic) => clinic.id === current.id)) notFound();
 
   const now = new Date();
+  const reportingTimeZone = group.clinics.find((clinic) => clinic.id === current.id)!.timeZone;
+  const anchorPeriods = buildBranchTrendPeriods(now, reportingTimeZone, 12);
   const branchResults = await Promise.all(group.clinics.map(async (clinic) => {
-    const periods = buildBranchTrendPeriods(now, clinic.timeZone, 12);
+    const periods = anchorPeriods.map((period) => ({
+      ...period,
+      range: getClinicReportDateRangeForDates(period.range.startDate, period.range.endDate, clinic.timeZone),
+    }));
     const monthly = await Promise.all(periods.map(async (period) => {
       const [financialEntries, appointments] = await Promise.all([
         prisma.treatmentFinancialEntry.groupBy({
