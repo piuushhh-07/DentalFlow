@@ -45,6 +45,13 @@ export async function requestPatientAppointmentCancellation(
       portalAccessEnabled: true,
       portalAccessEnabledAt: { not: null },
       archivedAt: null,
+      appointments: {
+        some: {
+          id: parsed.data.appointmentId,
+          scheduledAt: { gt: new Date() },
+          status: { in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED] },
+        },
+      },
     },
     select: { id: true, clinicId: true },
   });
@@ -135,7 +142,7 @@ export async function reviewPatientAppointmentCancellationRequest(
         });
       }
 
-      await transaction.patientAppointmentCancellationRequest.updateMany({
+      const reviewed = await transaction.patientAppointmentCancellationRequest.updateMany({
         where: {
           id: request.id,
           clinicId: membership.clinicId,
@@ -148,6 +155,7 @@ export async function reviewPatientAppointmentCancellationRequest(
           reviewerNotes: parsed.data.reviewerNotes || null,
         },
       });
+      if (reviewed.count !== 1) throw new Error("REQUEST_NOT_PENDING");
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
     if (error instanceof Error && error.message === "REQUEST_NOT_PENDING") {
