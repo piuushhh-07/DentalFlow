@@ -202,6 +202,22 @@ enum PatientAppointmentCancellationStatus {
   REJECTED
 }
 
+enum PatientLeadStatus {
+  NEW
+  CONTACTED
+  APPOINTMENT_BOOKED
+  LOST
+}
+
+enum PatientLeadSource {
+  WALK_IN
+  PHONE_CALL
+  WEBSITE
+  REFERRAL
+  SOCIAL_MEDIA
+  OTHER
+}
+
 enum PreventiveRecallType {
   SIX_MONTH_CHECKUP
   CLEANING
@@ -387,6 +403,7 @@ model Clinic {
   onboardingUser                     UserProfile?                        @relation("ClinicOnboarding", fields: [onboardingUserId], references: [id], onDelete: SetNull)
   memberships                        ClinicMembership[]
   patients                           Patient[]
+  patientLeads                       PatientLead[]
   treatmentPlans                     TreatmentPlan[]
   treatmentCatalogueItems            TreatmentCatalogueItem[]
   treatmentFinancialEntries          TreatmentFinancialEntry[]
@@ -615,6 +632,31 @@ model ClinicInvitation {
   @@index([clinicId, invitedByUserId], map: "ci_inviter_clinic_idx")
   @@index([invitedByUserId, clinicId], map: "fk_1adgo_invited_by_user_id_2c")
   @@map("clinic_invitations")
+}
+
+model PatientLead {
+  id                 String           @id @default(uuid()) @db.Uuid
+  clinicId           String           @db.Uuid
+  fullName           String           @db.VarChar(160)
+  phoneNumber        String           @db.VarChar(20)
+  normalizedPhone    String           @db.VarChar(16)
+  email              String?          @db.VarChar(254)
+  source             PatientLeadSource @default(OTHER)
+  status             PatientLeadStatus @default(NEW)
+  treatmentInterest  String?          @db.VarChar(160)
+  notes              String?          @db.Text
+  whatsappOptIn      Boolean          @default(false)
+  whatsappOptedInAt  DateTime?        @db.Timestamptz(6)
+  nextFollowUpAt     DateTime?        @db.Timestamptz(6)
+  lastContactedAt    DateTime?        @db.Timestamptz(6)
+  createdAt          DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime         @updatedAt @db.Timestamptz(6)
+  clinic             Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([clinicId, normalizedPhone])
+  @@index([clinicId, status, nextFollowUpAt])
+  @@index([clinicId, nextFollowUpAt])
+  @@map("patient_leads")
 }
 
 model Patient {
