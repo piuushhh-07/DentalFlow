@@ -58,6 +58,12 @@ enum StaffAttendanceStatus {
   HOLIDAY
 }
 
+enum StaffLeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum ClinicPermission {
   PATIENT_VIEW
   PATIENT_EDIT
@@ -352,6 +358,7 @@ model UserProfile {
   createdAt       DateTime           @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime           @updatedAt @db.Timestamptz(6)
   memberships     ClinicMembership[]
+  reviewedStaffLeaveRequests ClinicStaffLeaveRequest[] @relation("StaffLeaveReviewer")
   onboardedClinic Clinic?            @relation("ClinicOnboarding")
 
   @@map("user_profiles")
@@ -382,6 +389,7 @@ model Clinic {
   appointments                       Appointment[]
   dentists                           ClinicDentist[]
   staffAttendanceRecords             ClinicStaffAttendance[]
+  staffLeaveRequests                 ClinicStaffLeaveRequest[]
   treatmentChairs                    TreatmentChair[]
   appointmentRequests                AppointmentRequest[]
   invitations                        ClinicInvitation[]
@@ -566,6 +574,7 @@ model ClinicMembership {
   sentClinicInvitations             ClinicInvitation[]                  @relation("ClinicInvitationSender")
   staffProfile                      ClinicStaffProfile?
   attendanceRecords                 ClinicStaffAttendance[] @relation("StaffAttendanceMember")
+  leaveRequests                     ClinicStaffLeaveRequest[] @relation("StaffLeaveRequester")
   recordedAttendance                ClinicStaffAttendance[] @relation("StaffAttendanceRecorder")
   permissionGrants                  ClinicPermissionGrant[]
   permissionChangesAuthored         ClinicStaffAudit[]                  @relation("ClinicStaffAuditActor")
@@ -1186,6 +1195,29 @@ model ClinicStaffAttendance {
   @@index([clinicId, attendanceDate, status])
   @@index([clinicId, userId, attendanceDate])
   @@map("clinic_staff_attendance")
+}
+
+model ClinicStaffLeaveRequest {
+  id                String                  @id @default(uuid()) @db.Uuid
+  clinicId          String                  @db.Uuid
+  userId            String                  @db.Uuid
+  startDate         DateTime                @db.Date
+  endDate           DateTime                @db.Date
+  reason            String                  @db.VarChar(500)
+  status            StaffLeaveRequestStatus @default(PENDING)
+  reviewedByUserId  String?                 @db.Uuid
+  reviewedAt        DateTime?               @db.Timestamptz(6)
+  reviewerNotes     String?                 @db.VarChar(500)
+  createdAt         DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime                @updatedAt @db.Timestamptz(6)
+  clinic            Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  membership        ClinicMembership        @relation("StaffLeaveRequester", fields: [userId, clinicId], references: [userId, clinicId], onDelete: Cascade)
+  reviewedBy        UserProfile?            @relation("StaffLeaveReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([clinicId, status, startDate])
+  @@index([clinicId, userId, startDate, endDate])
+  @@index([reviewedByUserId])
+  @@map("clinic_staff_leave_requests")
 }
 
 model ClinicPermissionGrant {

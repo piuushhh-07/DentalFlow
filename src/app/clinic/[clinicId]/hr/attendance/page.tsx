@@ -129,6 +129,12 @@ export default async function StaffAttendancePage({
           >
             Monthly report
           </Link>
+          <Link
+            href={`/clinic/${owner.clinicId}/hr/leave`}
+            className="inline-flex h-10 items-center rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Leave requests
+          </Link>
           <form method="GET" className="flex items-end gap-2">
             <label className="text-sm font-medium text-slate-700">Attendance date
               <input type="date" name="date" max={today} defaultValue={date} className="mt-1 block h-10 rounded-md border border-slate-300 bg-white px-3" />

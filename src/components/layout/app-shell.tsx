@@ -23,7 +23,8 @@ type AppShellProps = Readonly<{
     | "equipment"
     | "expenses"
     | "finance"
-    | "team";
+    | "team"
+    | "leave";
 }>;
 
 export function AppShell({
