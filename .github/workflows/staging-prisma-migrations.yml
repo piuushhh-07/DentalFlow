@@ -76,6 +76,9 @@ jobs:
         run: npm ci
 
       - name: Show pending migration status
+        # Prisma exits with code 1 when unapplied migrations exist; that is expected here.
+        # The deploy step below is the authoritative connection and migration check.
+        continue-on-error: true
         run: npx prisma migrate status
 
       - name: Apply pending Prisma migrations
