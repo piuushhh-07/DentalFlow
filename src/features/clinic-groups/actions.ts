@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { getAuthenticatedUser, requireClinicRole } from "@/features/auth/lib/server-auth";
+import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { prisma } from "@/lib/db/prisma";
 
 const uuid = z.string().uuid();
