@@ -144,6 +144,56 @@ export async function recordInventoryMovement(
             ? item.currentStock.plus(quantity)
             : item.currentStock.minus(quantity);
         if (nextStock.isNegative()) throw new Error("INSUFFICIENT_STOCK");
+
+        const batchCount = await transaction.inventoryBatch.count({
+          where: { clinicId: membership.clinicId, itemId: item.id },
+        });
+        const batchUsage: string[] = [];
+        if (parsed.data.type === "STOCK_IN" && batchCount > 0) {
+          throw new Error("USE_PROCUREMENT_FOR_BATCH_STOCK_IN");
+        }
+        if (parsed.data.type === "STOCK_OUT" && batchCount > 0) {
+          const clinicDate = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Kolkata",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(new Date());
+          const today = new Date(`${clinicDate}T00:00:00.000Z`);
+          const batches = await transaction.inventoryBatch.findMany({
+            where: {
+              clinicId: membership.clinicId,
+              itemId: item.id,
+              quantityRemaining: { gt: 0 },
+              OR: [{ expiryDate: null }, { expiryDate: { gte: today } }],
+            },
+            orderBy: [
+              { expiryDate: { sort: "asc", nulls: "last" } },
+              { receivedAt: "asc" },
+            ],
+            select: {
+              id: true,
+              batchNumber: true,
+              quantityRemaining: true,
+            },
+          });
+          let remaining = quantity;
+          for (const batch of batches) {
+            if (!remaining.greaterThan(0)) break;
+            const used = batch.quantityRemaining.lessThan(remaining)
+              ? batch.quantityRemaining
+              : remaining;
+            await transaction.inventoryBatch.update({
+              where: { id: batch.id },
+              data: { quantityRemaining: batch.quantityRemaining.minus(used) },
+            });
+            batchUsage.push(`${batch.batchNumber}: ${used.toString()}`);
+            remaining = remaining.minus(used);
+          }
+          if (remaining.greaterThan(0)) {
+            throw new Error("INSUFFICIENT_NON_EXPIRED_BATCH_STOCK");
+          }
+        }
         await transaction.inventoryItem.update({
           where: { id: item.id },
           data: {
@@ -167,7 +217,10 @@ export async function recordInventoryMovement(
                 ? null
                 : new Prisma.Decimal(parsed.data.unitCost),
             reference: parsed.data.reference || null,
-            notes: parsed.data.notes || null,
+            notes: [
+              parsed.data.notes || null,
+              batchUsage.length ? `FEFO batches: ${batchUsage.join(", ")}` : null,
+            ].filter(Boolean).join(" · ").slice(0, 500) || null,
           },
         });
       },
@@ -179,6 +232,12 @@ export async function recordInventoryMovement(
     }
     if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") {
       redirect(inventoryPath(membership.clinicId, "insufficient-stock"));
+    }
+    if (error instanceof Error && error.message === "INSUFFICIENT_NON_EXPIRED_BATCH_STOCK") {
+      redirect(inventoryPath(membership.clinicId, "insufficient-batch-stock"));
+    }
+    if (error instanceof Error && error.message === "USE_PROCUREMENT_FOR_BATCH_STOCK_IN") {
+      redirect(inventoryPath(membership.clinicId, "use-procurement"));
     }
     if (error instanceof Error && error.message === "ITEM_NOT_FOUND") {
       redirect(inventoryPath(membership.clinicId, "item-not-found"));
