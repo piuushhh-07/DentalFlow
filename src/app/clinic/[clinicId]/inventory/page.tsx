@@ -23,6 +23,10 @@ const statusMessages: Record<string, string> = {
   "subscription-restricted": "Your clinic subscription is inactive. Restore or renew it to continue.",
   "insufficient-stock":
     "Stock cannot go below zero. Check the available quantity.",
+  "insufficient-batch-stock":
+    "There is not enough unexpired batch stock. Expired stock cannot be used.",
+  "use-procurement":
+    "This item uses batch tracking. Receive additional stock through Suppliers & procurement so its batch and expiry are recorded.",
   "item-not-found": "That inventory item is no longer available.",
   error: "We couldn't save the inventory change. Please try again.",
 };
@@ -103,9 +107,12 @@ export default async function ClinicInventoryPage({
             Keep dental materials and clinic supplies visible. Track stock
             received and used, and spot items that need reordering.
           </p>
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap gap-2">
             <a href={`/clinic/${membership.clinicId}/inventory/procurement`} className="inline-flex h-9 items-center rounded-md border border-teal-700 px-3 text-sm font-semibold text-teal-800 hover:bg-teal-50">
               Suppliers & procurement →
+            </a>
+            <a href={`/clinic/${membership.clinicId}/inventory/batches`} className="inline-flex h-9 items-center rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Batch & expiry tracking →
             </a>
           </div>
         </header>
