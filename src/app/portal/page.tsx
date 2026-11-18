@@ -194,6 +194,40 @@ export default async function PatientPortalPage({
 
                     <div className="mt-7 border-t border-slate-100 pt-6">
                       <h3 className="font-semibold text-slate-900">
+                        Recent appointments
+                      </h3>
+                      {patient.recentAppointments.length === 0 ? (
+                        <p className="mt-2 text-sm text-slate-500">
+                          No previous appointments are available.
+                        </p>
+                      ) : (
+                        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                          {patient.recentAppointments.map((appointment, index) => (
+                            <li
+                              className="rounded-lg bg-slate-50 p-3 text-sm"
+                              key={`${appointment.scheduledAt.toISOString()}-${index}`}
+                            >
+                              <p className="font-medium text-slate-900">
+                                {appointment.type}
+                              </p>
+                              <p className="mt-1 text-slate-600">
+                                {new Intl.DateTimeFormat("en-IN", {
+                                  dateStyle: "medium",
+                                  timeStyle: "short",
+                                  timeZone: "Asia/Kolkata",
+                                }).format(appointment.scheduledAt)}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {appointment.status.replaceAll("_", " ").toLowerCase()}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="mt-7 border-t border-slate-100 pt-6">
+                      <h3 className="font-semibold text-slate-900">
                         Treatment history
                       </h3>
                       {patient.treatmentPlans.length === 0 ? (
