@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
-import { createPatientLead, updatePatientLead } from "@/features/leads/actions";
+import { convertPatientLeadToPatient, createPatientLead, updatePatientLead } from "@/features/leads/actions";
 import { prisma } from "@/lib/db/prisma";
 
 export const dynamic = "force-dynamic";
@@ -21,22 +21,30 @@ const statusLabels: Record<PatientLeadStatus, string> = {
   NEW: "New",
   CONTACTED: "Contacted",
   APPOINTMENT_BOOKED: "Appointment booked",
+  CONVERTED: "Converted to patient",
   LOST: "Not proceeding",
 };
 const statusStyles: Record<PatientLeadStatus, string> = {
   NEW: "bg-sky-50 text-sky-800",
   CONTACTED: "bg-amber-50 text-amber-800",
   APPOINTMENT_BOOKED: "bg-emerald-50 text-emerald-800",
+  CONVERTED: "bg-teal-100 text-teal-900",
   LOST: "bg-slate-100 text-slate-600",
 };
 const messages: Record<string, string> = {
   created: "Lead added to your clinic CRM.",
   updated: "Lead follow-up details updated.",
+  converted: "Lead converted to a patient record.",
+  "already-converted": "This enquiry has already been converted.",
+  "lead-not-convertible": "Mark this enquiry as active before converting it.",
+  "archived-patient-conflict": "A patient with this phone number is archived. Restore or review that record before converting this enquiry.",
+  "conversion-error": "We could not convert this enquiry. Check patient capacity and try again.",
   "duplicate-phone": "A lead with this phone number already exists in this clinic.",
   "invalid-phone": "Enter a valid Indian mobile number.",
   "lead-not-found": "This lead could not be found in this clinic.",
   error: "We could not save the lead. Please try again.",
 };
+const editableLeadStatuses = [PatientLeadStatus.NEW, PatientLeadStatus.CONTACTED, PatientLeadStatus.APPOINTMENT_BOOKED, PatientLeadStatus.LOST];
 const inrDate = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" });
 function dateInputValue(value: Date | null): string {
   if (!value) return "";
@@ -89,11 +97,12 @@ export default async function PatientLeadsPage({
 
         {statusMessage ? <p role="status" className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">{statusMessage}</p> : null}
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <a href={`/clinic/${membership.clinicId}/leads`} className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-medium text-slate-500">All enquiries</p><p className="mt-2 text-2xl font-semibold text-slate-900">{totalCount}</p></a>
           <a href={`/clinic/${membership.clinicId}/leads?status=NEW`} className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-medium text-slate-500">New</p><p className="mt-2 text-2xl font-semibold text-slate-900">{countFor(PatientLeadStatus.NEW)}</p></a>
           <a href={`/clinic/${membership.clinicId}/leads?status=CONTACTED`} className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-medium text-slate-500">Contacted</p><p className="mt-2 text-2xl font-semibold text-slate-900">{countFor(PatientLeadStatus.CONTACTED)}</p></a>
           <a href={`/clinic/${membership.clinicId}/leads?status=APPOINTMENT_BOOKED`} className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-medium text-slate-500">Appointment booked</p><p className="mt-2 text-2xl font-semibold text-slate-900">{countFor(PatientLeadStatus.APPOINTMENT_BOOKED)}</p></a>
+          <a href={`/clinic/${membership.clinicId}/leads?status=CONVERTED`} className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-medium text-slate-500">Converted</p><p className="mt-2 text-2xl font-semibold text-slate-900">{countFor(PatientLeadStatus.CONVERTED)}</p></a>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-medium text-amber-800">Follow-ups due</p><p className="mt-2 text-2xl font-semibold text-amber-950">{dueCount}</p></div>
         </section>
 
@@ -141,14 +150,27 @@ export default async function PatientLeadsPage({
                   </div>
                   {lead.nextFollowUpAt ? <p className={`text-xs font-medium ${overdue ? "text-rose-700" : "text-slate-500"}`}>Next follow-up: {inrDate.format(lead.nextFollowUpAt)}</p> : <p className="text-xs text-slate-500">No follow-up date set</p>}
                   {lead.notes ? <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{lead.notes}</p> : null}
+                  {!lead.convertedPatientId ? (
                   <form action={updatePatientLead} className="grid gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
                     <input type="hidden" name="clinicId" value={membership.clinicId} />
                     <input type="hidden" name="leadId" value={lead.id} />
-                    <label className="text-xs font-medium text-slate-600">Status<select name="status" defaultValue={lead.status} className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900">{Object.values(PatientLeadStatus).map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select></label>
+                    <label className="text-xs font-medium text-slate-600">Status<select name="status" defaultValue={lead.status} className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900">{editableLeadStatuses.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select></label>
                     <label className="text-xs font-medium text-slate-600">Next follow-up<input name="nextFollowUpAt" type="date" defaultValue={dateInputValue(lead.nextFollowUpAt)} className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900" /></label>
                     <label className="text-xs font-medium text-slate-600 sm:col-span-2">Update notes<textarea name="notes" rows={1} maxLength={5000} defaultValue={lead.notes ?? ""} className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900" /></label>
                     <button type="submit" className="h-9 rounded-md bg-slate-800 px-3 text-xs font-semibold text-white hover:bg-slate-900 sm:col-span-2 lg:col-span-4">Save follow-up update</button>
                   </form>
+                  ) : (
+                    <p className="rounded-lg bg-teal-50 p-3 text-sm text-teal-900">
+                      This enquiry is linked to a patient record. <a className="font-semibold underline" href={`/clinic/${membership.clinicId}/patients/${lead.convertedPatientId}`}>Open patient record</a>
+                    </p>
+                  )}
+                  {!lead.convertedPatientId && lead.status !== PatientLeadStatus.LOST ? (
+                    <form action={convertPatientLeadToPatient}>
+                      <input type="hidden" name="clinicId" value={membership.clinicId} />
+                      <input type="hidden" name="leadId" value={lead.id} />
+                      <button type="submit" className="h-9 rounded-md border border-teal-700 px-3 text-xs font-semibold text-teal-800 hover:bg-teal-50">Convert to patient record</button>
+                    </form>
+                  ) : null}
                 </article>
               );
             })}
