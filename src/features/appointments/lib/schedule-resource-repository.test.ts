@@ -55,6 +55,36 @@ before(async () => {
   ]);
 });
 
+function mockDentistTransaction(
+  context: TestContext,
+  delegate: ResourceDelegate,
+) {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(prisma, "$transaction");
+  const transaction = {
+    clinicSubscription: { findFirst: async () => null },
+    clinicDentist: {
+      ...delegate,
+      count: async () => 0,
+    },
+  };
+  Object.defineProperty(prisma, "$transaction", {
+    configurable: true,
+    value: async (callback: unknown) => {
+      if (typeof callback !== "function") {
+        throw new Error("Expected an interactive Prisma transaction callback.");
+      }
+      return (callback as (tx: typeof transaction) => Promise<unknown>)(transaction);
+    },
+  });
+  context.after(() => {
+    if (originalDescriptor) {
+      Object.defineProperty(prisma, "$transaction", originalDescriptor);
+    } else {
+      Reflect.deleteProperty(prisma, "$transaction");
+    }
+  });
+}
+
 function mockResourceModel(
   context: TestContext,
   model: ResourceModel,
@@ -78,7 +108,7 @@ function mockResourceModel(
 test("createScheduleResource creates a dentist scoped to the requested clinic", async (t) => {
   let createArgs: unknown;
   let duplicateLookupArgs: unknown;
-  mockResourceModel(t, "clinicDentist", {
+  mockDentistTransaction(t, {
     findFirst: async (args) => {
       duplicateLookupArgs = args;
       return null;
@@ -136,7 +166,7 @@ test("createScheduleResource creates a chair scoped to the requested clinic", as
 
 test("createScheduleResource rejects a duplicate dentist name within the clinic", async (t) => {
   let createCalls = 0;
-  mockResourceModel(t, "clinicDentist", {
+  mockDentistTransaction(t, {
     findFirst: async () => ({ id: dentistId }),
     create: async () => {
       createCalls += 1;
