@@ -37,6 +37,12 @@ const receiveSchema = z.object({
   batchNumber: z.string().trim().min(1).max(100),
   expiryDate: z.union([z.literal(""), z.coerce.date()]).optional(),
 });
+const supplierReturnSchema = z.object({
+  clinicId: uuid,
+  batchId: uuid,
+  quantity: z.coerce.number().finite().positive().max(1000000).refine((value) => Number.isInteger(value * 1000)),
+  reason: z.string().trim().min(3).max(400),
+});
 
 function path(clinicId: string, status: string) {
   return `/clinic/${clinicId}/inventory/procurement?status=${status}`;
@@ -139,4 +145,49 @@ export async function receiveInventoryPurchaseOrderLine(formData: FormData): Pro
   revalidatePath(`/clinic/${membership.clinicId}/inventory`);
   revalidatePath(`/clinic/${membership.clinicId}/inventory/procurement`);
   redirect(path(membership.clinicId, "received"));
+}
+
+export async function returnInventoryBatchToSupplier(formData: FormData): Promise<never> {
+  const parsed = supplierReturnSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/clinics");
+  const membership = await requireClinicRole(parsed.data.clinicId, [ClinicRole.OWNER]);
+  try {
+    await prisma.$transaction(async (tx) => {
+      await assertFeatureEnabled(tx, membership.clinicId, "inventoryManagement");
+      const batch = await tx.inventoryBatch.findFirst({
+        where: { id: parsed.data.batchId, clinicId: membership.clinicId, quantityRemaining: { gt: 0 }, supplierId: { not: null } },
+        include: {
+          supplier: { select: { id: true, name: true, active: true } },
+          item: { select: { id: true, currentStock: true, name: true } },
+        },
+      });
+      if (!batch || !batch.supplier || !batch.supplier.active) throw new Error("BATCH_NOT_RETURNABLE");
+      const quantity = new Prisma.Decimal(parsed.data.quantity);
+      if (batch.quantityRemaining.lessThan(quantity) || batch.item.currentStock.lessThan(quantity)) throw new Error("INSUFFICIENT_RETURN_STOCK");
+      const updatedBatch = await tx.inventoryBatch.updateMany({
+        where: { id: batch.id, clinicId: membership.clinicId, quantityRemaining: { gte: quantity } },
+        data: { quantityRemaining: { decrement: quantity } },
+      });
+      if (updatedBatch.count !== 1) throw new Error("INSUFFICIENT_RETURN_STOCK");
+      const updatedItem = await tx.inventoryItem.updateMany({
+        where: { id: batch.item.id, clinicId: membership.clinicId, currentStock: { gte: quantity } },
+        data: { currentStock: { decrement: quantity } },
+      });
+      if (updatedItem.count !== 1) throw new Error("INSUFFICIENT_RETURN_STOCK");
+      await tx.inventoryTransaction.create({
+        data: {
+          clinicId: membership.clinicId, itemId: batch.item.id, actorUserId: membership.userId,
+          type: "SUPPLIER_RETURN", quantity, unitCost: batch.unitCost, reference: batch.id,
+          notes: `Supplier: ${batch.supplier.name} · Batch: ${batch.batchNumber} · Reason: ${parsed.data.reason}`.slice(0, 500),
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    if (error instanceof Error && error.message === "BATCH_NOT_RETURNABLE") redirect(path(membership.clinicId, "batch-not-returnable"));
+    if (error instanceof Error && error.message === "INSUFFICIENT_RETURN_STOCK") redirect(path(membership.clinicId, "insufficient-return-stock"));
+    handleError(membership.clinicId, error);
+  }
+  revalidatePath(`/clinic/${membership.clinicId}/inventory`);
+  revalidatePath(`/clinic/${membership.clinicId}/inventory/procurement`);
+  redirect(path(membership.clinicId, "supplier-returned"));
 }

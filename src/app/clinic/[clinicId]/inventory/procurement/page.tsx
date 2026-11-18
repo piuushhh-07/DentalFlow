@@ -8,6 +8,7 @@ import {
   createInventoryPurchaseOrder,
   createInventorySupplier,
   receiveInventoryPurchaseOrderLine,
+  returnInventoryBatchToSupplier,
 } from "@/features/inventory/procurement-actions";
 import { prisma } from "@/lib/db/prisma";
 
@@ -17,6 +18,9 @@ const messages: Record<string, string> = {
   "supplier-created": "Supplier saved.",
   "order-created": "Purchase order created.",
   received: "Goods received and stock updated.",
+  "supplier-returned": "Supplier return recorded and stock quantities updated.",
+  "batch-not-returnable": "This batch has no active linked supplier and cannot be returned through this workflow.",
+  "insufficient-return-stock": "The return quantity exceeds the remaining batch or clinic stock.",
   duplicate: "That supplier name or batch number already exists.",
   "over-received": "Received quantity cannot exceed the outstanding order quantity.",
   "order-not-receivable": "This purchase order is no longer open for receiving.",
@@ -36,11 +40,23 @@ export default async function InventoryProcurementPage({
   try { membership = await requireClinicMembership(parsed.data); }
   catch (error) { if (error instanceof ClinicAccessDeniedError) notFound(); throw error; }
 
-  const [clinic, suppliers, items, orders] = await Promise.all([
+  const [clinic, suppliers, items, orders, returnableBatches, recentReturns] = await Promise.all([
     prisma.clinic.findUnique({ where: { id: membership.clinicId }, select: { name: true } }),
     prisma.inventorySupplier.findMany({ where: { clinicId: membership.clinicId, active: true }, orderBy: { name: "asc" } }),
     prisma.inventoryItem.findMany({ where: { clinicId: membership.clinicId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, unit: true, unitCost: true, currentStock: true } }),
     prisma.inventoryPurchaseOrder.findMany({ where: { clinicId: membership.clinicId }, orderBy: { orderedAt: "desc" }, take: 50, include: { supplier: { select: { name: true } }, lines: { include: { item: { select: { name: true, unit: true } } } } } }),
+    prisma.inventoryBatch.findMany({
+      where: { clinicId: membership.clinicId, quantityRemaining: { gt: 0 }, supplierId: { not: null }, supplier: { is: { active: true } } },
+      orderBy: [{ expiryDate: { sort: "asc", nulls: "last" } }, { receivedAt: "asc" }],
+      take: 100,
+      include: { item: { select: { name: true, unit: true } }, supplier: { select: { name: true } } },
+    }),
+    prisma.inventoryTransaction.findMany({
+      where: { clinicId: membership.clinicId, type: "SUPPLIER_RETURN" },
+      orderBy: { createdAt: "desc" },
+      take: 25,
+      include: { item: { select: { name: true, unit: true } } },
+    }),
   ]);
   if (!clinic) notFound();
   const canManage = membership.role === "OWNER";
@@ -98,6 +114,61 @@ export default async function InventoryProcurementPage({
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4"><h2 className="font-semibold text-slate-900">Suppliers</h2></div>
           {suppliers.length ? <div className="grid gap-px bg-slate-100 sm:grid-cols-2">{suppliers.map((supplier) => <article key={supplier.id} className="bg-white p-4"><p className="font-medium text-slate-900">{supplier.name}</p><p className="mt-1 text-xs text-slate-500">{[supplier.contactName, supplier.phone, supplier.email, supplier.gstin ? `GSTIN ${supplier.gstin}` : null].filter(Boolean).join(" · ") || "No contact details"}</p></article>)}</div> : <p className="p-6 text-sm text-slate-500">No suppliers have been added.</p>}
+        </section>
+
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <h2 className="font-semibold text-slate-900">Return stock to supplier</h2>
+            <p className="mt-1 text-sm text-slate-500">Return unused stock against its original supplier batch. The batch balance and clinic stock are reduced together.</p>
+          </div>
+          {returnableBatches.length ? (
+            <div className="divide-y divide-slate-100">
+              {returnableBatches.map((batch) => (
+                <article key={batch.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div>
+                    <p className="font-medium text-slate-900">{batch.item.name} · Batch {batch.batchNumber}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {batch.supplier?.name ?? "Supplier unavailable"} · {Number(batch.quantityRemaining)} {batch.item.unit} available to return
+                      {batch.expiryDate ? ` · Expiry ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" }).format(batch.expiryDate)}` : ""}
+                    </p>
+                  </div>
+                  {canManage ? (
+                    <form action={returnInventoryBatchToSupplier} className="flex flex-wrap items-end gap-2">
+                      <input type="hidden" name="clinicId" value={membership.clinicId} />
+                      <input type="hidden" name="batchId" value={batch.id} />
+                      <label className="text-xs text-slate-500">Return qty
+                        <input required name="quantity" type="number" min="0.001" max={Number(batch.quantityRemaining)} step="0.001" className="mt-1 block h-9 w-24 rounded-md border border-slate-300 px-2 text-sm text-slate-900" />
+                      </label>
+                      <label className="text-xs text-slate-500">Reason
+                        <input required name="reason" minLength={3} maxLength={400} placeholder="Unused / wrong item" className="mt-1 block h-9 w-48 rounded-md border border-slate-300 px-2 text-sm text-slate-900" />
+                      </label>
+                      <button className="h-9 rounded-md border border-amber-700 px-3 text-sm font-semibold text-amber-800 hover:bg-amber-50" type="submit">Record return</button>
+                    </form>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : <p className="p-6 text-sm text-slate-500">No supplier-linked batches currently have stock available to return.</p>}
+        </section>
+
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <h2 className="font-semibold text-slate-900">Recent supplier returns</h2>
+            <p className="mt-1 text-sm text-slate-500">Return history is recorded in the inventory transaction audit trail.</p>
+          </div>
+          {recentReturns.length ? (
+            <div className="divide-y divide-slate-100">
+              {recentReturns.map((entry) => (
+                <article key={entry.id} className="flex flex-wrap items-start justify-between gap-2 p-4">
+                  <div>
+                    <p className="font-medium text-slate-900">{entry.item.name} · {Number(entry.quantity)} {entry.item.unit} returned</p>
+                    <p className="mt-1 text-xs text-slate-500">{entry.notes ?? "Supplier return"}</p>
+                  </div>
+                  <time className="text-xs text-slate-500">{new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(entry.createdAt)}</time>
+                </article>
+              ))}
+            </div>
+          ) : <p className="p-6 text-sm text-slate-500">No supplier returns recorded yet.</p>}
         </section>
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
