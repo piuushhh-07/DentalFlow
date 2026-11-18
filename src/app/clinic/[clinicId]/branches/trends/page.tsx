@@ -6,6 +6,7 @@ import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError, ClinicRoleDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
+import { getMonthOverMonthChange } from "@/features/clinic-groups/lib/branch-monthly-comparison";
 import { buildBranchTrendPeriods } from "@/features/clinic-groups/lib/branch-trends";
 import { getClinicReportDateRangeForDates } from "@/features/reports/lib/report-validation";
 import { prisma } from "@/lib/db/prisma";
@@ -132,6 +133,19 @@ export default async function BranchTrendsPage({ params }: BranchTrendsPageProps
     netCollections: sum.netCollections + period.netCollections,
   }), { payments: 0, refunds: 0, appointments: 0, netCollections: 0 });
 
+  // Compare the two latest completed calendar months; the current month may be partial.
+  const latestCompletedIndex = Math.max(0, groupMonthly.length - 2);
+  const precedingCompletedIndex = Math.max(0, latestCompletedIndex - 1);
+  const latestCompleted = groupMonthly[latestCompletedIndex];
+  const precedingCompleted = groupMonthly[precedingCompletedIndex];
+  const groupComparisons = [
+    { label: "Net collections", value: currency.format(latestCompleted.netCollections), change: getMonthOverMonthChange(latestCompleted.netCollections, precedingCompleted.netCollections), format: (value: number) => currency.format(value) },
+    { label: "Payments", value: currency.format(latestCompleted.payments), change: getMonthOverMonthChange(latestCompleted.payments, precedingCompleted.payments), format: (value: number) => currency.format(value) },
+    { label: "Refunds", value: currency.format(latestCompleted.refunds), change: getMonthOverMonthChange(latestCompleted.refunds, precedingCompleted.refunds), format: (value: number) => currency.format(value) },
+    { label: "Appointments", value: latestCompleted.appointments.toLocaleString("en-IN"), change: getMonthOverMonthChange(latestCompleted.appointments, precedingCompleted.appointments), format: (value: number) => value.toLocaleString("en-IN") },
+  ];
+  const formatSigned = (value: number, format: (value: number) => string) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${format(Math.abs(value))}`;
+
   return (
     <AppShell clinicId={owner.clinicId} activeSection="branches">
       <div className="mx-auto max-w-6xl space-y-7">
@@ -156,6 +170,55 @@ export default async function BranchTrendsPage({ params }: BranchTrendsPageProps
               <p className="mt-2 text-xs text-slate-500">Last 12 calendar months</p>
             </article>
           ))}
+        </section>
+
+        <section aria-label="Month-over-month comparison" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-semibold text-slate-900">Month-over-month performance</h2>
+            <p className="text-xs text-slate-500">{latestCompleted.label} vs {precedingCompleted.label} · completed months</p>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {groupComparisons.map((item) => (
+              <article key={item.label} className="rounded-lg border border-slate-100 p-4">
+                <h3 className="text-sm font-medium text-slate-600">{item.label}</h3>
+                <p className="mt-2 text-xl font-semibold tabular-nums text-slate-900">{item.value}</p>
+                <p className="mt-2 text-sm font-medium tabular-nums text-slate-700">
+                  {formatSigned(item.change.absoluteChange, item.format)}
+                  <span className="ml-2 text-xs font-normal text-slate-500">
+                    {item.change.percentageChange === null ? "· no prior-month baseline" : `· ${item.change.percentageChange > 0 ? "+" : ""}${item.change.percentageChange.toFixed(1)}%`}
+                  </span>
+                </p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="py-2 font-semibold">Branch</th>
+                  <th className="px-3 py-2 text-right font-semibold">{latestCompleted.label}</th>
+                  <th className="px-3 py-2 text-right font-semibold">{precedingCompleted.label}</th>
+                  <th className="py-2 text-right font-semibold">Net change</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {branchResults.map((branch) => {
+                  const latest = branch.monthly[latestCompletedIndex].netCollections;
+                  const previous = branch.monthly[precedingCompletedIndex].netCollections;
+                  const change = getMonthOverMonthChange(latest, previous);
+                  return (
+                    <tr key={branch.id}>
+                      <th scope="row" className="py-3 font-medium text-slate-800">{branch.name}</th>
+                      <td className="px-3 py-3 text-right tabular-nums">{currency.format(latest)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{currency.format(previous)}</td>
+                      <td className="py-3 text-right font-semibold tabular-nums">{formatSigned(change.absoluteChange, currency.format)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-slate-500">Percentage change is calculated against the absolute value of the preceding month. When the preceding value is zero, only the absolute change is shown. Increases and decreases are descriptive, not performance ratings.</p>
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
