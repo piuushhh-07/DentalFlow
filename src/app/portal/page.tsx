@@ -99,6 +99,24 @@ export default async function PatientPortalPage({
                         ? ` · ${patient.clinic.phoneNumber}`
                         : ""}
                     </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {patient.clinic.publicBookingEnabled && (
+                        <a
+                          className="inline-flex min-h-10 items-center rounded-md bg-teal-800 px-4 text-sm font-semibold text-white hover:bg-teal-900"
+                          href={`/book/${patient.clinic.publicBookingSlug}`}
+                        >
+                          Request an appointment
+                        </a>
+                      )}
+                      {patient.clinic.phoneNumber && (
+                        <a
+                          className="inline-flex min-h-10 items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                          href={`tel:${patient.clinic.phoneNumber}`}
+                        >
+                          Call clinic
+                        </a>
+                      )}
+                    </div>
                     <div className="mt-6 grid gap-5 md:grid-cols-2">
                       <div>
                         <h3 className="font-semibold text-slate-900">
