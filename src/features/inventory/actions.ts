@@ -58,9 +58,6 @@ export async function createInventoryItem(formData: FormData): Promise<never> {
     unitCost: formData.get("unitCost") ?? "",
   });
   if (!parsed.success) redirect("/clinics");
-  if (parsed.data.type === "WASTAGE" && !parsed.data.notes) {
-    redirect(inventoryPath(parsed.data.clinicId, "wastage-reason-required"));
-  }
   const membership = await requireClinicRole(parsed.data.clinicId, [
     ClinicRole.OWNER,
   ]);
@@ -121,6 +118,9 @@ export async function recordInventoryMovement(
     notes: formData.get("notes") ?? "",
   });
   if (!parsed.success) redirect("/clinics");
+  if (parsed.data.type === "WASTAGE" && !parsed.data.notes) {
+    redirect(inventoryPath(parsed.data.clinicId, "wastage-reason-required"));
+  }
   const membership = await requireClinicRole(parsed.data.clinicId, [
     ClinicRole.OWNER,
   ]);
