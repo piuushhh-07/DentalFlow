@@ -167,7 +167,7 @@ export async function GET(
 
   const csv = serializeBranchTrendCsv(rows);
   const filenameDate = anchorPeriods[anchorPeriods.length - 1].key;
-  return new Response(`\uFEFF${csv}\r\n`, {
+  return new Response(csv, {
     headers: {
       "Cache-Control": "private, no-store, max-age=0",
       "Content-Disposition": `attachment; filename="dentalflow-branch-financial-trends-${filenameDate}.csv"`,
