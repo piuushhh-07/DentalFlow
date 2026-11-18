@@ -31,14 +31,13 @@ export function resolveBranchReportRange(
   const last30Days = getClinicReportDateRange(now, timeZone);
 
   if (preset === "custom") {
-    const invalidDates =
+    if (
       requestedStartDate === undefined ||
       requestedEndDate === undefined ||
       !isValidReportDate(requestedStartDate) ||
       !isValidReportDate(requestedEndDate) ||
-      requestedStartDate > requestedEndDate;
-
-    if (invalidDates) {
+      requestedStartDate > requestedEndDate
+    ) {
       return {
         preset,
         range: last30Days,
