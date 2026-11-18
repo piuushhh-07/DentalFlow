@@ -68,6 +68,8 @@
     visibility: hidden !important;
   }
 
+  #patient-portal-document,
+  #patient-portal-document *,
   #prescription-document,
   #prescription-document *,
   #treatment-estimate-document,
