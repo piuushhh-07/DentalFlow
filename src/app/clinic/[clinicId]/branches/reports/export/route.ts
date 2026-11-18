@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 function csvCell(value: string | number): string {
   const text = String(value);
-  const safeText = typeof value === "string" && /^[=+@\\-\\t\\r]/.test(text)
+  const safeText = typeof value === "string" && /^[=+@\-\t\r]/.test(text)
     ? `'${text}`
     : text;
   return `"${safeText.replaceAll('"', '""')}"`;
@@ -162,7 +162,7 @@ export async function GET(
 
   const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
   const filenameDate = selected.range.endDate;
-  return new Response(`\\uFEFF${csv}\\r\\n`, {
+  return new Response(`\uFEFF${csv}\r\n`, {
     headers: {
       "Cache-Control": "private, no-store, max-age=0",
       "Content-Disposition": `attachment; filename="dentalflow-branch-report-${filenameDate}.csv"`,
