@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
-import { convertPatientLeadToPatient, createPatientLead, updatePatientLead } from "@/features/leads/actions";
+import { addPatientLeadActivity, convertPatientLeadToPatient, createPatientLead, updatePatientLead } from "@/features/leads/actions";
 import { prisma } from "@/lib/db/prisma";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +43,8 @@ const messages: Record<string, string> = {
   "invalid-phone": "Enter a valid Indian mobile number.",
   "lead-not-found": "This lead could not be found in this clinic.",
   error: "We could not save the lead. Please try again.",
+  "activity-added": "Interaction added to the enquiry timeline.",
+  "activity-error": "We could not save this interaction. Please try again.",
 };
 const editableLeadStatuses = [PatientLeadStatus.NEW, PatientLeadStatus.CONTACTED, PatientLeadStatus.APPOINTMENT_BOOKED, PatientLeadStatus.LOST];
 const inrDate = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" });
@@ -66,6 +68,7 @@ export default async function PatientLeadsPage({
     prisma.patientLead.findMany({
       where: { clinicId: membership.clinicId, ...(selectedStatus ? { status: selectedStatus } : {}) },
       orderBy: [{ nextFollowUpAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+      include: { activities: { orderBy: { createdAt: "desc" }, take: 5 } },
       take: 100,
     }),
     prisma.patientLead.groupBy({
@@ -150,6 +153,46 @@ export default async function PatientLeadsPage({
                   </div>
                   {lead.nextFollowUpAt ? <p className={`text-xs font-medium ${overdue ? "text-rose-700" : "text-slate-500"}`}>Next follow-up: {inrDate.format(lead.nextFollowUpAt)}</p> : <p className="text-xs text-slate-500">No follow-up date set</p>}
                   {lead.notes ? <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{lead.notes}</p> : null}
+                  <section className="rounded-lg border border-slate-200 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="text-sm font-semibold text-slate-800">Interaction history</h4>
+                      <span className="text-xs text-slate-500">Latest 5 entries</span>
+                    </div>
+                    {lead.activities.length ? (
+                      <ol className="mt-3 space-y-3">
+                        {lead.activities.map((activity) => (
+                          <li key={activity.id} className="border-l-2 border-teal-200 pl-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-xs font-semibold text-slate-700">{activity.type.replaceAll("_", " ")}</span>
+                              <time className="text-xs text-slate-500">{inrDate.format(activity.createdAt)}</time>
+                            </div>
+                            <p className="mt-1 text-sm font-medium text-slate-800">{activity.summary}</p>
+                            {activity.details ? <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{activity.details}</p> : null}
+                          </li>
+                        ))}
+                      </ol>
+                    ) : <p className="mt-2 text-sm text-slate-500">No interactions logged yet.</p>}
+                    <form action={addPatientLeadActivity} className="mt-4 grid gap-2 border-t border-slate-100 pt-3 sm:grid-cols-2">
+                      <input type="hidden" name="clinicId" value={membership.clinicId} />
+                      <input type="hidden" name="leadId" value={lead.id} />
+                      <label className="text-xs font-medium text-slate-600">Interaction type
+                        <select name="type" defaultValue="CALL" className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900">
+                          <option value="CALL">Phone call</option>
+                          <option value="WHATSAPP">WhatsApp conversation</option>
+                          <option value="NOTE">Note</option>
+                          <option value="APPOINTMENT">Appointment discussion</option>
+                          <option value="OTHER">Other</option>
+                        </select>
+                      </label>
+                      <label className="text-xs font-medium text-slate-600">Summary
+                        <input required name="summary" minLength={2} maxLength={240} placeholder="e.g. Discussed implant estimate" className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900" />
+                      </label>
+                      <label className="text-xs font-medium text-slate-600 sm:col-span-2">Details (optional)
+                        <textarea name="details" rows={2} maxLength={3000} placeholder="Outcome, questions, next steps..." className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900" />
+                      </label>
+                      <button type="submit" className="h-9 rounded-md bg-teal-700 px-3 text-xs font-semibold text-white hover:bg-teal-800 sm:col-span-2">Log interaction</button>
+                    </form>
+                  </section>
                   {!lead.convertedPatientId ? (
                   <form action={updatePatientLead} className="grid gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
                     <input type="hidden" name="clinicId" value={membership.clinicId} />
