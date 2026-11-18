@@ -59,7 +59,10 @@ function mockDentistTransaction(
   context: TestContext,
   delegate: ResourceDelegate,
 ) {
-  const originalDescriptor = Object.getOwnPropertyDescriptor(prisma, "$transaction");
+  const originalDescriptor = Object.getOwnPropertyDescriptor(
+    prisma,
+    "$transaction",
+  );
   const transaction = {
     clinicSubscription: { findFirst: async () => null },
     clinicDentist: {
@@ -73,7 +76,10 @@ function mockDentistTransaction(
       if (typeof callback !== "function") {
         throw new Error("Expected an interactive Prisma transaction callback.");
       }
-      return (callback as (tx: typeof transaction) => Promise<unknown>)(transaction);
+      const work = callback as (
+        tx: typeof transaction,
+      ) => Promise<unknown>;
+      return work(transaction);
     },
   });
   context.after(() => {
