@@ -13,7 +13,7 @@ import { prisma } from "@/lib/db/prisma";
 
 const uuid = z.string().uuid();
 const leadSource = z.nativeEnum(PatientLeadSource);
-const leadStatus = z.enum(["NEW", "CONTACTED", "APPOINTMENT_BOOKED", "LOST"]);
+const leadStatus = z.nativeEnum(PatientLeadStatus).refine((status) => status !== PatientLeadStatus.CONVERTED);
 const createLeadSchema = z.object({
   clinicId: uuid,
   fullName: z.string().trim().min(2).max(160),
