@@ -53,7 +53,7 @@ export default async function PatientLeadsPage({
   const selectedStatus = Object.values(PatientLeadStatus).includes(searchParams?.status as PatientLeadStatus)
     ? (searchParams?.status as PatientLeadStatus)
     : undefined;
-  const [clinic, leads, counts] = await Promise.all([
+  const [clinic, leads, counts, dueCount] = await Promise.all([
     prisma.clinic.findUnique({ where: { id: membership.clinicId }, select: { name: true } }),
     prisma.patientLead.findMany({
       where: { clinicId: membership.clinicId, ...(selectedStatus ? { status: selectedStatus } : {}) },
@@ -65,10 +65,12 @@ export default async function PatientLeadsPage({
       where: { clinicId: membership.clinicId },
       _count: { _all: true },
     }),
+    prisma.patientLead.count({
+      where: { clinicId: membership.clinicId, nextFollowUpAt: { lte: new Date() }, status: { notIn: [PatientLeadStatus.LOST, PatientLeadStatus.APPOINTMENT_BOOKED] } },
+    }),
   ]);
   if (!clinic) notFound();
   const now = new Date();
-  const dueCount = leads.filter((lead) => lead.nextFollowUpAt && lead.nextFollowUpAt <= now && lead.status !== PatientLeadStatus.LOST && lead.status !== PatientLeadStatus.APPOINTMENT_BOOKED).length;
   const totalCount = counts.reduce((total, entry) => total + entry._count._all, 0);
   const countFor = (status: PatientLeadStatus) => counts.find((entry) => entry.status === status)?._count._all ?? 0;
   const statusMessage = searchParams?.status ? messages[searchParams.status] : undefined;
