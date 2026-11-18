@@ -31,7 +31,7 @@ const itemSchema = z.object({
 const movementSchema = z.object({
   clinicId: uuidSchema,
   itemId: uuidSchema,
-  type: z.enum(["STOCK_IN", "STOCK_OUT"]),
+  type: z.enum(["STOCK_IN", "STOCK_OUT", "WASTAGE"]),
   quantity: z.coerce.number().finite().positive().max(1_000_000),
   unitCost: z
     .union([
@@ -118,6 +118,9 @@ export async function recordInventoryMovement(
     notes: formData.get("notes") ?? "",
   });
   if (!parsed.success) redirect("/clinics");
+  if (parsed.data.type === "WASTAGE" && !parsed.data.notes) {
+    redirect(inventoryPath(parsed.data.clinicId, "wastage-reason-required"));
+  }
   const membership = await requireClinicRole(parsed.data.clinicId, [
     ClinicRole.OWNER,
   ]);
@@ -152,7 +155,7 @@ export async function recordInventoryMovement(
         if (parsed.data.type === "STOCK_IN" && batchCount > 0) {
           throw new Error("USE_PROCUREMENT_FOR_BATCH_STOCK_IN");
         }
-        if (parsed.data.type === "STOCK_OUT" && batchCount > 0) {
+        if (parsed.data.type !== "STOCK_IN" && batchCount > 0) {
           const clinicDate = new Intl.DateTimeFormat("en-CA", {
             timeZone: "Asia/Kolkata",
             year: "numeric",
@@ -165,7 +168,7 @@ export async function recordInventoryMovement(
               clinicId: membership.clinicId,
               itemId: item.id,
               quantityRemaining: { gt: 0 },
-              OR: [{ expiryDate: null }, { expiryDate: { gte: today } }],
+              ...(parsed.data.type === "WASTAGE" ? {} : { OR: [{ expiryDate: null }, { expiryDate: { gte: today } }] }),
             },
             orderBy: [
               { expiryDate: { sort: "asc", nulls: "last" } },
@@ -191,7 +194,11 @@ export async function recordInventoryMovement(
             remaining = remaining.minus(used);
           }
           if (remaining.greaterThan(0)) {
-            throw new Error("INSUFFICIENT_NON_EXPIRED_BATCH_STOCK");
+            throw new Error(
+              parsed.data.type === "WASTAGE"
+                ? "INSUFFICIENT_TRACKED_BATCH_STOCK"
+                : "INSUFFICIENT_NON_EXPIRED_BATCH_STOCK",
+            );
           }
         }
         await transaction.inventoryItem.update({
@@ -218,7 +225,9 @@ export async function recordInventoryMovement(
                 : new Prisma.Decimal(parsed.data.unitCost),
             reference: parsed.data.reference || null,
             notes: [
-              parsed.data.notes || null,
+              parsed.data.type === "WASTAGE" && parsed.data.notes
+                ? `Wastage reason: ${parsed.data.notes}`
+                : parsed.data.notes || null,
               batchUsage.length ? `FEFO batches: ${batchUsage.join(", ")}` : null,
             ].filter(Boolean).join(" · ").slice(0, 500) || null,
           },
@@ -233,7 +242,10 @@ export async function recordInventoryMovement(
     if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") {
       redirect(inventoryPath(membership.clinicId, "insufficient-stock"));
     }
-    if (error instanceof Error && error.message === "INSUFFICIENT_NON_EXPIRED_BATCH_STOCK") {
+    if (
+      error instanceof Error &&
+      ["INSUFFICIENT_NON_EXPIRED_BATCH_STOCK", "INSUFFICIENT_TRACKED_BATCH_STOCK"].includes(error.message)
+    ) {
       redirect(inventoryPath(membership.clinicId, "insufficient-batch-stock"));
     }
     if (error instanceof Error && error.message === "USE_PROCUREMENT_FOR_BATCH_STOCK_IN") {
