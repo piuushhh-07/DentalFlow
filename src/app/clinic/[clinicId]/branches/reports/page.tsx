@@ -131,7 +131,7 @@ export default async function BranchReportsPage({ params }: BranchReportsPagePro
           <Link href={`/clinic/${owner.clinicId}/branches`} className="text-sm font-medium text-teal-800 hover:underline">← Branch management</Link>
           <p className="mt-4 text-sm font-medium text-teal-700">Clinic group · {group.name}</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">Branch performance</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-600">A consolidated operational snapshot for the last 30 calendar days in each branch's local time zone. Only aggregate counts and amounts are shown; patient-level records remain in their own clinic.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">A consolidated operational snapshot for the last 30 calendar days in each branch&apos;s local time zone. Only aggregate counts and amounts are shown; patient-level records remain in their own clinic.</p>
         </div>
 
         <section aria-label="Group totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -195,7 +195,7 @@ export default async function BranchReportsPage({ params }: BranchReportsPagePro
 
         <aside className="rounded-xl border border-amber-200 bg-amber-50 p-4">
           <h2 className="text-sm font-semibold text-amber-900">Privacy and reporting boundary</h2>
-          <p className="mt-1 text-sm leading-6 text-amber-800">This view includes only aggregate counts and financial totals for clinics where you still have active owner access. It does not expose patient names, contact details, clinical notes, treatment records, invoices or staff-level activity. Each branch's reports use its own time zone.</p>
+          <p className="mt-1 text-sm leading-6 text-amber-800">This view includes only aggregate counts and financial totals for clinics where you still have active owner access. It does not expose patient names, contact details, clinical notes, treatment records, invoices or staff-level activity. Each branch&apos;s reports use its own time zone.</p>
         </aside>
       </div>
     </AppShell>
