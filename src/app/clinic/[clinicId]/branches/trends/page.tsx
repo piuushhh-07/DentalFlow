@@ -140,6 +140,7 @@ export default async function BranchTrendsPage({ params }: BranchTrendsPageProps
           <p className="mt-4 text-sm font-medium text-teal-700">Clinic group · {group.name}</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">Financial trends</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">Twelve months of group collections and appointment activity, split by branch.</p>
+          <a href={`/clinic/${owner.clinicId}/branches/trends/export`} className="mt-4 inline-flex h-10 items-center justify-center rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-800">Download 12-month CSV</a>
         </div>
 
         <section aria-label="Twelve month group totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
