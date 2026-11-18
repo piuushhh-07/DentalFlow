@@ -107,6 +107,7 @@ export default async function ClinicBranchesPage({ params, searchParams }: Branc
                   <h2 className="mt-1 text-xl font-semibold text-slate-900">{group.name}</h2>
                   <p className="mt-1 text-sm text-slate-500">{group.clinics.length} branches · branch data remains separate</p>
                 </div>
+                <Link href={`/clinic/${currentClinic.id}/branches/reports`} className="inline-flex h-9 items-center rounded-md bg-teal-700 px-3 text-xs font-semibold text-white hover:bg-teal-800">View group reports</Link>
                 <form action={dissolveClinicGroup}>
                   <input type="hidden" name="clinicId" value={currentClinic.id} />
                   <input type="hidden" name="groupId" value={group.id} />
