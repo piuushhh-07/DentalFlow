@@ -196,13 +196,13 @@ export default async function BranchReportsPage({ params, searchParams = {} }: B
               <>
                 <div>
                   <label htmlFor="branch-report-start" className="mb-1.5 block text-sm font-medium text-slate-700">Start date</label>
-                  <input id="branch-report-start" name="startDate" type="date" required value={selectedRange.startDateInput} readOnly className="h-10 rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm text-slate-700" />
+                  <input id="branch-report-start" name="startDate" type="date" required defaultValue={selectedRange.startDateInput} className="h-10 rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm text-slate-700" />
                 </div>
                 <div>
                   <label htmlFor="branch-report-end" className="mb-1.5 block text-sm font-medium text-slate-700">End date</label>
-                  <input id="branch-report-end" name="endDate" type="date" required value={selectedRange.endDateInput} readOnly className="h-10 rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm text-slate-700" />
+                  <input id="branch-report-end" name="endDate" type="date" required defaultValue={selectedRange.endDateInput} className="h-10 rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm text-slate-700" />
                 </div>
-                <p className="text-xs text-slate-500">Select custom dates by editing the URL parameters: startDate and endDate.</p>
+                
               </>
             ) : null}
             <button type="submit" className="h-10 rounded-lg border border-teal-700 px-4 text-sm font-semibold text-teal-800 hover:bg-teal-50">Apply filters</button>
