@@ -206,6 +206,7 @@ enum PatientLeadStatus {
   NEW
   CONTACTED
   APPOINTMENT_BOOKED
+  CONVERTED
   LOST
 }
 
@@ -647,6 +648,8 @@ model PatientLead {
   notes              String?          @db.Text
   whatsappOptIn      Boolean          @default(false)
   whatsappOptedInAt  DateTime?        @db.Timestamptz(6)
+  convertedPatientId String?          @db.Uuid
+  convertedPatient   Patient?         @relation("PatientLeadConversion", fields: [convertedPatientId, clinicId], references: [id, clinicId], onDelete: Restrict)
   nextFollowUpAt     DateTime?        @db.Timestamptz(6)
   lastContactedAt    DateTime?        @db.Timestamptz(6)
   createdAt          DateTime         @default(now()) @db.Timestamptz(6)
@@ -656,6 +659,7 @@ model PatientLead {
   @@unique([clinicId, normalizedPhone])
   @@index([clinicId, status, nextFollowUpAt])
   @@index([clinicId, nextFollowUpAt])
+  @@index([clinicId, convertedPatientId])
   @@map("patient_leads")
 }
 
@@ -690,6 +694,7 @@ model Patient {
   dentalClinicalRecords      DentalClinicalRecord[]
   digitalPrescriptions       DigitalPrescription[]
   dataExportAudits           PatientDataExportAudit[]
+  convertedLeads             PatientLead[]                @relation("PatientLeadConversion")
   dentalLabOrders            DentalLabOrder[]
 
   @@unique([id, clinicId])
