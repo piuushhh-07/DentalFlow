@@ -165,7 +165,7 @@ export default async function PatientLeadsPage({
                     </p>
                   )}
                   {!lead.convertedPatientId && lead.status !== PatientLeadStatus.LOST ? (
-                    <form action={convertPatientLeadToPatient>
+                    <form action={convertPatientLeadToPatient}>
                       <input type="hidden" name="clinicId" value={membership.clinicId} />
                       <input type="hidden" name="leadId" value={lead.id} />
                       <button type="submit" className="h-9 rounded-md border border-teal-700 px-3 text-xs font-semibold text-teal-800 hover:bg-teal-50">Convert to patient record</button>
