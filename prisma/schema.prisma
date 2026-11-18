@@ -196,6 +196,12 @@ enum AppointmentRequestStatus {
   CANCELLED
 }
 
+enum PatientAppointmentCancellationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum PreventiveRecallType {
   SIX_MONTH_CHECKUP
   CLEANING
@@ -387,6 +393,7 @@ model Clinic {
   treatmentEstimates                 TreatmentEstimate[]
   treatmentVisits                    TreatmentVisit[]
   appointments                       Appointment[]
+  patientAppointmentCancellationRequests PatientAppointmentCancellationRequest[]
   dentists                           ClinicDentist[]
   staffAttendanceRecords             ClinicStaffAttendance[]
   staffLeaveRequests                 ClinicStaffLeaveRequest[]
@@ -579,6 +586,7 @@ model ClinicMembership {
   permissionGrants                  ClinicPermissionGrant[]
   permissionChangesAuthored         ClinicStaffAudit[]                  @relation("ClinicStaffAuditActor")
   permissionChangesTargeted         ClinicStaffAudit[]                  @relation("ClinicStaffAuditTarget")
+  reviewedPatientAppointmentCancellationRequests PatientAppointmentCancellationRequest[] @relation("PatientAppointmentCancellationReviewer")
 
   @@unique([userId, clinicId])
   @@index([clinicId, role])
@@ -630,6 +638,7 @@ model Patient {
   treatmentFinancialEntries  TreatmentFinancialEntry[]
   treatmentEstimates         TreatmentEstimate[]
   appointments               Appointment[]
+  appointmentCancellationRequests PatientAppointmentCancellationRequest[]
   preventiveRecalls          PreventiveRecall[]
   messageLogs                MessageLog[]
   insurancePolicies          InsurancePolicy[]
@@ -1112,6 +1121,7 @@ model Appointment {
   dentist          ClinicDentist?    @relation(fields: [dentistId, clinicId], references: [id, clinicId], onDelete: Restrict)
   chair            TreatmentChair?   @relation(fields: [chairId, clinicId], references: [id, clinicId], onDelete: Restrict)
   messageLogs      MessageLog[]
+  cancellationRequests PatientAppointmentCancellationRequest[]
 
   @@unique([id, clinicId])
   @@unique([id, clinicId, patientId])
@@ -1126,6 +1136,28 @@ model Appointment {
   @@index([patientId, clinicId], map: "fk_r6ypy_patient_id_2c")
   @@index([treatmentVisitId, clinicId, patientId], map: "fk_r6ypy_treatment_visit_id_3c")
   @@map("appointments")
+}
+
+model PatientAppointmentCancellationRequest {
+  id                String                                  @id @default(uuid()) @db.Uuid
+  clinicId          String                                  @db.Uuid
+  patientId         String                                  @db.Uuid
+  appointmentId     String                                  @db.Uuid
+  reason            String?                                 @db.VarChar(500)
+  status            PatientAppointmentCancellationStatus    @default(PENDING)
+  reviewedByUserId  String?                                 @db.Uuid
+  reviewedAt        DateTime?                               @db.Timestamptz(6)
+  reviewerNotes     String?                                 @db.VarChar(500)
+  createdAt         DateTime                                @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime                                @updatedAt @db.Timestamptz(6)
+  clinic            Clinic                                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient           Patient                                 @relation(fields: [patientId, clinicId], references: [id, clinicId], onDelete: Cascade)
+  appointment       Appointment                             @relation(fields: [appointmentId, clinicId, patientId], references: [id, clinicId, patientId], onDelete: Cascade)
+  reviewer          ClinicMembership?                       @relation("PatientAppointmentCancellationReviewer", fields: [reviewedByUserId, clinicId], references: [userId, clinicId], onDelete: Restrict)
+
+  @@index([clinicId, status, createdAt])
+  @@index([clinicId, appointmentId])
+  @@map("patient_appointment_cancellation_requests")
 }
 
 model ClinicDentist {
