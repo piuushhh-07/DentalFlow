@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { PatientLeadSource, PatientLeadStatus } from "@prisma/client";
+import { ClinicRole, PatientLeadSource, PatientLeadStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -49,7 +49,7 @@ export default async function PatientLeadsPage({
 }: { params: { clinicId: string }; searchParams?: { status?: string } }) {
   const parsed = z.string().uuid().safeParse(params.clinicId);
   if (!parsed.success) notFound();
-  const membership = await requireClinicRole(parsed.data, ["OWNER"]);
+  const membership = await requireClinicRole(parsed.data, [ClinicRole.OWNER]);
   const selectedStatus = Object.values(PatientLeadStatus).includes(searchParams?.status as PatientLeadStatus)
     ? (searchParams?.status as PatientLeadStatus)
     : undefined;
