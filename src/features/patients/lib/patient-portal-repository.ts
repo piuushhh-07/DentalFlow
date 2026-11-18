@@ -104,10 +104,13 @@ export async function listPatientPortalRecords(email: string) {
           status: true,
         },
       },
+      phoneNumber: true,
       clinic: {
         select: {
           name: true,
           phoneNumber: true,
+          publicBookingEnabled: true,
+          publicBookingSlug: true,
         },
       },
     },
