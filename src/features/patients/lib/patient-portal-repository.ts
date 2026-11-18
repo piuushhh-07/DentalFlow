@@ -31,9 +31,15 @@ export async function listPatientPortalRecords(email: string) {
         orderBy: { scheduledAt: "asc" },
         take: 10,
         select: {
+          id: true,
           scheduledAt: true,
           type: true,
           status: true,
+          cancellationRequests: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { status: true },
+          },
           clinic: { select: { timeZone: true } },
         },
       },

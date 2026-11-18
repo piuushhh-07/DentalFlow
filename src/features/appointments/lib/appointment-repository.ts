@@ -505,6 +505,17 @@ export async function listAppointmentRequests(clinicId: string) {
   });
 }
 
+export async function listPatientAppointmentCancellationRequests(clinicId: string) {
+  return prisma.patientAppointmentCancellationRequest.findMany({
+    where: { clinicId, status: "PENDING" },
+    orderBy: { createdAt: "asc" },
+    include: {
+      patient: { select: { fullName: true, phoneNumber: true } },
+      appointment: { select: { scheduledAt: true, type: true } },
+    },
+  });
+}
+
 export async function createPublicAppointmentRequest(
   clinicId: string,
   input: Readonly<{

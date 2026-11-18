@@ -1,6 +1,7 @@
 import { signOutPatientPortal } from "@/features/patients/actions";
 import { PatientPortalSignInForm } from "@/features/patients/components/patient-portal-sign-in-form";
 import { PrintPatientPortalButton } from "@/features/patients/components/print-patient-portal-button";
+import { PatientAppointmentCancellationForm } from "@/features/patients/components/patient-appointment-cancellation-form";
 import { listPatientPortalRecords } from "@/features/patients/lib/patient-portal-repository";
 import {
   isExpectedUnauthenticatedAuthError,
@@ -148,6 +149,10 @@ export default async function PatientPortalPage({
                                 <p className="mt-1 text-xs text-slate-500">
                                   {appointment.status.replaceAll("_", " ")}
                                 </p>
+                                <PatientAppointmentCancellationForm
+                                  appointmentId={appointment.id}
+                                  previousStatus={appointment.cancellationRequests[0]?.status}
+                                />
                               </li>
                             ))}
                           </ul>
