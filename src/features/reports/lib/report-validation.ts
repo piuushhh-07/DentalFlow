@@ -60,6 +60,31 @@ function startOfDateInTimeZone(date: string, timeZone: string): Date {
   return new Date(candidate);
 }
 
+export function isValidReportDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function getClinicReportDateRangeForDates(
+  startDate: string,
+  endDate: string,
+  timeZone: string,
+): ClinicReportDateRange {
+  if (!isValidReportDate(startDate) || !isValidReportDate(endDate) || startDate > endDate) {
+    throw new RangeError("The report date range is invalid.");
+  }
+  const endExclusiveDate = shiftDate(endDate, 1);
+  return {
+    startDate,
+    endDate,
+    endExclusiveDate,
+    startAt: startOfDateInTimeZone(startDate, timeZone),
+    endExclusiveAt: startOfDateInTimeZone(endExclusiveDate, timeZone),
+    timeZone,
+  };
+}
+
 export function getClinicReportDateRange(
   now: Date,
   timeZone: string,

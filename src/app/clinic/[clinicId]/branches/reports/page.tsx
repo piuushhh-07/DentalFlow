@@ -1,18 +1,22 @@
 import Link from "next/link";
 import { AppointmentStatus, ClinicRole, FinancialEntryType } from "@prisma/client";
 import { notFound } from "next/navigation";
-import { Building2, CalendarDays, IndianRupee, UsersRound } from "lucide-react";
+import { Building2, CalendarDays, Download, IndianRupee, UsersRound } from "lucide-react";
 import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError, ClinicRoleDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicRole } from "@/features/auth/lib/server-auth";
-import { getClinicReportDateRange, formatReportDateRange } from "@/features/reports/lib/report-validation";
+import { BRANCH_REPORT_PRESETS, resolveBranchReportRange } from "@/features/clinic-groups/lib/branch-reporting";
+import { formatReportDateRange } from "@/features/reports/lib/report-validation";
 import { prisma } from "@/lib/db/prisma";
 
 export const dynamic = "force-dynamic";
 
-type BranchReportsPageProps = Readonly<{ params: { clinicId: string } }>;
+type BranchReportsPageProps = Readonly<{
+  params: { clinicId: string };
+  searchParams?: { range?: string; startDate?: string; endDate?: string };
+}>;
 
 const currency = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -27,7 +31,16 @@ function safeCount(value: number): number {
   return value;
 }
 
-export default async function BranchReportsPage({ params }: BranchReportsPageProps) {
+function getExportHref(clinicId: string, range: string, startDate: string, endDate: string) {
+  const query = new URLSearchParams({ range });
+  if (range === "custom") {
+    query.set("startDate", startDate);
+    query.set("endDate", endDate);
+  }
+  return `/clinic/${clinicId}/branches/reports/export?${query.toString()}`;
+}
+
+export default async function BranchReportsPage({ params, searchParams = {} }: BranchReportsPageProps) {
   const parsedId = z.string().uuid().safeParse(params.clinicId);
   if (!parsedId.success) notFound();
 
@@ -72,8 +85,24 @@ export default async function BranchReportsPage({ params }: BranchReportsPagePro
   });
   if (!group || group.clinics.length < 2 || !group.clinics.some((clinic) => clinic.id === current.id)) notFound();
 
+  const now = new Date();
+  const selectedRange = resolveBranchReportRange(
+    now,
+    group.clinics.find((clinic) => clinic.id === current.id)!.timeZone,
+    searchParams.range,
+    searchParams.startDate,
+    searchParams.endDate,
+  );
+
   const branches = await Promise.all(group.clinics.map(async (clinic) => {
-    const range = getClinicReportDateRange(new Date(), clinic.timeZone);
+    const selection = resolveBranchReportRange(
+      now,
+      clinic.timeZone,
+      searchParams.range,
+      searchParams.startDate,
+      searchParams.endDate,
+    );
+    const range = selection.range;
     const [patients, appointments, financialEntries] = await Promise.all([
       prisma.patient.count({ where: { clinicId: clinic.id, archivedAt: null } }),
       prisma.appointment.count({
@@ -118,21 +147,69 @@ export default async function BranchReportsPage({ params }: BranchReportsPagePro
   }), { patients: 0, appointments: 0, payments: 0, refunds: 0, netCollections: 0 });
 
   const cards = [
-    { label: "Active patients", value: totals.patients.toLocaleString("en-IN"), icon: UsersRound, detail: "Active patient records across branches" },
-    { label: "Appointments", value: totals.appointments.toLocaleString("en-IN"), icon: CalendarDays, detail: "Appointments in the reporting window, excluding cancelled and no-show" },
+    { label: "Active patients", value: totals.patients.toLocaleString("en-IN"), icon: UsersRound, detail: "Active patient records across branches (current snapshot)" },
+    { label: "Appointments", value: totals.appointments.toLocaleString("en-IN"), icon: CalendarDays, detail: "Appointments in the selected period, excluding cancelled and no-show" },
     { label: "Net collections", value: currency.format(totals.netCollections), icon: IndianRupee, detail: `${currency.format(totals.payments)} payments less ${currency.format(totals.refunds)} refunds` },
     { label: "Branches", value: branches.length.toLocaleString("en-IN"), icon: Building2, detail: "Branches where you currently have owner access" },
   ];
+
+  const presetLabels: Record<(typeof BRANCH_REPORT_PRESETS)[number], string> = {
+    "7": "Last 7 days",
+    "30": "Last 30 days",
+    "90": "Last 90 days",
+    month: "This month",
+    custom: "Custom dates",
+  };
+  const exportHref = getExportHref(
+    owner.clinicId,
+    selectedRange.preset,
+    selectedRange.startDateInput,
+    selectedRange.endDateInput,
+  );
 
   return (
     <AppShell clinicId={owner.clinicId} activeSection="branches">
       <div className="mx-auto max-w-6xl space-y-7">
         <div>
           <Link href={`/clinic/${owner.clinicId}/branches`} className="text-sm font-medium text-teal-800 hover:underline">← Branch management</Link>
-          <p className="mt-4 text-sm font-medium text-teal-700">Clinic group · {group.name}</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">Branch performance</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-600">A consolidated operational snapshot for the last 30 calendar days in each branch&apos;s local time zone. Only aggregate counts and amounts are shown; patient-level records remain in their own clinic.</p>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-teal-700">Clinic group · {group.name}</p>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">Branch performance</h1>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Compare aggregate clinic activity without sharing patient-level records between branches.</p>
+            </div>
+            <a href={exportHref} download className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-800">
+              <Download aria-hidden="true" className="size-4" /> Export CSV
+            </a>
+          </div>
         </div>
+
+        <section aria-label="Report filters" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <form method="get" className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="w-full sm:max-w-xs">
+              <label htmlFor="branch-report-range" className="mb-1.5 block text-sm font-medium text-slate-700">Reporting period</label>
+              <select id="branch-report-range" name="range" defaultValue={selectedRange.preset} className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100">
+                {BRANCH_REPORT_PRESETS.map((preset) => <option key={preset} value={preset}>{presetLabels[preset]}</option>)}
+              </select>
+            </div>
+            {selectedRange.preset === "custom" ? (
+              <>
+                <div>
+                  <label htmlFor="branch-report-start" className="mb-1.5 block text-sm font-medium text-slate-700">Start date</label>
+                  <input id="branch-report-start" name="startDate" type="date" required defaultValue={selectedRange.startDateInput} className="h-10 rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm text-slate-700" />
+                </div>
+                <div>
+                  <label htmlFor="branch-report-end" className="mb-1.5 block text-sm font-medium text-slate-700">End date</label>
+                  <input id="branch-report-end" name="endDate" type="date" required defaultValue={selectedRange.endDateInput} className="h-10 rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm text-slate-700" />
+                </div>
+                
+              </>
+            ) : null}
+            <button type="submit" className="h-10 rounded-lg border border-teal-700 px-4 text-sm font-semibold text-teal-800 hover:bg-teal-50">Apply filters</button>
+          </form>
+          {selectedRange.error ? <p role="alert" className="mt-3 text-sm text-rose-700">{selectedRange.error} Showing the last 30 days until corrected.</p> : null}
+          <p className="mt-3 text-xs text-slate-500">Date boundaries use each branch&apos;s own timezone. Patient totals are a current active-record snapshot; appointment and collection metrics use the selected period.</p>
+        </section>
 
         <section aria-label="Group totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {cards.map(({ label, value, icon: Icon, detail }) => (
@@ -195,7 +272,7 @@ export default async function BranchReportsPage({ params }: BranchReportsPagePro
 
         <aside className="rounded-xl border border-amber-200 bg-amber-50 p-4">
           <h2 className="text-sm font-semibold text-amber-900">Privacy and reporting boundary</h2>
-          <p className="mt-1 text-sm leading-6 text-amber-800">This view includes only aggregate counts and financial totals for clinics where you still have active owner access. It does not expose patient names, contact details, clinical notes, treatment records, invoices or staff-level activity. Each branch&apos;s reports use its own time zone.</p>
+          <p className="mt-1 text-sm leading-6 text-amber-800">This view includes only aggregate counts and financial totals for clinics where you still have active owner access. It does not expose patient names, contact details, clinical notes, treatment records, invoices or staff-level activity.</p>
         </aside>
       </div>
     </AppShell>
