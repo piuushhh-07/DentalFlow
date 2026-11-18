@@ -24,7 +24,7 @@ const statusMessages: Record<string, string> = {
   "insufficient-stock":
     "Stock cannot go below zero. Check the available quantity.",
   "insufficient-batch-stock":
-    "There is not enough unexpired batch stock. Expired stock cannot be used.",
+    "There is not enough tracked batch stock to record this movement.",
   "use-procurement":
     "This item uses batch tracking. Receive additional stock through Suppliers & procurement so its batch and expiry are recorded.",  "wastage-reason-required":
     "Add a reason before recording inventory wastage.",
