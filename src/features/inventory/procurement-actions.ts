@@ -40,7 +40,7 @@ const receiveSchema = z.object({
 const supplierReturnSchema = z.object({
   clinicId: uuid,
   batchId: uuid,
-  quantity: z.coerce.number().finite().positive().max(1000000),
+  quantity: z.coerce.number().finite().positive().max(1000000).refine((value) => Number.isInteger(value * 1000)),
   reason: z.string().trim().min(3).max(400),
 });
 
