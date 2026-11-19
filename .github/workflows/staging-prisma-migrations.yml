@@ -88,6 +88,11 @@ jobs:
         continue-on-error: true
         run: npx prisma migrate resolve --rolled-back 20261114090000_patient_archive
 
+      - name: Clear the interrupted patient lead conversion migration state
+        # The failed migration was split so the enum value commits before dependent DDL.
+        continue-on-error: true
+        run: npx prisma migrate resolve --rolled-back 20261118170000_patient_lead_conversion
+
       - name: Apply pending Prisma migrations
         run: npx prisma migrate deploy
 
