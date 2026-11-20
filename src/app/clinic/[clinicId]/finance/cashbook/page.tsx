@@ -6,6 +6,10 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
 import { closeCashRegister } from "@/features/finance/actions";
+import { CashbookLivePreview } from "@/features/finance/components/cashbook-live-preview";
+import { requireCashbookPaymentMethod, startOfLocalDate, nextBusinessDate } from "@/features/finance/lib/cashbook-reconciliation";
+import { toMinorUnits } from "@/features/finance/lib/dentist-payouts";
+import { FinancialEntryType, PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +63,60 @@ export default async function CashbookPage({
   if (!clinic) notFound();
 
   const today = todayInZone(clinic.timeZone);
+  const todayStart = startOfLocalDate(today, clinic.timeZone);
+  const tomorrowStart = startOfLocalDate(nextBusinessDate(today), clinic.timeZone);
+  const todayDate = new Date(`${today}T00:00:00.000Z`);
+  const tomorrowDate = new Date(`${nextBusinessDate(today)}T00:00:00.000Z`);
+  const [todayEntries, todayExpenses, todayDentistPayouts, todayVendorPayments] = await Promise.all([
+    prisma.treatmentFinancialEntry.findMany({
+      where: {
+        clinicId: membership.clinicId,
+        entryType: { in: [FinancialEntryType.PAYMENT, FinancialEntryType.REFUND] },
+        paidAt: { gte: todayStart, lt: tomorrowStart },
+      },
+      select: { entryType: true, paymentMethod: true, amount: true },
+    }),
+    prisma.clinicExpense.findMany({
+      where: { clinicId: membership.clinicId, expenseDate: { gte: todayDate, lt: tomorrowDate } },
+      select: { paymentMethod: true, amount: true },
+    }),
+    prisma.dentistPayoutPayment.findMany({
+      where: {
+        clinicId: membership.clinicId,
+        paymentMethod: PaymentMethod.CASH,
+        paidAt: { gte: todayStart, lt: tomorrowStart },
+      },
+      select: { amount: true },
+    }),
+    prisma.vendorBillPayment.findMany({
+      where: {
+        clinicId: membership.clinicId,
+        paymentMethod: PaymentMethod.CASH,
+        paidAt: { gte: todayStart, lt: tomorrowStart },
+      },
+      select: { amount: true },
+    }),
+  ]);
+  const hasUnclassifiedTreatmentEntry = todayEntries.some((entry) => entry.paymentMethod === null);
+  const cashEntries = todayEntries
+    .filter((entry) => entry.paymentMethod !== null)
+    .map((entry) => ({
+      entryType: entry.entryType,
+      paymentMethod: requireCashbookPaymentMethod(entry.paymentMethod),
+      amountMinor: toMinorUnits(entry.amount.toString()),
+    }));
+  const sumCashEntries = (items: { paymentMethod: PaymentMethod; amount: { toString(): string } }[]) =>
+    items.filter((item) => item.paymentMethod === PaymentMethod.CASH)
+      .reduce((sum, item) => sum + toMinorUnits(item.amount.toString()), 0) / 100;
+  const cashCollections = cashEntries
+    .filter((entry) => entry.paymentMethod === PaymentMethod.CASH && entry.entryType === FinancialEntryType.PAYMENT)
+    .reduce((sum, entry) => sum + entry.amountMinor, 0) / 100;
+  const cashRefunds = cashEntries
+    .filter((entry) => entry.paymentMethod === PaymentMethod.CASH && entry.entryType === FinancialEntryType.REFUND)
+    .reduce((sum, entry) => sum + entry.amountMinor, 0) / 100;
+  const cashClinicExpenses = sumCashEntries(todayExpenses);
+  const cashDentistPayouts = todayDentistPayouts.reduce((sum, item) => sum + toMinorUnits(item.amount.toString()), 0) / 100;
+  const cashVendorBillPayments = todayVendorPayments.reduce((sum, item) => sum + toMinorUnits(item.amount.toString()), 0) / 100;
   const closes = await prisma.cashRegisterClose.findMany({
     where: { clinicId: membership.clinicId },
     orderBy: [{ businessDate: "desc" }],
@@ -90,6 +148,16 @@ export default async function CashbookPage({
           <Link className="text-sm font-semibold text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/finance/dentist-payouts`}>Dentist & consultant payouts →</Link>
           <Link className="text-sm font-semibold text-teal-800 hover:underline" href={`/clinic/${membership.clinicId}/finance/reports`}>Financial reports →</Link>
         </div>\n\n        {status ? <p role="status" className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">{status}</p> : null}
+
+        <CashbookLivePreview
+          businessDate={today}
+          cashCollections={cashCollections}
+          cashRefunds={cashRefunds}
+          cashClinicExpenses={cashClinicExpenses}
+          cashDentistPayouts={cashDentistPayouts}
+          cashVendorBillPayments={cashVendorBillPayments}
+          hasUnclassifiedTreatmentEntry={hasUnclassifiedTreatmentEntry}
+        />
 
         {canClose ? (
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
