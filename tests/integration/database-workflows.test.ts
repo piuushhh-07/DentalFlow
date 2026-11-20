@@ -1724,6 +1724,61 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       );
       assert.ok(resourceBooking.id && adjacentResourceBooking.id);
 
+
+      const concurrentResourceInputs = [
+        {
+          ...appointmentInput,
+          treatmentVisitId: null,
+          time: "11:00",
+        },
+        {
+          ...appointmentInput,
+          treatmentVisitId: null,
+          time: "11:00",
+        },
+      ];
+      const concurrentResourceBookings = await Promise.allSettled(
+        concurrentResourceInputs.map((input) =>
+          createClinicAppointment(clinicAId, input),
+        ),
+      );
+      assert.equal(
+        concurrentResourceBookings.filter((result) => result.status === "fulfilled")
+          .length,
+        1,
+        "Concurrent appointments must not double-book the same dentist and chair.",
+      );
+      const rejectedResourceBookings = concurrentResourceBookings.filter(
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected",
+      );
+      assert.equal(rejectedResourceBookings.length, 1);
+      assert.ok(
+        rejectedResourceBookings[0].reason instanceof AppointmentConflictError,
+        "The losing concurrent booking must report an appointment conflict.",
+      );
+      const concurrentResourceStart = new Date(
+        `${appointmentDate}T11:00:00.000+05:30`,
+      );
+      const persistedConcurrentResourceBookings =
+        await freshReader.appointment.findMany({
+          where: {
+            clinicId: clinicAId,
+            dentistId: dentist.id,
+            chairId: chair.id,
+            scheduledAt: concurrentResourceStart,
+            status: {
+              notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW],
+            },
+          },
+          select: { id: true },
+        });
+      assert.equal(
+        persistedConcurrentResourceBookings.length,
+        1,
+        "Exactly one active appointment may persist for the concurrently requested resource slot.",
+      );
+
       const publicBookingPlan = await prisma.billingPlanVersion.create({
         data: {
           code: `public-booking-integration-${randomUUID()}`,
