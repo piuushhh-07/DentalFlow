@@ -1949,6 +1949,66 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "An already-approved booking request cannot be approved twice.",
       );
 
+      const concurrentlyApprovableRequest =
+        await freshReader.appointmentRequest.create({
+          data: {
+            clinicId: clinicAId,
+            patientName: `${marker} Concurrent public booking approval`,
+            phoneNumber: syntheticPhone(),
+            requestedAt: new Date(`${appointmentDate}T19:00:00.000+05:30`),
+            durationMinutes: 30,
+            type: "Consultation",
+            dentistId: resourceTestDentist.id,
+            chairId: resourceTestChair.id,
+            notes: "Synthetic concurrent approval request.",
+          },
+          select: { id: true, requestedAt: true },
+        });
+      const concurrentApprovals = await Promise.allSettled([
+        approveAppointmentRequest(clinicAId, concurrentlyApprovableRequest.id),
+        approveAppointmentRequest(clinicAId, concurrentlyApprovableRequest.id),
+      ]);
+      assert.equal(
+        concurrentApprovals.filter((result) => result.status === "fulfilled")
+          .length,
+        1,
+        "Concurrent approval attempts must create exactly one appointment.",
+      );
+      const failedConcurrentApproval = concurrentApprovals.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected",
+      );
+      assert.ok(failedConcurrentApproval);
+      assert.ok(
+        failedConcurrentApproval.reason instanceof AppointmentRequestNotFoundError ||
+          safePrismaErrorCode(failedConcurrentApproval.reason) === "P2034",
+        "The losing approval may fail only because the request was already handled or its transaction conflicted.",
+      );
+      assert.equal(
+        (
+          await freshReader.appointmentRequest.findUniqueOrThrow({
+            where: { id: concurrentlyApprovableRequest.id },
+            select: { status: true },
+          })
+        ).status,
+        AppointmentRequestStatus.APPROVED,
+      );
+      const concurrentApprovalAppointments =
+        await freshReader.appointment.findMany({
+          where: {
+            clinicId: clinicAId,
+            scheduledAt: concurrentlyApprovableRequest.requestedAt,
+            dentistId: resourceTestDentist.id,
+            chairId: resourceTestChair.id,
+          },
+          select: { id: true },
+        });
+      assert.equal(
+        concurrentApprovalAppointments.length,
+        1,
+        "A concurrent retry must not create a duplicate appointment.",
+      );
+
       await assert.rejects(
         updateClinicAppointment(clinicAId, appointment.id, {
           ...appointmentInput,
