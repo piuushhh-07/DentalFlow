@@ -18,6 +18,14 @@ const currency = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
 });
 
+function toMinorUnits(amount: number): number {
+  return Math.round(amount * 100);
+}
+
+function isValidRupeeInput(value: string): boolean {
+  return /^\d+(?:\.\d{1,2})?$/.test(value) && Number.isFinite(Number(value));
+}
+
 export function CashbookLivePreview({
   businessDate,
   cashCollections,
@@ -31,17 +39,24 @@ export function CashbookLivePreview({
   const [countedCash, setCountedCash] = useState("");
 
   const values = useMemo(() => {
-    const opening = Number(openingCash);
-    const counted = Number(countedCash);
-    const validOpening = Number.isFinite(opening) && opening >= 0 ? opening : 0;
-    const validCounted = countedCash.trim() !== "" && Number.isFinite(counted) && counted >= 0
-      ? counted
-      : null;
-    const expenses = cashClinicExpenses + cashDentistPayouts + cashVendorBillPayments;
-    const expected = validOpening + cashCollections - cashRefunds - expenses;
+    const validOpening = isValidRupeeInput(openingCash)
+      ? toMinorUnits(Number(openingCash))
+      : 0;
+    const validCounted =
+      countedCash.trim() !== "" && isValidRupeeInput(countedCash)
+        ? toMinorUnits(Number(countedCash))
+        : null;
+    const expenses =
+      toMinorUnits(cashClinicExpenses) +
+      toMinorUnits(cashDentistPayouts) +
+      toMinorUnits(cashVendorBillPayments);
+    const expected =
+      validOpening +
+      toMinorUnits(cashCollections) -
+      toMinorUnits(cashRefunds) -
+      expenses;
+
     return {
-      opening: validOpening,
-      counted: validCounted,
       expenses,
       expected,
       variance: validCounted === null ? null : validCounted - expected,
@@ -76,36 +91,36 @@ export function CashbookLivePreview({
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <label className="text-sm font-medium text-slate-700">
           Preview opening cash (₹)
-          <input type="number" min="0" step="0.01" value={openingCash} onChange={(event) => setOpeningCash(event.target.value)} className="mt-1 block h-10 w-full rounded-md border border-slate-300 bg-white px-3" />
+          <input type="number" min="0" max="1000000000" step="0.01" value={openingCash} onChange={(event) => setOpeningCash(event.target.value)} className="mt-1 block h-10 w-full rounded-md border border-slate-300 bg-white px-3" />
         </label>
         <label className="text-sm font-medium text-slate-700">
           Preview counted cash (₹)
-          <input type="number" min="0" step="0.01" value={countedCash} onChange={(event) => setCountedCash(event.target.value)} placeholder="Enter drawer count" className="mt-1 block h-10 w-full rounded-md border border-slate-300 bg-white px-3" />
+          <input type="number" min="0" max="1000000000" step="0.01" value={countedCash} onChange={(event) => setCountedCash(event.target.value)} placeholder="Enter drawer count" className="mt-1 block h-10 w-full rounded-md border border-slate-300 bg-white px-3" />
         </label>
         <div className="rounded-lg bg-white p-3">
           <p className="text-xs text-slate-500">Expected cash</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{currency.format(values.expected)}</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{currency.format(values.expected / 100)}</p>
         </div>
         <div className="rounded-lg bg-white p-3">
           <p className="text-xs text-slate-500">Cash variance</p>
           <p className={`mt-1 text-xl font-semibold tabular-nums ${values.variance === null ? "text-slate-400" : values.variance === 0 ? "text-emerald-700" : "text-rose-700"}`}>
-            {values.variance === null ? "Enter counted cash" : currency.format(values.variance)}
+            {values.variance === null ? "Enter counted cash" : currency.format(values.variance / 100)}
           </p>
         </div>
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {[
-          ["Cash collections", cashCollections],
-          ["Cash refunds", -cashRefunds],
-          ["Clinic cash expenses", -cashClinicExpenses],
-          ["Dentist cash payouts", -cashDentistPayouts],
-          ["Vendor cash payments", -cashVendorBillPayments],
+          ["Cash collections", toMinorUnits(cashCollections)],
+          ["Cash refunds", -toMinorUnits(cashRefunds)],
+          ["Clinic cash expenses", -toMinorUnits(cashClinicExpenses)],
+          ["Dentist cash payouts", -toMinorUnits(cashDentistPayouts)],
+          ["Vendor cash payments", -toMinorUnits(cashVendorBillPayments)],
           ["Total cash outflows", -values.expenses],
         ].map(([label, amount]) => (
           <div key={label} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
             <span className="text-slate-600">{label}</span>
-            <span className="font-semibold tabular-nums text-slate-900">{currency.format(Number(amount))}</span>
+            <span className="font-semibold tabular-nums text-slate-900">{currency.format(Number(amount) / 100)}</span>
           </div>
         ))}
       </div>
