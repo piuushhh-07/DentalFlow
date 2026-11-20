@@ -11,33 +11,26 @@ import {
   BillingAccessRestrictedError,
   BillingFeatureUnavailableError,
 } from "@/features/billing/lib/billing-entitlements";
+import {
+  assertCashRegisterNotClosed,
+  calculateCashbookReconciliation,
+  collectionNetMinor,
+  nextBusinessDate,
+  requireCashbookPaymentMethod,
+  startOfLocalDate,
+} from "@/features/finance/lib/cashbook-reconciliation";
+import { toMinorUnits } from "@/features/finance/lib/dentist-payouts";
 import { prisma } from "@/lib/db/prisma";
 
 const schema = z.object({
   clinicId: z.string().uuid(),
   businessDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  openingCash: z.coerce.number().finite().min(0).max(1_000_000_000),
-  countedCash: z.coerce.number().finite().min(0).max(1_000_000_000),
+  openingCash: z.string().regex(/^\d+(?:\.\d{1,2})?$/).transform(Number)
+    .refine((amount) => Number.isFinite(amount) && amount <= 1_000_000_000),
+  countedCash: z.string().regex(/^\d+(?:\.\d{1,2})?$/).transform(Number)
+    .refine((amount) => Number.isFinite(amount) && amount <= 1_000_000_000),
   notes: z.string().trim().max(1000).optional(),
 });
-
-function startOfLocalDate(date: string, timeZone: string): Date {
-  const desired = new Date(`${date}T00:00:00.000Z`).getTime();
-  let candidate = desired;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone, year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
-    }).formatToParts(new Date(candidate));
-    const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-    const represented = Date.UTC(
-      Number(values.year), Number(values.month) - 1, Number(values.day),
-      Number(values.hour), Number(values.minute), Number(values.second),
-    );
-    candidate += desired - represented;
-  }
-  return new Date(candidate);
-}
 
 function localDateInZone(timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -45,12 +38,6 @@ function localDateInZone(timeZone: string): string {
   }).formatToParts(new Date());
   const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
   return `${values.year}-${values.month}-${values.day}`;
-}
-
-function nextDate(date: string): string {
-  const value = new Date(`${date}T00:00:00.000Z`);
-  value.setUTCDate(value.getUTCDate() + 1);
-  return value.toISOString().slice(0, 10);
 }
 
 export async function closeCashRegister(formData: FormData): Promise<never> {
@@ -65,7 +52,8 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
 
   const membership = await requireClinicRole(parsed.data.clinicId, [ClinicRole.OWNER]);
   const businessDate = new Date(`${parsed.data.businessDate}T00:00:00.000Z`);
-  const nextBusinessDate = new Date(`${nextDate(parsed.data.businessDate)}T00:00:00.000Z`);
+  const nextDate = nextBusinessDate(parsed.data.businessDate);
+  const nextBusinessDateValue = new Date(`${nextDate}T00:00:00.000Z`);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -77,7 +65,7 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
         where: { clinicId_businessDate: { clinicId: membership.clinicId, businessDate } },
         select: { id: true },
       });
-      if (existing) throw new Error("CASH_REGISTER_ALREADY_CLOSED");
+      assertCashRegisterNotClosed(existing !== null);
 
       const clinic = await tx.clinic.findUnique({
         where: { id: membership.clinicId },
@@ -89,14 +77,18 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
       }
 
       const startAt = startOfLocalDate(parsed.data.businessDate, clinic.timeZone);
-      const endAt = startOfLocalDate(nextDate(parsed.data.businessDate), clinic.timeZone);
-      const [entries, expenses, dentistPayoutPayments] = await Promise.all([
+      const endAt = startOfLocalDate(nextDate, clinic.timeZone);
+      const [entries, expenses, dentistPayoutPayments, vendorBillPayments] = await Promise.all([
         tx.treatmentFinancialEntry.findMany({
-          where: { clinicId: membership.clinicId, paidAt: { gte: startAt, lt: endAt } },
+          where: {
+            clinicId: membership.clinicId,
+            entryType: { in: [FinancialEntryType.PAYMENT, FinancialEntryType.REFUND] },
+            paidAt: { gte: startAt, lt: endAt },
+          },
           select: { entryType: true, paymentMethod: true, amount: true },
         }),
         tx.clinicExpense.findMany({
-          where: { clinicId: membership.clinicId, expenseDate: { gte: businessDate, lt: nextBusinessDate } },
+          where: { clinicId: membership.clinicId, expenseDate: { gte: businessDate, lt: nextBusinessDateValue } },
           select: { paymentMethod: true, amount: true },
         }),
         tx.dentistPayoutPayment.findMany({
@@ -107,38 +99,56 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
           },
           select: { amount: true },
         }),
+        tx.vendorBillPayment.findMany({
+          where: {
+            clinicId: membership.clinicId,
+            paymentMethod: PaymentMethod.CASH,
+            paidAt: { gte: startAt, lt: endAt },
+          },
+          select: { paymentMethod: true, amount: true },
+        }),
       ]);
 
-      const zero = new Prisma.Decimal(0);
-      const sumEntries = (method: PaymentMethod, type: FinancialEntryType) =>
-        entries.filter((entry) => entry.paymentMethod === method && entry.entryType === type)
-          .reduce((sum, entry) => sum.plus(entry.amount), zero);
-      const cashCollections = sumEntries(PaymentMethod.CASH, FinancialEntryType.PAYMENT);
-      const cashRefunds = sumEntries(PaymentMethod.CASH, FinancialEntryType.REFUND);
-      const recordedCashExpenses = expenses.filter((expense) => expense.paymentMethod === PaymentMethod.CASH)
-        .reduce((sum, expense) => sum.plus(expense.amount), zero);
-      const cashDentistPayouts = dentistPayoutPayments
-        .reduce((sum, payment) => sum.plus(payment.amount), zero);
-      const cashExpenses = recordedCashExpenses.plus(cashDentistPayouts);
-      const openingCash = new Prisma.Decimal(parsed.data.openingCash);
-      const countedCash = new Prisma.Decimal(parsed.data.countedCash);
-      const expectedCash = openingCash.plus(cashCollections).minus(cashRefunds).minus(cashExpenses);
-
+      const cashEntries = entries.map((entry) => ({
+        entryType: entry.entryType,
+        paymentMethod: requireCashbookPaymentMethod(entry.paymentMethod),
+        amountMinor: toMinorUnits(entry.amount.toString()),
+      }));
+      const openingCashMinor = toMinorUnits(parsed.data.openingCash);
+      const countedCashMinor = toMinorUnits(parsed.data.countedCash);
+      const reconciliation = calculateCashbookReconciliation({
+        openingCashMinor,
+        countedCashMinor,
+        entries: cashEntries,
+        clinicExpenses: expenses.map((expense) => ({
+          paymentMethod: expense.paymentMethod,
+          amountMinor: toMinorUnits(expense.amount.toString()),
+        })),
+        dentistPayouts: dentistPayoutPayments.map((payment) => ({
+          paymentMethod: PaymentMethod.CASH,
+          amountMinor: toMinorUnits(payment.amount.toString()),
+        })),
+        vendorBillPayments: vendorBillPayments.map((payment) => ({
+          paymentMethod: payment.paymentMethod,
+          amountMinor: toMinorUnits(payment.amount.toString()),
+        })),
+      });
+      const toDecimal = (minorUnits: number) => new Prisma.Decimal(minorUnits).dividedBy(100);
       const collectionFor = (method: PaymentMethod) =>
-        sumEntries(method, FinancialEntryType.PAYMENT).minus(sumEntries(method, FinancialEntryType.REFUND));
+        toDecimal(collectionNetMinor(cashEntries, method));
 
       await tx.cashRegisterClose.create({
         data: {
           clinicId: membership.clinicId,
           closedByUserId: membership.userId,
           businessDate,
-          openingCash,
-          cashCollections,
-          cashRefunds,
-          cashExpenses,
-          expectedCash,
-          countedCash,
-          cashVariance: countedCash.minus(expectedCash),
+          openingCash: toDecimal(openingCashMinor),
+          cashCollections: toDecimal(reconciliation.cashCollections),
+          cashRefunds: toDecimal(reconciliation.cashRefunds),
+          cashExpenses: toDecimal(reconciliation.cashExpenses),
+          expectedCash: toDecimal(reconciliation.expectedCash),
+          countedCash: toDecimal(countedCashMinor),
+          cashVariance: toDecimal(reconciliation.cashVariance),
           upiCollections: collectionFor(PaymentMethod.UPI),
           cardCollections: collectionFor(PaymentMethod.CARD),
           bankTransferCollections: collectionFor(PaymentMethod.BANK_TRANSFER),
@@ -159,6 +169,9 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
     }
     if (error instanceof Error && error.message === "CASH_REGISTER_FUTURE_DATE") {
       redirect(`/clinic/${membership.clinicId}/finance/cashbook?status=future-date`);
+    }
+    if (error instanceof Error && error.message === "CASHBOOK_ENTRY_MISSING_PAYMENT_METHOD") {
+      redirect(`/clinic/${membership.clinicId}/finance/cashbook?status=unclassified-treatment-entry`);
     }
     console.error("Cash register close failed", {
       errorName: error instanceof Error ? error.name : "UnknownError",

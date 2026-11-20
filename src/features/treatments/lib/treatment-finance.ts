@@ -479,7 +479,8 @@ async function createTreatmentPlanFinancialEntryInTransaction(
             createdByUserId,
             entryType: input.entryType,
             paymentMethod:
-              input.entryType === FinancialEntryType.PAYMENT
+              input.entryType === FinancialEntryType.PAYMENT ||
+              input.entryType === FinancialEntryType.REFUND
                 ? (input.paymentMethod ?? PaymentMethod.OTHER)
                 : null,
             amount,
