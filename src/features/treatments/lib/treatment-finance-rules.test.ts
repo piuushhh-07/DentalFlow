@@ -40,6 +40,25 @@ test("treatment finance validation requires reasons and valid precision", () => 
     requestKey,
   });
   assert.equal(validPayment.success, true);
+
+  const missingRefundMethod = treatmentFinancialEntrySchema.safeParse({
+    entryType: "REFUND",
+    amount: "10.00",
+    notes: "Refund approved by clinic owner",
+    paidAt: "2026-10-18",
+    requestKey,
+  });
+  assert.equal(missingRefundMethod.success, false);
+
+  const validCashRefund = treatmentFinancialEntrySchema.safeParse({
+    entryType: "REFUND",
+    amount: "10.00",
+    paymentMethod: "CASH",
+    notes: "Refund approved by clinic owner",
+    paidAt: "2026-10-18",
+    requestKey,
+  });
+  assert.equal(validCashRefund.success, true);
 });
 
 test("percentage discounts use decimal precision and cap the remaining amount", () => {
@@ -98,6 +117,7 @@ test("financial idempotency hashes include payment references and audit reasons"
   const base = treatmentFinancialEntrySchema.parse({
     entryType: "REFUND",
     amount: "25.00",
+    paymentMethod: "CASH",
     notes: "Refund approved by clinic owner",
     reference: "UPI-REF-100",
     paidAt: "2026-11-14T10:00:00.000Z",

@@ -47,13 +47,14 @@ export const treatmentFinancialEntrySchema = z
       });
     }
     if (
-      input.entryType === FinancialEntryType.PAYMENT &&
+      (input.entryType === FinancialEntryType.PAYMENT ||
+        input.entryType === FinancialEntryType.REFUND) &&
       !input.paymentMethod
     ) {
       context.addIssue({
         code: "custom",
         path: ["paymentMethod"],
-        message: "Choose a payment method.",
+        message: "Choose a payment method for this entry.",
       });
     }
     if (

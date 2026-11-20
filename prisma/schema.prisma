@@ -2250,6 +2250,7 @@ model VendorBillPayment {
   clinicId         String           @db.Uuid
   billId           String           @db.Uuid
   recordedByUserId String           @db.Uuid
+  idempotencyKey   String?          @db.Uuid
   amount            Decimal          @db.Decimal(12, 2)
   paymentMethod     PaymentMethod
   paidAt            DateTime         @default(now()) @db.Timestamptz(6)
@@ -2262,5 +2263,6 @@ model VendorBillPayment {
 
   @@index([clinicId, paidAt])
   @@index([billId, clinicId, paidAt])
+  @@unique([clinicId, idempotencyKey])
   @@map("vendor_bill_payments")
 }

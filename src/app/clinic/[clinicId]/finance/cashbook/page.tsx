@@ -29,6 +29,7 @@ const messages: Record<string, string> = {
   closed: "Day closed. The cash count and reconciliation snapshot have been saved.",
   "already-closed": "A cash register close already exists for that business date. Closed days cannot be overwritten.",
   "future-date": "A future business date cannot be closed.",
+  "unclassified-treatment-entry": "A treatment payment or refund in this business date has no payment method. Review the ledger entry before closing so cash is not guessed.",
   "upgrade-required": "Cash register management is not included in your current plan.",
   "subscription-restricted": "Your clinic subscription currently restricts finance changes.",
   error: "We couldn't close the cash register. Please check the details and try again.",
@@ -79,7 +80,7 @@ export default async function CashbookPage({
           <p className="text-sm font-medium text-teal-700">{clinic.name}</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Daily cashbook</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Reconcile the physical cash drawer against recorded patient payments, refunds and cash expenses.
+            Reconcile the physical cash drawer against recorded patient payments, refunds, clinic expenses, dentist payouts and cash vendor-bill payments.
             UPI, card and bank collections are shown separately. This is an operational cash close, not a bank statement reconciliation.
           </p>
         </header>
@@ -93,7 +94,7 @@ export default async function CashbookPage({
         {canClose ? (
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">Close a business day</h2>
-            <p className="mt-1 text-sm text-slate-600">The system calculates expected cash from the existing treatment ledger and cash expenses. Closing is one-time and cannot be edited.</p>
+            <p className="mt-1 text-sm text-slate-600">The system calculates expected cash from the treatment ledger and cash outflows paid in cash. UPI, card and bank collections are reported separately. Closing is one-time and cannot be edited.</p>
             <form action={closeCashRegister} className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <input type="hidden" name="clinicId" value={membership.clinicId} />
               <label className="text-sm font-medium text-slate-700">Business date

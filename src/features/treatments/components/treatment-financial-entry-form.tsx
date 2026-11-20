@@ -96,10 +96,10 @@ export function TreatmentFinancialEntryForm({
           type="number"
         />
       </label>
-      {entryType === "PAYMENT" ? (
+      {entryType === "PAYMENT" || entryType === "REFUND" ? (
         <>
           <label className="space-y-2 text-sm font-medium text-slate-700">
-            Payment method
+            {entryType === "REFUND" ? "Refund method" : "Payment method"}
             <select
               className="h-10 w-full rounded-md border border-input bg-white px-3"
               name="paymentMethod"
@@ -111,16 +111,18 @@ export function TreatmentFinancialEntryForm({
               ))}
             </select>
           </label>
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Payment date
-            <input
-              className="h-10 w-full rounded-md border border-input bg-white px-3"
-              defaultValue={today}
-              name="paidAt"
-              required
-              type="date"
-            />
-          </label>
+          {entryType === "PAYMENT" ? (
+            <label className="space-y-2 text-sm font-medium text-slate-700">
+              Payment date
+              <input
+                className="h-10 w-full rounded-md border border-input bg-white px-3"
+                defaultValue={today}
+                name="paidAt"
+                required
+                type="date"
+              />
+            </label>
+          ) : null}
         </>
       ) : (
         <input name="paidAt" type="hidden" value={`${today}T12:00:00.000Z`} />

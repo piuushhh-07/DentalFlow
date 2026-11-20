@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { randomUUID } from "node:crypto";
 import { PaymentMethod, VendorBillStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ClinicAccessDeniedError } from "@/features/auth/lib/authorization";
 import { requireClinicMembership } from "@/features/auth/lib/server-auth";
+import { toMinorUnits } from "@/features/finance/lib/dentist-payouts";
+import { getVendorBillStatus } from "@/features/finance/lib/vendor-bill-rules";
 import { recordVendorBillPayment, createVendorBill } from "@/features/finance/payables-actions";
 import { prisma } from "@/lib/db/prisma";
 
@@ -21,7 +24,9 @@ function todayInZone(timeZone: string): string {
 const statusMessages: Record<string, string> = {
   created: "Vendor bill saved.",
   "payment-recorded": "Payment recorded and outstanding balance updated.",
+  "payment-duplicate": "This payment submission was already recorded.",
   overpayment: "That payment exceeds the remaining bill balance.",
+  "void-bill": "Payments cannot be recorded against a void bill.",
   "upgrade-required": "Payables management is not included in your current plan.",
   "subscription-restricted": "Your subscription currently restricts finance changes.",
   error: "We couldn't save the vendor bill.",
@@ -63,10 +68,22 @@ export default async function PayablesPage({
   const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: clinic.timeZone });
   const todayDate = new Date(`${today}T00:00:00.000Z`);
   const rows = bills.map((bill) => {
-    const paid = bill.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-    const balance = Math.max(0, Number(bill.amount) - paid);
+    const paidMinor = bill.payments.reduce(
+      (sum, payment) => sum + toMinorUnits(payment.amount.toString()),
+      0,
+    );
+    const totalMinor = toMinorUnits(bill.amount.toString());
+    const paid = paidMinor / 100;
+    const balance = Math.max(0, totalMinor - paidMinor) / 100;
     const daysOverdue = balance > 0 ? Math.max(0, Math.floor((todayDate.getTime() - bill.dueDate.getTime()) / 86400000)) : 0;
-    return { ...bill, paid, balance, daysOverdue };
+    return {
+      ...bill,
+      status: getVendorBillStatus(totalMinor, paidMinor),
+      paid,
+      balance,
+      daysOverdue,
+      idempotencyKey: randomUUID(),
+    };
   });
   const openRows = rows.filter((bill) => bill.balance > 0);
   const totalOutstanding = openRows.reduce((sum, bill) => sum + bill.balance, 0);
@@ -181,6 +198,7 @@ export default async function PayablesPage({
                     <form action={recordVendorBillPayment} className="grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-5">
                       <input type="hidden" name="clinicId" value={membership.clinicId} />
                       <input type="hidden" name="billId" value={bill.id} />
+                      <input type="hidden" name="idempotencyKey" value={bill.idempotencyKey} />
                       <label className="text-xs font-medium text-slate-600">Payment (₹)
                         <input required type="number" name="amount" min="0.01" max={bill.balance.toFixed(2)} step="0.01" className="mt-1 block h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm" />
                       </label>
