@@ -1885,6 +1885,40 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         AppointmentRequestStatus.PENDING,
         "A cross-clinic approval attempt must leave the request pending.",
       );
+      const appointmentThatTookTheSlot = await prisma.appointment.create({
+        data: {
+          clinicId: clinicAId,
+          patientId: patientA.id,
+          scheduledAt: new Date(`${appointmentDate}T13:00:00.000+05:30`),
+          durationMinutes: 30,
+          dentistId: resourceTestDentist.id,
+          chairId: resourceTestChair.id,
+          dentistName: resourceTestDentist.name,
+          chairLabel: resourceTestChair.label,
+          type: "Synthetic appointment taking pending slot",
+          notes: "Synthetic conflict fixture.",
+        },
+        select: { id: true },
+      });
+      await assert.rejects(
+        approveAppointmentRequest(clinicAId, approvableBookingRequest.id),
+        AppointmentConflictError,
+        "Approval must re-check resource availability because the slot may have been booked after the request was submitted.",
+      );
+      assert.equal(
+        (
+          await freshReader.appointmentRequest.findUniqueOrThrow({
+            where: { id: approvableBookingRequest.id },
+            select: { status: true },
+          })
+        ).status,
+        AppointmentRequestStatus.PENDING,
+        "A conflicting approval must leave the request pending.",
+      );
+      await prisma.appointment.delete({
+        where: { id: appointmentThatTookTheSlot.id },
+      });
+
       const approvedAppointment = await approveAppointmentRequest(
         clinicAId,
         approvableBookingRequest.id,
