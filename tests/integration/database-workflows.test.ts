@@ -1898,6 +1898,40 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         userAId,
         paymentInput,
       );
+
+      const paymentRetry = await createTreatmentPlanFinancialEntry(
+        clinicAId,
+        patientA.id,
+        plan.id,
+        userAId,
+        paymentInput,
+      );
+      assert.equal(
+        paymentRetry.id,
+        payment.id,
+        "Retrying the same payment request must return the original ledger entry.",
+      );
+      assert.equal(
+        paymentRetry.receiptNumber,
+        payment.receiptNumber,
+        "An idempotent payment retry must preserve the original receipt number.",
+      );
+
+      const conflictingPaymentRetry = treatmentFinancialEntrySchema.parse({
+        ...paymentInput,
+        amount: "1600.00",
+      });
+      await assert.rejects(
+        createTreatmentPlanFinancialEntry(
+          clinicAId,
+          patientA.id,
+          plan.id,
+          userAId,
+          conflictingPaymentRetry,
+        ),
+        /submission key has already been used/,
+        "Reusing a payment request key with changed details must be rejected.",
+      );
       for (const supabase of [supabaseA, supabaseB]) {
         const { data, error } = await supabase
           .from("treatment_financial_entries")
