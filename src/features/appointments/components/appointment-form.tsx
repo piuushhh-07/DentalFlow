@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFormState } from "react-dom";
 
 import {
@@ -65,6 +66,12 @@ export function AppointmentForm({
 }: AppointmentFormProps) {
   const action = initial ? updateAppointmentAction : createAppointmentAction;
   const [state, formAction] = useFormState(action, initialState);
+  const [selectedPatientId, setSelectedPatientId] = useState(
+    initial?.patientId ?? "",
+  );
+  const [selectedVisitId, setSelectedVisitId] = useState(
+    initial?.treatmentVisitId ?? "",
+  );
   const patientNames = new Map(
     patients.map((patient) => [patient.id, patient.fullName]),
   );
@@ -110,7 +117,11 @@ export function AppointmentForm({
             Patient
             <select
               className={`${inputClass} mt-1`}
-              defaultValue={initial?.patientId ?? ""}
+              onChange={(event) => {
+                setSelectedPatientId(event.target.value);
+                setSelectedVisitId("");
+              }}
+              value={selectedPatientId}
               name="patientId"
               required
             >
@@ -128,11 +139,14 @@ export function AppointmentForm({
             Linked treatment visit (optional)
             <select
               className={`${inputClass} mt-1`}
-              defaultValue={initial?.treatmentVisitId ?? ""}
+              onChange={(event) => setSelectedVisitId(event.target.value)}
+              value={selectedVisitId}
               name="treatmentVisitId"
             >
               <option value="">No linked visit</option>
-              {visits.map((visit) => (
+              {visits
+                .filter((visit) => visit.patientId === selectedPatientId)
+                .map((visit) => (
                 <option key={visit.id} value={visit.id}>
                   {patientNames.get(visit.patientId) ?? "Patient"} ·{" "}
                   {visit.treatmentPlan.name} · Visit {visit.visitNumber}
