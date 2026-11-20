@@ -1717,6 +1717,41 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       );
       assert.ok(resourceBooking.id && adjacentResourceBooking.id);
 
+      await assert.rejects(
+        updateClinicAppointment(clinicAId, appointment.id, {
+          ...appointmentInput,
+          treatmentVisitId: null,
+          time: "10:15",
+          chairId: resourceTestChair.id,
+        }),
+        AppointmentConflictError,
+        "Rescheduling must reject a dentist conflict even when the chair changes.",
+      );
+      await assert.rejects(
+        updateClinicAppointment(clinicAId, appointment.id, {
+          ...appointmentInput,
+          treatmentVisitId: null,
+          time: "10:15",
+          dentistId: resourceTestDentist.id,
+        }),
+        AppointmentConflictError,
+        "Rescheduling must reject a chair conflict even when the dentist changes.",
+      );
+      const appointmentAfterRejectedReschedules =
+        await freshReader.appointment.findFirstOrThrow({
+          where: { id: appointment.id, clinicId: clinicAId },
+          select: { scheduledAt: true, treatmentVisitId: true },
+        });
+      assert.equal(
+        appointmentAfterRejectedReschedules.scheduledAt.toISOString(),
+        new Date(`${appointmentDate}T23:00:00.000+05:30`).toISOString(),
+        "A rejected reschedule must leave the original appointment time unchanged.",
+      );
+      assert.equal(
+        appointmentAfterRejectedReschedules.treatmentVisitId,
+        persistedPlan.visits[0].id,
+      );
+
       const concurrentBookingInputs = [
         {
           ...appointmentInput,
