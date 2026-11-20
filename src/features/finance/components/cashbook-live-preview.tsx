@@ -62,7 +62,7 @@ export function CashbookLivePreview({
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">Live reconciliation preview</p>
           <h2 className="mt-1 text-lg font-semibold text-slate-900">Today · {businessDate}</h2>
-          <p className="mt-1 text-sm text-slate-600">Today's ledger figures only. These preview inputs do not populate the close form below; repeat the values there when saving. Nothing is saved here.</p>
+          <p className="mt-1 text-sm text-slate-600">Today&apos;s ledger figures only. These preview inputs do not populate the close form below; repeat the values there when saving. Nothing is saved here.</p>
         </div>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-teal-800">Read-only ledger data</span>
       </div>
