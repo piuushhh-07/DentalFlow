@@ -30,8 +30,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   AppointmentConflictError,
   AppointmentPatientNotFoundError,
+  AppointmentRequestConflictError,
+  AppointmentRequestRateLimitError,
   AppointmentRequestNotFoundError,
   approveAppointmentRequest,
+  createPublicAppointmentRequest,
   AppointmentVisitAlreadyScheduledError,
   AppointmentVisitNotFoundError,
   createClinicAppointment,
@@ -1720,6 +1723,97 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         },
       );
       assert.ok(resourceBooking.id && adjacentResourceBooking.id);
+
+      const publicBookingPlan = await prisma.billingPlanVersion.create({
+        data: {
+          code: `public-booking-integration-${randomUUID()}`,
+          version: 1,
+          displayName: `${marker} Public Booking Plan`,
+          currency: "INR",
+          amountMinor: 50000,
+          interval: BillingInterval.MONTH,
+          intervalCount: 1,
+          totalBillingCycles: 12,
+          trialDays: 0,
+          graceDays: 7,
+          entitlements: { features: { publicBooking: true } },
+          providerPlanId: `plan_${randomUUID().replaceAll("-", "")}`,
+        },
+      });
+      await prisma.clinicSubscription.create({
+        data: {
+          clinicId: clinicAId,
+          planVersionId: publicBookingPlan.id,
+          status: BillingSubscriptionStatus.ACTIVE,
+          currentPeriodStart: new Date(Date.now() - 60_000),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60_000),
+        },
+      });
+
+      const publicBookingInput = {
+        patientName: `${marker} Public booking`,
+        phoneNumber: syntheticPhone(),
+        requestedAt: new Date(`${appointmentDate}T14:00:00.000+05:30`),
+        dentistId: resourceTestDentist.id,
+        chairId: resourceTestChair.id,
+        notes: "Synthetic public booking submission.",
+      };
+      const firstPublicBooking = await createPublicAppointmentRequest(
+        clinicAId,
+        publicBookingInput,
+      );
+      const retriedPublicBooking = await createPublicAppointmentRequest(
+        clinicAId,
+        publicBookingInput,
+      );
+      assert.deepEqual(
+        retriedPublicBooking,
+        firstPublicBooking,
+        "An identical public submission must return the original pending request.",
+      );
+      assert.equal(
+        (
+          await freshReader.appointmentRequest.findUniqueOrThrow({
+            where: { id: firstPublicBooking.id },
+            select: { status: true },
+          })
+        ).status,
+        AppointmentRequestStatus.PENDING,
+      );
+
+      await assert.rejects(
+        createPublicAppointmentRequest(clinicAId, {
+          ...publicBookingInput,
+          patientName: `${marker} Conflicting public booking`,
+          phoneNumber: syntheticPhone(),
+        }),
+        AppointmentRequestConflictError,
+        "A pending request must block an overlapping request for the same dentist and chair.",
+      );
+
+      const rateLimitedPhone = syntheticPhone();
+      for (const hour of [15, 16, 17]) {
+        await createPublicAppointmentRequest(clinicAId, {
+          ...publicBookingInput,
+          patientName: `${marker} Rate-limit request ${hour}`,
+          phoneNumber: rateLimitedPhone,
+          requestedAt: new Date(
+            `${appointmentDate}T${String(hour).padStart(2, "0")}:00:00.000+05:30`,
+          ),
+        });
+      }
+      await assert.rejects(
+        createPublicAppointmentRequest(clinicAId, {
+          ...publicBookingInput,
+          patientName: `${marker} Rate-limit overflow`,
+          phoneNumber: rateLimitedPhone,
+          requestedAt: new Date(
+            `${appointmentDate}T18:00:00.000+05:30`,
+          ),
+        }),
+        AppointmentRequestRateLimitError,
+        "A phone number must be rate-limited after three requests in the configured window.",
+      );
 
       const pendingBookingRequest = await freshReader.appointmentRequest.create({
         data: {
