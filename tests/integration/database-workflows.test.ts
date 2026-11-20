@@ -30,6 +30,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   AppointmentConflictError,
   AppointmentPatientNotFoundError,
+  AppointmentRequestNotFoundError,
   AppointmentVisitAlreadyScheduledError,
   AppointmentVisitNotFoundError,
   createClinicAppointment,
