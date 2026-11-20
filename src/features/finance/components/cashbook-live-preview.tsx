@@ -62,7 +62,7 @@ export function CashbookLivePreview({
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">Live reconciliation preview</p>
           <h2 className="mt-1 text-lg font-semibold text-slate-900">Today · {businessDate}</h2>
-          <p className="mt-1 text-sm text-slate-600">Updates as you enter opening and counted cash. Nothing is saved by this preview.</p>
+          <p className="mt-1 text-sm text-slate-600">Today's ledger figures only. These preview inputs do not populate the close form below; repeat the values there when saving. Nothing is saved here.</p>
         </div>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-teal-800">Read-only ledger data</span>
       </div>
@@ -75,11 +75,11 @@ export function CashbookLivePreview({
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <label className="text-sm font-medium text-slate-700">
-          Opening cash (₹)
+          Preview opening cash (₹)
           <input type="number" min="0" step="0.01" value={openingCash} onChange={(event) => setOpeningCash(event.target.value)} className="mt-1 block h-10 w-full rounded-md border border-slate-300 bg-white px-3" />
         </label>
         <label className="text-sm font-medium text-slate-700">
-          Counted cash (₹)
+          Preview counted cash (₹)
           <input type="number" min="0" step="0.01" value={countedCash} onChange={(event) => setCountedCash(event.target.value)} placeholder="Enter drawer count" className="mt-1 block h-10 w-full rounded-md border border-slate-300 bg-white px-3" />
         </label>
         <div className="rounded-lg bg-white p-3">
