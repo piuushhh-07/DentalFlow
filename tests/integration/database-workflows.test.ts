@@ -31,6 +31,7 @@ import {
   AppointmentConflictError,
   AppointmentPatientNotFoundError,
   AppointmentRequestNotFoundError,
+  approveAppointmentRequest,
   AppointmentVisitAlreadyScheduledError,
   AppointmentVisitNotFoundError,
   createClinicAppointment,
@@ -1758,6 +1759,66 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         rejectAppointmentRequest(clinicAId, pendingBookingRequest.id),
         AppointmentRequestNotFoundError,
         "A handled booking request cannot be rejected a second time.",
+      );
+
+      const approvableBookingRequest =
+        await freshReader.appointmentRequest.create({
+          data: {
+            clinicId: clinicAId,
+            patientName: `${marker} Public booking approval`,
+            phoneNumber: syntheticPhone(),
+            requestedAt: new Date(`${appointmentDate}T13:00:00.000+05:30`),
+            durationMinutes: 30,
+            type: "Consultation",
+            dentistId: resourceTestDentist.id,
+            chairId: resourceTestChair.id,
+            notes: "Synthetic public booking approval request.",
+          },
+          select: { id: true },
+        });
+      await assert.rejects(
+        approveAppointmentRequest(clinicBId, approvableBookingRequest.id),
+        AppointmentRequestNotFoundError,
+        "A different clinic must not approve this booking request.",
+      );
+      assert.equal(
+        (
+          await freshReader.appointmentRequest.findUniqueOrThrow({
+            where: { id: approvableBookingRequest.id },
+            select: { status: true },
+          })
+        ).status,
+        AppointmentRequestStatus.PENDING,
+        "A cross-clinic approval attempt must leave the request pending.",
+      );
+      const approvedAppointment = await approveAppointmentRequest(
+        clinicAId,
+        approvableBookingRequest.id,
+      );
+      assert.ok(approvedAppointment.id);
+      assert.equal(
+        (
+          await freshReader.appointmentRequest.findUniqueOrThrow({
+            where: { id: approvableBookingRequest.id },
+            select: { status: true },
+          })
+        ).status,
+        AppointmentRequestStatus.APPROVED,
+      );
+      assert.ok(
+        await freshReader.appointment.findFirst({
+          where: {
+            id: approvedAppointment.id,
+            clinicId: clinicAId,
+          },
+          select: { id: true, patientId: true },
+        }),
+        "Approval must create an appointment inside the owning clinic.",
+      );
+      await assert.rejects(
+        approveAppointmentRequest(clinicAId, approvableBookingRequest.id),
+        AppointmentRequestNotFoundError,
+        "An already-approved booking request cannot be approved twice.",
       );
 
       await assert.rejects(
