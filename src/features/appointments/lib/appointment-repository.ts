@@ -178,8 +178,11 @@ async function lockAppointmentResources(
 ): Promise<void> {
   const lockKeys = getAppointmentResourceLockKeys(clinicId, dentistId, chairId);
   for (const lockKey of lockKeys) {
+    // Prisma cannot deserialize PostgreSQL's `void` return value from
+    // pg_advisory_xact_lock. Return a supported boolean while still acquiring
+    // the transaction-scoped lock.
     await transaction.$queryRaw`
-      SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
+      SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0)) IS NULL
     `;
   }
 }
