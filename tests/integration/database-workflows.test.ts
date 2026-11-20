@@ -1779,6 +1779,107 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "Exactly one active appointment may persist for the concurrently requested resource slot.",
       );
 
+
+      const concurrentDentistOnlyInputs = [
+        {
+          ...appointmentInput,
+          treatmentVisitId: null,
+          time: "11:30",
+          dentistId: dentist.id,
+          chairId: chair.id,
+        },
+        {
+          ...appointmentInput,
+          treatmentVisitId: null,
+          time: "11:30",
+          dentistId: dentist.id,
+          chairId: resourceTestChair.id,
+        },
+      ];
+      const concurrentDentistOnlyBookings = await Promise.allSettled(
+        concurrentDentistOnlyInputs.map((input) =>
+          createClinicAppointment(clinicAId, input),
+        ),
+      );
+      assert.equal(
+        concurrentDentistOnlyBookings.filter(
+          (result) => result.status === "fulfilled",
+        ).length,
+        1,
+        "Concurrent appointments sharing only a dentist must not overlap.",
+      );
+      const dentistOnlyFailure = concurrentDentistOnlyBookings.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected",
+      );
+      assert.ok(dentistOnlyFailure);
+      assert.ok(
+        dentistOnlyFailure.reason instanceof AppointmentConflictError,
+        "The losing dentist-only booking must report an appointment conflict.",
+      );
+      const dentistOnlySlot = await freshReader.appointment.findMany({
+        where: {
+          clinicId: clinicAId,
+          dentistId: dentist.id,
+          scheduledAt: new Date(`${appointmentDate}T11:30:00.000+05:30`),
+          status: {
+            notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW],
+          },
+        },
+        select: { id: true },
+      });
+      assert.equal(dentistOnlySlot.length, 1);
+
+      const concurrentChairOnlyInputs = [
+        {
+          ...appointmentInput,
+          treatmentVisitId: null,
+          time: "12:00",
+          dentistId: dentist.id,
+          chairId: chair.id,
+        },
+        {
+          ...appointmentInput,
+          treatmentVisitId: null,
+          time: "12:00",
+          dentistId: resourceTestDentist.id,
+          chairId: chair.id,
+        },
+      ];
+      const concurrentChairOnlyBookings = await Promise.allSettled(
+        concurrentChairOnlyInputs.map((input) =>
+          createClinicAppointment(clinicAId, input),
+        ),
+      );
+      assert.equal(
+        concurrentChairOnlyBookings.filter(
+          (result) => result.status === "fulfilled",
+        ).length,
+        1,
+        "Concurrent appointments sharing only a chair must not overlap.",
+      );
+      const chairOnlyFailure = concurrentChairOnlyBookings.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected",
+      );
+      assert.ok(chairOnlyFailure);
+      assert.ok(
+        chairOnlyFailure.reason instanceof AppointmentConflictError,
+        "The losing chair-only booking must report an appointment conflict.",
+      );
+      const chairOnlySlot = await freshReader.appointment.findMany({
+        where: {
+          clinicId: clinicAId,
+          chairId: chair.id,
+          scheduledAt: new Date(`${appointmentDate}T12:00:00.000+05:30`),
+          status: {
+            notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW],
+          },
+        },
+        select: { id: true },
+      });
+      assert.equal(chairOnlySlot.length, 1);
+
       const publicBookingPlan = await prisma.billingPlanVersion.create({
         data: {
           code: `public-booking-integration-${randomUUID()}`,
