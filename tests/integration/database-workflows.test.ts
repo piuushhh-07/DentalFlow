@@ -1683,11 +1683,11 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
 
       const resourceTestDentist = await freshReader.clinicDentist.create({
         data: { clinicId: clinicAId, name: `${marker} Alternate Dentist` },
-        select: { id: true },
+        select: { id: true, name: true },
       });
       const resourceTestChair = await freshReader.treatmentChair.create({
         data: { clinicId: clinicAId, label: `${marker} Alternate Chair` },
-        select: { id: true },
+        select: { id: true, label: true },
       });
       const resourceBooking = await createClinicAppointment(clinicAId, {
         ...appointmentInput,
