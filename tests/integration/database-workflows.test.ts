@@ -8,6 +8,7 @@ import {
   InsuranceDocumentType,
   InsurancePreAuthorizationStatus,
   AppointmentStatus,
+  AppointmentRequestStatus,
   BillingInterval,
   BillingPaymentStatus,
   BillingSubscriptionStatus,
@@ -29,6 +30,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   AppointmentConflictError,
   AppointmentPatientNotFoundError,
+  AppointmentRequestNotFoundError,
   AppointmentVisitAlreadyScheduledError,
   AppointmentVisitNotFoundError,
   createClinicAppointment,
@@ -36,6 +38,7 @@ import {
   listClinicAppointments,
   updateClinicAppointment,
   updateClinicAppointmentStatus,
+  rejectAppointmentRequest,
 } from "@/features/appointments/lib/appointment-repository";
 import { createAppointmentSchema } from "@/features/appointments/lib/appointment-validation";
 import {
@@ -1716,6 +1719,46 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         },
       );
       assert.ok(resourceBooking.id && adjacentResourceBooking.id);
+
+      const pendingBookingRequest = await freshReader.appointmentRequest.create({
+        data: {
+          clinicId: clinicAId,
+          patientName: `${marker} Public booking rejection`,
+          phoneNumber: syntheticPhone(),
+          requestedAt: new Date(`${appointmentDate}T12:00:00.000+05:30`),
+          durationMinutes: 30,
+          type: "Consultation",
+          dentistId: resourceTestDentist.id,
+          chairId: resourceTestChair.id,
+          notes: "Synthetic public booking request.",
+        },
+        select: { id: true },
+      });
+      await assert.rejects(
+        rejectAppointmentRequest(clinicBId, pendingBookingRequest.id),
+        AppointmentRequestNotFoundError,
+        "A different clinic must not reject this booking request.",
+      );
+      assert.equal(
+        (await freshReader.appointmentRequest.findUniqueOrThrow({
+          where: { id: pendingBookingRequest.id },
+          select: { status: true },
+        })).status,
+        AppointmentRequestStatus.PENDING,
+      );
+      await rejectAppointmentRequest(clinicAId, pendingBookingRequest.id);
+      assert.equal(
+        (await freshReader.appointmentRequest.findUniqueOrThrow({
+          where: { id: pendingBookingRequest.id },
+          select: { status: true },
+        })).status,
+        AppointmentRequestStatus.REJECTED,
+      );
+      await assert.rejects(
+        rejectAppointmentRequest(clinicAId, pendingBookingRequest.id),
+        AppointmentRequestNotFoundError,
+        "A handled booking request cannot be rejected a second time.",
+      );
 
       await assert.rejects(
         updateClinicAppointment(clinicAId, appointment.id, {
