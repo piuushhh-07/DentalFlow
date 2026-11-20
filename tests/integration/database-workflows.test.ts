@@ -3164,6 +3164,41 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         staffMembership,
       );
 
+      const staffPatientInput = patientInputSchema.parse({
+        fullName: `${marker} Staff Workflow Patient`,
+        phoneNumber: syntheticPhone(),
+        whatsappOptIn: false,
+        notes: "Created by the synthetic STAFF workflow test.",
+      });
+      const staffPatient = await createClinicPatient(
+        verifiedStaffMembership.clinicId,
+        staffPatientInput,
+      );
+      assert.ok(
+        await updateClinicPatient(
+          verifiedStaffMembership.clinicId,
+          staffPatient.id,
+          patientInputSchema.parse({
+            ...staffPatientInput,
+            fullName: `${marker} Staff Workflow Patient Updated`,
+          }),
+        ),
+        "An active STAFF member must be able to update clinic patient records.",
+      );
+      const staffTreatmentPlan = await createClinicTreatmentPlan(
+        verifiedStaffMembership.clinicId,
+        staffPatient.id,
+        planInput,
+      );
+      assert.ok(
+        await getClinicTreatmentPlan(
+          verifiedStaffMembership.clinicId,
+          staffPatient.id,
+          staffTreatmentPlan.id,
+        ),
+        "An active STAFF member must be able to create and read treatment plans.",
+      );
+
       assert.equal(
         authorizeClinicRole(verifiedStaffMembership, [
           ClinicRole.OWNER,
