@@ -1674,6 +1674,49 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         AppointmentConflictError,
       );
 
+      const resourceTestDentist = await freshReader.clinicDentist.create({
+        data: { clinicId: clinicAId, name: `${marker} Alternate Dentist` },
+        select: { id: true },
+      });
+      const resourceTestChair = await freshReader.treatmentChair.create({
+        data: { clinicId: clinicAId, label: `${marker} Alternate Chair` },
+        select: { id: true },
+      });
+      const resourceBooking = await createClinicAppointment(clinicAId, {
+        ...appointmentInput,
+        treatmentVisitId: null,
+        time: "10:00",
+      });
+      await assert.rejects(
+        createClinicAppointment(clinicAId, {
+          ...appointmentInput,
+          treatmentVisitId: null,
+          time: "10:15",
+          chairId: resourceTestChair.id,
+        }),
+        AppointmentConflictError,
+        "A dentist cannot be double-booked even when another chair is selected.",
+      );
+      await assert.rejects(
+        createClinicAppointment(clinicAId, {
+          ...appointmentInput,
+          treatmentVisitId: null,
+          time: "10:15",
+          dentistId: resourceTestDentist.id,
+        }),
+        AppointmentConflictError,
+        "A chair cannot be double-booked even when another dentist is selected.",
+      );
+      const adjacentResourceBooking = await createClinicAppointment(
+        clinicAId,
+        {
+          ...appointmentInput,
+          treatmentVisitId: null,
+          time: "10:30",
+        },
+      );
+      assert.ok(resourceBooking.id && adjacentResourceBooking.id);
+
       const concurrentBookingInputs = [
         {
           ...appointmentInput,
