@@ -16,6 +16,7 @@ import {
   getAvailablePreAuthorizationTransitions,
   paymentInputSchema,
   validateClaimTransition,
+  validatePolicyReadinessForClaimSubmission,
   validatePreAuthorizationTransition,
 } from "@/features/insurance/lib/insurance-validation";
 import {
@@ -260,4 +261,42 @@ describe("insurance validation", () => {
       ClinicAccessDeniedError,
     );
   });
+  it("requires documented dental coverage before a claim can be submitted", () => {
+    assert.match(
+      validatePolicyReadinessForClaimSubmission({
+        dentalCoverageStatus: "NOT_VERIFIED",
+        policyWordingReference: null,
+      }) ?? "",
+      /verify dental coverage/i,
+    );
+    assert.match(
+      validatePolicyReadinessForClaimSubmission({
+        dentalCoverageStatus: "COVERED",
+        policyWordingReference: null,
+      }) ?? "",
+      /wording or customer information sheet reference/i,
+    );
+    assert.match(
+      validatePolicyReadinessForClaimSubmission({
+        dentalCoverageStatus: "EXCLUDED",
+        policyWordingReference: "CIS page 4, exclusions",
+      }) ?? "",
+      /exclude dental treatment/i,
+    );
+    assert.equal(
+      validatePolicyReadinessForClaimSubmission({
+        dentalCoverageStatus: "COVERED",
+        policyWordingReference: "Policy wording v3, section 5.2",
+      }),
+      null,
+    );
+    assert.equal(
+      validatePolicyReadinessForClaimSubmission({
+        dentalCoverageStatus: "ACCIDENT_ONLY",
+        policyWordingReference: "Policy wording, accidental injury clause",
+      }),
+      null,
+    );
+  });
+
 });

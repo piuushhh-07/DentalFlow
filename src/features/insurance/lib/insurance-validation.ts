@@ -439,3 +439,23 @@ export function getMissingDocumentCount(
     ({ status }) => status === "REQUIRED" || status === "REJECTED",
   ).length;
 }
+
+export type InsurancePolicyReadiness = Readonly<{
+  dentalCoverageStatus: string;
+  policyWordingReference: string | null;
+}>;
+
+export function validatePolicyReadinessForClaimSubmission(
+  policy: InsurancePolicyReadiness,
+): string | null {
+  if (policy.dentalCoverageStatus === "NOT_VERIFIED") {
+    return "Verify dental coverage against the policy wording or Customer Information Sheet before submitting this claim.";
+  }
+  if (policy.dentalCoverageStatus === "EXCLUDED") {
+    return "The recorded policy terms exclude dental treatment. Do not submit this as an eligible dental claim unless a documented applicable exception is confirmed.";
+  }
+  if (!policy.policyWordingReference?.trim()) {
+    return "Record the policy wording or Customer Information Sheet reference used to verify dental coverage before submitting.";
+  }
+  return null;
+}
