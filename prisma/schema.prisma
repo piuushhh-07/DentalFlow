@@ -1540,6 +1540,13 @@ model InsurancePolicy {
   patientId         String                      @db.Uuid
   providerId        String                      @db.Uuid
   policyNumber      String                      @db.VarChar(120)
+  productName       String?                     @db.VarChar(180)
+  uin               String?                     @db.VarChar(80)
+  dentalCoverageStatus String                   @default("NOT_VERIFIED") @db.VarChar(32)
+  policyWordingReference String?                @db.VarChar(500)
+  customerInformationSheetReceived Boolean      @default(false)
+  preExistingWaitingMonths Int?                 @db.SmallInt
+  specificWaitingMonths Int?                    @db.SmallInt
   memberReference   String?                     @db.VarChar(120)
   validFrom         DateTime                    @db.Date
   validUntil        DateTime                    @db.Date

@@ -79,7 +79,7 @@ export default async function InsurancePoliciesPage({
               Patient policies
             </h1>
             <p className="mt-2 text-sm text-slate-600">
-              Track policy periods and reference coverage information.
+              Review policy dates, product identifiers, dental coverage verification and waiting-period details from the actual policy documents.
             </p>
           </div>
           <Link
@@ -164,6 +164,12 @@ export default async function InsurancePoliciesPage({
                         {policy.provider.name} ·{" "}
                         {maskPolicyIdentifier(policy.policyNumber)}
                       </p>
+                      {policy.productName && (
+                        <p className="mt-1 text-sm text-slate-700">
+                          {policy.productName}
+                          {policy.uin ? ` · UIN ${policy.uin}` : ""}
+                        </p>
+                      )}
                       <p className="mt-1 text-xs text-slate-500">
                         {dateFormatter.format(policy.validFrom)} –{" "}
                         {dateFormatter.format(policy.validUntil)}
@@ -171,6 +177,39 @@ export default async function InsurancePoliciesPage({
                           ? ` · Limit ${amountFormatter.format(Number(policy.coverageLimit))}`
                           : ""}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <span className={`rounded-full px-2 py-1 font-medium ${
+                          policy.dentalCoverageStatus === "COVERED" || policy.dentalCoverageStatus === "OPD_ADDON"
+                            ? "bg-emerald-50 text-emerald-800"
+                            : policy.dentalCoverageStatus === "NOT_VERIFIED"
+                              ? "bg-amber-50 text-amber-800"
+                              : "bg-slate-100 text-slate-700"
+                        }`}>
+                          Dental: {policy.dentalCoverageStatus.replaceAll("_", " ").toLowerCase()}
+                        </span>
+                        <span className={`rounded-full px-2 py-1 font-medium ${
+                          policy.customerInformationSheetReceived
+                            ? "bg-emerald-50 text-emerald-800"
+                            : "bg-amber-50 text-amber-800"
+                        }`}>
+                          CIS {policy.customerInformationSheetReceived ? "recorded" : "not recorded"}
+                        </span>
+                        {policy.preExistingWaitingMonths !== null && (
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">
+                            PED wait: {policy.preExistingWaitingMonths} months
+                          </span>
+                        )}
+                        {policy.specificWaitingMonths !== null && (
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">
+                            Specific wait: {policy.specificWaitingMonths} months
+                          </span>
+                        )}
+                      </div>
+                      {policy.policyWordingReference && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Wording/CIS reference: {policy.policyWordingReference}
+                        </p>
+                      )}
                     </div>
                     <span
                       className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${

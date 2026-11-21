@@ -9,6 +9,7 @@ import {
   maskPolicyIdentifier,
   normalizeCurrencyAmount,
   positiveCurrencyAmountSchema,
+  policyInputSchema,
   decisionInputSchema,
   claimSearchSchema,
   getAvailableClaimTransitions,
@@ -37,6 +38,44 @@ const baseContext = {
 };
 
 describe("insurance validation", () => {
+  it("validates India-specific policy fields without assuming dental cover", () => {
+    const basePolicy = {
+      patientId: "20000000-0000-4000-8000-000000000001",
+      providerId: "30000000-0000-4000-8000-000000000001",
+      policyNumber: "POL-123",
+      productName: "Retail Health Policy",
+      uin: "IRDAI/HLT/123/2024",
+      dentalCoverageStatus: "NOT_VERIFIED",
+      policyWordingReference: "CIS page 2, exclusions clause",
+      customerInformationSheetReceived: true,
+      preExistingWaitingMonths: "36",
+      specificWaitingMonths: "24",
+      memberReference: "",
+      validFrom: "2026-01-01",
+      validUntil: "2026-12-31",
+      coverageLimit: "500000",
+      deductible: "",
+      coPaymentPercent: "",
+      exclusions: "",
+      coverageNotes: "",
+    };
+    assert.equal(policyInputSchema.safeParse(basePolicy).success, true);
+    assert.equal(
+      policyInputSchema.safeParse({
+        ...basePolicy,
+        preExistingWaitingMonths: "37",
+      }).success,
+      false,
+    );
+    assert.equal(
+      policyInputSchema.safeParse({
+        ...basePolicy,
+        dentalCoverageStatus: "AUTOMATICALLY_COVERED",
+      }).success,
+      false,
+    );
+  });
+
   it("normalizes rupee input to paise-safe decimal strings", () => {
     assert.equal(normalizeCurrencyAmount("125.5"), "125.50");
     assert.equal(amountToPaise("0.09"), BigInt(9));

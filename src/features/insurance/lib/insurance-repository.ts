@@ -491,6 +491,8 @@ export async function listInsurancePolicies(
                 patient: { fullName: { contains: query, mode: "insensitive" } },
               },
               { provider: { name: { contains: query, mode: "insensitive" } } },
+            { productName: { contains: query, mode: "insensitive" } },
+            { uin: { contains: query, mode: "insensitive" } },
             ],
           }
         : {}),
@@ -501,6 +503,13 @@ export async function listInsurancePolicies(
       id: true,
       patientId: true,
       policyNumber: true,
+      productName: true,
+      uin: true,
+      dentalCoverageStatus: true,
+      policyWordingReference: true,
+      customerInformationSheetReceived: true,
+      preExistingWaitingMonths: true,
+      specificWaitingMonths: true,
       validFrom: true,
       validUntil: true,
       coverageLimit: true,
@@ -526,6 +535,8 @@ export async function listInsurancePoliciesPage(
           OR: [
             { patient: { fullName: { contains: query, mode: "insensitive" } } },
             { provider: { name: { contains: query, mode: "insensitive" } } },
+            { productName: { contains: query, mode: "insensitive" } },
+            { uin: { contains: query, mode: "insensitive" } },
           ],
         }
       : {}),
@@ -542,6 +553,13 @@ export async function listInsurancePoliciesPage(
       id: true,
       patientId: true,
       policyNumber: true,
+      productName: true,
+      uin: true,
+      dentalCoverageStatus: true,
+      policyWordingReference: true,
+      customerInformationSheetReceived: true,
+      preExistingWaitingMonths: true,
+      specificWaitingMonths: true,
       validFrom: true,
       validUntil: true,
       coverageLimit: true,
@@ -571,6 +589,13 @@ export async function createInsurancePolicy(
     patientId: string;
     providerId: string;
     policyNumber: string;
+    productName: string | null;
+    uin: string | null;
+    dentalCoverageStatus: string;
+    policyWordingReference: string | null;
+    customerInformationSheetReceived: boolean;
+    preExistingWaitingMonths: number | null;
+    specificWaitingMonths: number | null;
     memberReference: string | null;
     validFrom: string;
     validUntil: string;
@@ -598,6 +623,13 @@ export async function createInsurancePolicy(
       patientId: patient.id,
       providerId: provider.id,
       policyNumber: input.policyNumber,
+      productName: input.productName,
+      uin: input.uin,
+      dentalCoverageStatus: input.dentalCoverageStatus,
+      policyWordingReference: input.policyWordingReference,
+      customerInformationSheetReceived: input.customerInformationSheetReceived,
+      preExistingWaitingMonths: input.preExistingWaitingMonths,
+      specificWaitingMonths: input.specificWaitingMonths,
       memberReference: input.memberReference,
       validFrom: databaseDate(input.validFrom),
       validUntil: databaseDate(input.validUntil),

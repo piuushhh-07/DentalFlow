@@ -105,6 +105,23 @@ export default async function InsuranceDashboardPage({
           current="Overview"
         />
 
+        <section className="my-6 rounded-xl border border-blue-200 bg-blue-50/70 p-5">
+          <h2 className="font-semibold text-slate-900">India policy compliance checklist</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-700">
+            Record the terms from the member&apos;s policy schedule and Customer Information Sheet (CIS).
+            These regulatory checkpoints do not establish that a dental procedure is covered.
+          </p>
+          <ul className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
+            <li><strong>Waiting periods:</strong> Pre-existing disease and specific waiting periods are capped at 36 months under the 2024 framework.</li>
+            <li><strong>Moratorium:</strong> 60 continuous months, subject to established fraud and the applicable sum-insured rules.</li>
+            <li><strong>Cashless authorisation:</strong> Insurer decision within 1 hour of receiving the request.</li>
+            <li><strong>Discharge authorisation:</strong> Final authorisation within 3 hours of receiving the request.</li>
+          </ul>
+          <a className="mt-3 inline-flex text-sm font-semibold text-blue-800 underline" href="https://irdai.gov.in/document-detail?documentId=4942918" rel="noreferrer" target="_blank">
+            IRDAI Master Circular on Health Insurance Business (29 May 2024)
+          </a>
+        </section>
+
         <section
           aria-label="Insurance dashboard metrics"
           className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
