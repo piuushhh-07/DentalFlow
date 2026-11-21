@@ -23,6 +23,7 @@ import {
   calculateOutstandingPaise,
   formatPaise,
   isPolicyUsableOn,
+  validatePolicyReadinessForClaimSubmission,
   validateClaimTransition,
   validatePreAuthorizationTransition,
   type ClaimTransitionContext,
@@ -923,6 +924,12 @@ export async function updateInsuranceClaimStatus(
         include: {
           payments: { select: { kind: true, amount: true } },
           documents: { select: { status: true } },
+          policy: {
+            select: {
+              dentalCoverageStatus: true,
+              policyWordingReference: true,
+            },
+          },
         },
       });
       if (!claim) throw new InsuranceRecordNotFoundError();
@@ -956,6 +963,14 @@ export async function updateInsuranceClaimStatus(
             status !== InsuranceDocumentStatus.REJECTED,
         ),
       };
+      if (input.status === InsuranceClaimStatus.SUBMITTED) {
+        const policyReadinessIssue = validatePolicyReadinessForClaimSubmission(
+          claim.policy,
+        );
+        if (policyReadinessIssue) {
+          throw new InsuranceValidationError(policyReadinessIssue);
+        }
+      }
       const issue = validateClaimTransition(
         claim.status,
         input.status,
