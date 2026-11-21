@@ -57,6 +57,43 @@ export function PolicyForm({
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
+          <label className={labelClass} htmlFor="productName">Policy product name</label>
+          <input className={fieldClass} id="productName" maxLength={180} name="productName" />
+        </div>
+        <div>
+          <label className={labelClass} htmlFor="uin">IRDAI UIN (as printed on policy)</label>
+          <input className={fieldClass} id="uin" maxLength={80} name="uin" />
+        </div>
+        <div>
+          <label className={labelClass} htmlFor="dentalCoverageStatus">Dental coverage stated in policy</label>
+          <select className={fieldClass} defaultValue="NOT_VERIFIED" id="dentalCoverageStatus" name="dentalCoverageStatus" required>
+            <option value="NOT_VERIFIED">Not verified from wording</option>
+            <option value="COVERED">Dental explicitly covered</option>
+            <option value="ACCIDENT_ONLY">Accident-related dental only</option>
+            <option value="HOSPITALIZATION_ONLY">Hospitalisation-linked only</option>
+            <option value="OPD_ADDON">OPD / dental add-on stated</option>
+            <option value="EXCLUDED">Dental excluded</option>
+          </select>
+        </div>
+        <div>
+          <label className={labelClass} htmlFor="policyWordingReference">Policy wording / CIS reference</label>
+          <input className={fieldClass} id="policyWordingReference" maxLength={500} name="policyWordingReference" placeholder="Document name, clause or page" />
+        </div>
+        <div>
+          <label className={labelClass} htmlFor="preExistingWaitingMonths">Pre-existing disease waiting period (months)</label>
+          <input className={fieldClass} id="preExistingWaitingMonths" max="36" min="0" name="preExistingWaitingMonths" type="number" />
+        </div>
+        <div>
+          <label className={labelClass} htmlFor="specificWaitingMonths">Specific disease waiting period (months)</label>
+          <input className={fieldClass} id="specificWaitingMonths" max="36" min="0" name="specificWaitingMonths" type="number" />
+        </div>
+      </div>
+      <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+        <input className="mt-1" name="customerInformationSheetReceived" type="checkbox" />
+        Customer Information Sheet (CIS) received and checked against policy wording
+      </label>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
           <label className={labelClass} htmlFor="policyNumber">
             Policy number
           </label>
