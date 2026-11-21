@@ -535,6 +535,8 @@ export async function listInsurancePoliciesPage(
           OR: [
             { patient: { fullName: { contains: query, mode: "insensitive" } } },
             { provider: { name: { contains: query, mode: "insensitive" } } },
+            { productName: { contains: query, mode: "insensitive" } },
+            { uin: { contains: query, mode: "insensitive" } },
           ],
         }
       : {}),
