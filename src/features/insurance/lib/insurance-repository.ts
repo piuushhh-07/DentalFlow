@@ -571,6 +571,13 @@ export async function createInsurancePolicy(
     patientId: string;
     providerId: string;
     policyNumber: string;
+    productName: string | null;
+    uin: string | null;
+    dentalCoverageStatus: string;
+    policyWordingReference: string | null;
+    customerInformationSheetReceived: boolean;
+    preExistingWaitingMonths: number | null;
+    specificWaitingMonths: number | null;
     memberReference: string | null;
     validFrom: string;
     validUntil: string;
@@ -598,6 +605,13 @@ export async function createInsurancePolicy(
       patientId: patient.id,
       providerId: provider.id,
       policyNumber: input.policyNumber,
+      productName: input.productName,
+      uin: input.uin,
+      dentalCoverageStatus: input.dentalCoverageStatus,
+      policyWordingReference: input.policyWordingReference,
+      customerInformationSheetReceived: input.customerInformationSheetReceived,
+      preExistingWaitingMonths: input.preExistingWaitingMonths,
+      specificWaitingMonths: input.specificWaitingMonths,
       memberReference: input.memberReference,
       validFrom: databaseDate(input.validFrom),
       validUntil: databaseDate(input.validUntil),
