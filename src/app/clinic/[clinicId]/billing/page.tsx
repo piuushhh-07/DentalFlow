@@ -12,6 +12,7 @@ import { requireClinicRole } from "@/features/auth/lib/server-auth";
 import { BillingPortal } from "@/features/billing/components/billing-portal";
 import {
   getClinicBillingPortalData,
+  getClinicBillingUsage,
   listAvailableBillingPlans,
 } from "@/features/billing/lib/billing-repository";
 import { ClinicRole } from "@prisma/client";
@@ -40,12 +41,15 @@ export default async function ClinicBillingPage({ params }: BillingPageProps) {
     throw error;
   }
 
-  const [subscription, plans] = await Promise.all([
+  const [subscription, plans, usage] = await Promise.all([
     measureServerOperation("billing.subscription_portal", () =>
       getClinicBillingPortalData(membership.clinicId),
     ),
     measureServerOperation("billing.available_plans", () =>
       listAvailableBillingPlans(),
+    ),
+    measureServerOperation("billing.usage", () =>
+      getClinicBillingUsage(membership.clinicId),
     ),
   ]);
   const portalSubscription = subscription
@@ -80,6 +84,7 @@ export default async function ClinicBillingPage({ params }: BillingPageProps) {
         </div>
         <BillingPortal
           clinicId={membership.clinicId}
+          usage={usage}
           plans={plans}
           subscription={portalSubscription}
         />

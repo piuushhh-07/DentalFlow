@@ -54,10 +54,17 @@ type BillingPortalData = Readonly<{
   }>[];
 }>;
 
+type BillingUsage = Readonly<{
+  patients: number;
+  dentists: number;
+  staff: number;
+}>;
+
 type BillingPortalProps = Readonly<{
   clinicId: string;
   plans: readonly BillingPlan[];
   subscription: BillingPortalData | null;
+  usage: BillingUsage;
 }>;
 
 type PlanEntitlements = Readonly<{
@@ -183,8 +190,68 @@ function PlanEntitlementSummary({
   );
 }
 
+function UsageSummary({
+  usage,
+  subscription,
+}: {
+  usage: BillingUsage;
+  subscription: BillingPortalData | null;
+}) {
+  const limits = subscription
+    ? readPlanEntitlements(subscription.planVersion.entitlements)
+    : {};
+  const rows = [
+    {
+      label: "Patient records",
+      used: usage.patients,
+      limit: limits.maxPatients,
+    },
+    {
+      label: "Active dentists",
+      used: usage.dentists,
+      limit: limits.maxDentists,
+    },
+    { label: "Staff seats", used: usage.staff, limit: limits.maxStaff },
+  ];
+
+  return (
+    <section
+      aria-labelledby="billing-usage-heading"
+      className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+    >
+      <h2
+        id="billing-usage-heading"
+        className="text-base font-semibold text-slate-900"
+      >
+        Current clinic usage
+      </h2>
+      <p className="mt-1 text-sm text-slate-600">
+        Live counts from this clinic. Limits are applied by the server when
+        new records or team members are added.
+      </p>
+      <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+        {rows.map((row) => (
+          <div key={row.label} className="rounded-lg bg-slate-50 px-4 py-3">
+            <dt className="text-sm text-slate-600">{row.label}</dt>
+            <dd className="mt-1 text-lg font-semibold tabular-nums text-slate-900">
+              {row.used.toLocaleString("en-IN")}
+              <span className="ml-1 text-sm font-normal text-slate-500">
+                / {row.limit ? row.limit.toLocaleString("en-IN") : "No limit"}
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 function formatPrice(amountMinor: number, currency: string): string {
-  return `${currency} ${(amountMinor / 100).toFixed(2)}`;
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amountMinor / 100);
 }
 
 function formatDate(date: Date | null): string | null {
@@ -204,6 +271,7 @@ export function BillingPortal({
   clinicId,
   plans,
   subscription,
+  usage,
 }: BillingPortalProps) {
   const [isPending, setIsPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -274,6 +342,8 @@ export function BillingPortal({
           {error ?? notice}
         </div>
       )}
+
+      <UsageSummary usage={usage} subscription={subscription} />
 
       {subscription ? (
         <section
@@ -561,8 +631,8 @@ export function BillingPortal({
             Compare available plans
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Compare the limits and modules configured for sale. Subscription
-            changes are not self-service from this screen yet.
+            Compare the limits and modules configured for sale. Eligible plan
+            changes are scheduled for the end of the current billing period.
           </p>
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
             {plans.map((plan) => (
