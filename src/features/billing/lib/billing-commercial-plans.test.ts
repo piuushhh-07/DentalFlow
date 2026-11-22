@@ -24,26 +24,43 @@ test("uses the approved INR prices and annual discounts", () => {
     DENTALFLOW_COMMERCIAL_PLANS.map((plan) => plan.amountMinor),
     [49900, 499900, 99900, 999900, 149900, 1499900],
   );
-  assert.ok(DENTALFLOW_COMMERCIAL_PLANS.every((plan) => plan.intervalCount === 1));
+  assert.ok(
+    DENTALFLOW_COMMERCIAL_PLANS.every((plan) => plan.intervalCount === 1),
+  );
 });
 
-test("enforces the Starter, Professional, and Clinic Plus team and patient limits", () => {
+test(
+  "enforces the Starter, Professional, and Clinic Plus team and patient limits",
+  () => {
   const monthly = DENTALFLOW_COMMERCIAL_PLANS.filter((plan) => plan.interval === "MONTH");
   const [starter, professional, clinicPlus] = monthly;
 
-  assert.deepEqual(
-    [starter.entitlements.maxDentists, starter.entitlements.maxStaff, starter.entitlements.maxPatients],
-    [1, 2, 300],
-  );
-  assert.deepEqual(
-    [professional.entitlements.maxDentists, professional.entitlements.maxStaff, professional.entitlements.maxPatients],
-    [3, 5, 1500],
-  );
-  assert.deepEqual(
-    [clinicPlus.entitlements.maxDentists, clinicPlus.entitlements.maxStaff, clinicPlus.entitlements.maxPatients],
-    [10, 15, 5000],
-  );
-});
+    assert.deepEqual(
+      [
+        starter.entitlements.maxDentists,
+        starter.entitlements.maxStaff,
+        starter.entitlements.maxPatients,
+      ],
+      [1, 2, 300],
+    );
+    assert.deepEqual(
+      [
+        professional.entitlements.maxDentists,
+        professional.entitlements.maxStaff,
+        professional.entitlements.maxPatients,
+      ],
+      [3, 5, 1500],
+    );
+    assert.deepEqual(
+      [
+        clinicPlus.entitlements.maxDentists,
+        clinicPlus.entitlements.maxStaff,
+        clinicPlus.entitlements.maxPatients,
+      ],
+      [10, 15, 5000],
+    );
+  },
+);
 
 test("keeps multi-branch entitlements disabled until that product capability is sold", () => {
   for (const plan of DENTALFLOW_COMMERCIAL_PLANS) {
