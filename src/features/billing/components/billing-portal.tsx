@@ -201,8 +201,16 @@ function UsageSummary({
     ? readPlanEntitlements(subscription.planVersion.entitlements)
     : {};
   const rows = [
-    { label: "Patient records", used: usage.patients, limit: limits.maxPatients },
-    { label: "Active dentists", used: usage.dentists, limit: limits.maxDentists },
+    {
+      label: "Patient records",
+      used: usage.patients,
+      limit: limits.maxPatients,
+    },
+    {
+      label: "Active dentists",
+      used: usage.dentists,
+      limit: limits.maxDentists,
+    },
     { label: "Staff seats", used: usage.staff, limit: limits.maxStaff },
   ];
 
@@ -211,11 +219,15 @@ function UsageSummary({
       aria-labelledby="billing-usage-heading"
       className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
     >
-      <h2 id="billing-usage-heading" className="text-base font-semibold text-slate-900">
+      <h2
+        id="billing-usage-heading"
+        className="text-base font-semibold text-slate-900"
+      >
         Current clinic usage
       </h2>
       <p className="mt-1 text-sm text-slate-600">
-        Live counts from this clinic. Limits are applied by the server when new records or team members are added.
+        Live counts from this clinic. Limits are applied by the server when
+        new records or team members are added.
       </p>
       <dl className="mt-4 grid gap-3 sm:grid-cols-3">
         {rows.map((row) => (
@@ -235,7 +247,11 @@ function UsageSummary({
 }
 
 function formatPrice(amountMinor: number, currency: string): string {
-  return `${currency} ${(amountMinor / 100).toFixed(2)}`;
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amountMinor / 100);
 }
 
 function formatDate(date: Date | null): string | null {
