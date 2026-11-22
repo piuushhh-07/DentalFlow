@@ -19,7 +19,7 @@ test("defines all six monthly and annual commercial plan versions", () => {
   );
 });
 
-test("uses the approved INR prices and annual discounts", () => {
+test("uses the INR monthly prices and annual discounts", () => {
   assert.deepEqual(
     DENTALFLOW_COMMERCIAL_PLANS.map((plan) => plan.amountMinor),
     [49900, 499900, 99900, 999900, 149900, 1499900],
@@ -32,8 +32,10 @@ test("uses the approved INR prices and annual discounts", () => {
 test(
   "enforces the Starter, Professional, and Clinic Plus team and patient limits",
   () => {
-  const monthly = DENTALFLOW_COMMERCIAL_PLANS.filter((plan) => plan.interval === "MONTH");
-  const [starter, professional, clinicPlus] = monthly;
+    const monthly = DENTALFLOW_COMMERCIAL_PLANS.filter(
+      (plan) => plan.interval === "MONTH",
+    );
+    const [starter, professional, clinicPlus] = monthly;
 
     assert.deepEqual(
       [
@@ -62,12 +64,15 @@ test(
   },
 );
 
-test("keeps multi-branch entitlements disabled until that product capability is sold", () => {
-  for (const plan of DENTALFLOW_COMMERCIAL_PLANS) {
-    const parsed = billingEntitlementsSchema.parse(plan.entitlements);
-    assert.equal(parsed.maxBranches, 1);
-    assert.equal(parsed.features.multiBranchManagement, false);
-    assert.equal(parsed.features.consolidatedFinance, false);
-    assert.equal(parsed.features.interBranchTransfers, false);
-  }
-});
+test(
+  "keeps multi-branch entitlements disabled until that product capability is sold",
+  () => {
+    for (const plan of DENTALFLOW_COMMERCIAL_PLANS) {
+      const parsed = billingEntitlementsSchema.parse(plan.entitlements);
+      assert.equal(parsed.maxBranches, 1);
+      assert.equal(parsed.features.multiBranchManagement, false);
+      assert.equal(parsed.features.consolidatedFinance, false);
+      assert.equal(parsed.features.interBranchTransfers, false);
+    }
+  },
+);
