@@ -373,3 +373,16 @@ export async function cancelClinicSubscriptionAtPeriodEnd(
     },
   });
 }
+
+
+export async function getClinicBillingUsage(clinicId: string) {
+  const [patients, dentists, staff] = await Promise.all([
+    prisma.patient.count({ where: { clinicId } }),
+    prisma.clinicDentist.count({ where: { clinicId, active: true } }),
+    prisma.clinicMembership.count({
+      where: { clinicId, role: "STAFF", revokedAt: null },
+    }),
+  ]);
+
+  return { patients, dentists, staff };
+}
