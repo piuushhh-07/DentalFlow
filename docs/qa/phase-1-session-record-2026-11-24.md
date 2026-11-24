@@ -12,27 +12,63 @@ Date: 2026-11-24
 - Page title: `DentalFlow`
 - Observed route: `/clinic/0f38a735-830c-4eae-ab23-40026ae4d0dc`
 
-## Verified observations
+## Phase 1 results
 
-- **Playwright test initialization — PASS:** Copilot reported successful initialization and an open setup browser.
-- **Staging access — PASS:** Browser reported the DentalFlow clinic dashboard, title `DentalFlow`, and clinic workspace.
-- **Vercel authentication gate — PASS:** The active Playwright session reached the application rather than the Vercel login screen.
-- **Dashboard functionality — NOT TESTED:** Dashboard was identified as the current page; individual controls and data were not yet explored.
-- **Patient management — NOT TESTED:** No patient pages or records inspected.
-- **Appointment calendar — NOT TESTED:** No calendar pages or scheduling behavior inspected.
+### Dashboard
+
+- **PASS:** Setup progress and summary cards rendered.
+- No visible application alert was observed.
+- Direct dashboard navigation succeeded.
+- Dashboard sidebar click timed out twice; this remains unresolved.
+
+### Patient list
+
+- **PASS — pagination only:** Page 1 displayed 10 rows and page 2 displayed 3 rows.
+- **NOT TESTED — search:** Search was visible. A synthetic query was entered but not submitted, so filtering behavior is unverified.
+- No dropdown filters were present.
+- A patient detail view was opened, but its record content was not captured or reported. No detail-field correctness claim is made.
+
+### Appointments
+
+- **PASS — view switching only:** Day, Week, and Month controls changed the URL view.
+- **BLOCKED — details and filters:** Dentist, chair, and status filters were visible but not exercised. A detail dialog opened, but its contents were not recorded, so detail-field correctness remains unverified.
+
+### Navigation
+
+- **PASS:** Patients, Appointments, Inventory, Equipment, Branches, and Reports routes displayed their expected headings.
+- **BLOCKED:** Dashboard sidebar navigation timed out twice. Direct navigation to the dashboard succeeded.
+
+## Diagnostics
+
+- No non-empty visible application alerts were observed.
+- No application-specific uncaught exceptions were observed.
+- Console errors included:
+  - Vercel endpoint returned 403.
+  - Identity-provider accounts list was empty.
+  - Google FedCM token error.
+  - Sentry returned 429.
+- DentalFlow route requests observed during exploration succeeded.
+- The available observations do not establish whether the third-party console errors affect user-facing functionality.
+
+## Screenshots and privacy
+
+- Screenshot recorded: `dentalflow-phase1-dashboard.png`.
+- No patient or appointment screenshots were taken to avoid exposing record information.
+- The browser remains open on the dashboard.
+- No patient details or credentials are included in this report.
 
 ## Safety and scope
 
-- No application tests were run during session initialization.
+- This phase was exploratory and read-only.
 - No patient records were created, edited, or deleted.
 - No forms were submitted.
 - No payments, WhatsApp messages, or subscription changes were triggered.
-- This record contains no patient details or credentials.
 
-## Next QA actions
+## Unresolved items and next QA actions
 
-1. Perform read-only dashboard inspection and record visible navigation, summary widgets, and errors.
-2. Inspect patient list and patient details without exposing personal information in screenshots or reports.
-3. Inspect appointment calendar views, filters, and appointment details without changing appointments.
-4. Update each area only after actual browser observation.
-5. Keep unvisited functionality marked NOT TESTED; page accessibility alone is not a functional PASS.
+1. Submit a synthetic patient search query and verify the resulting filtering behavior without changing records.
+2. Exercise dentist, chair, and status appointment filters using read-only interactions.
+3. Reopen appointment details and verify displayed fields without recording patient-identifying information.
+4. Investigate the Dashboard sidebar timeout while retaining successful direct-route navigation as a separate observation.
+5. Review the Vercel, identity-provider, FedCM, and Sentry errors to determine whether they are benign third-party issues or affect application behavior.
+6. Keep all untested behaviors marked NOT TESTED; do not infer functional correctness from route accessibility alone.
