@@ -33,6 +33,9 @@ export default async function ClinicStaffSettingsPage({
     throw error;
   }
   const team = await listClinicTeam(owner.clinicId);
+  const invitationConfigurationMissing =
+    !process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    !process.env.NEXT_PUBLIC_SITE_URL;
 
   return (
     <AppShell activeSection="team" clinicId={owner.clinicId}>
@@ -67,6 +70,22 @@ export default async function ClinicStaffSettingsPage({
             server actions, not only hidden in the interface.
           </p>
         </header>
+        {invitationConfigurationMissing && (
+          <aside
+            className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4"
+            role="status"
+          >
+            <h2 className="text-sm font-semibold text-amber-900">
+              Staff invitations need configuration
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-amber-800">
+              Add SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SITE_URL to this
+              deployment&apos;s server-side environment variables, then redeploy.
+              Keep the service-role key secret and never expose it to the
+              browser.
+            </p>
+          </aside>
+        )}
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <ClinicTeamManager
             clinicId={owner.clinicId}
