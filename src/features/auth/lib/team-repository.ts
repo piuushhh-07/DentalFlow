@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 export async function listClinicTeam(clinicId: string) {
   const [members, invitations] = await Promise.all([
     prisma.clinicMembership.findMany({
-      where: { clinicId },
+      where: { clinicId, revokedAt: null },
       orderBy: [{ role: "asc" }, { createdAt: "asc" }],
       select: {
         userId: true,
