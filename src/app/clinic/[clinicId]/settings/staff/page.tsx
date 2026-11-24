@@ -80,7 +80,7 @@ export default async function ClinicStaffSettingsPage({
             </h2>
             <p className="mt-1 text-sm leading-6 text-amber-800">
               Add SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SITE_URL to this
-              deployment's server-side environment variables, then redeploy.
+              deployment&apos;s server-side environment variables, then redeploy.
               Keep the service-role key secret and never expose it to the
               browser.
             </p>
