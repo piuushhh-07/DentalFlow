@@ -14,14 +14,12 @@ Date: 2026-11-24
 
 ## Verified observations
 
-| Area                          | Status      | Evidence                                                                                              |
-| ----------------------------- | ----------- | ----------------------------------------------------------------------------------------------------- |
-| Playwright test initialization | PASS        | Copilot reported successful initialization and an open setup browser                                 |
-| Staging access                | PASS        | Browser reported the DentalFlow clinic dashboard, title `DentalFlow`, and clinic workspace          |
-| Vercel authentication gate    | PASS        | The active Playwright session reached the application rather than the Vercel login screen            |
-| Dashboard functionality       | NOT TESTED  | Dashboard was identified as the current page; individual controls and data were not yet explored     |
-| Patient management            | NOT TESTED  | No patient pages or records inspected                                                                 |
-| Appointment calendar          | NOT TESTED  | No calendar pages or scheduling behavior inspected                                                    |
+- **Playwright test initialization — PASS:** Copilot reported successful initialization and an open setup browser.
+- **Staging access — PASS:** Browser reported the DentalFlow clinic dashboard, title `DentalFlow`, and clinic workspace.
+- **Vercel authentication gate — PASS:** The active Playwright session reached the application rather than the Vercel login screen.
+- **Dashboard functionality — NOT TESTED:** Dashboard was identified as the current page; individual controls and data were not yet explored.
+- **Patient management — NOT TESTED:** No patient pages or records inspected.
+- **Appointment calendar — NOT TESTED:** No calendar pages or scheduling behavior inspected.
 
 ## Safety and scope
 
