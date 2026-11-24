@@ -731,7 +731,7 @@ export function AppointmentCalendar({
                   clinicId={clinicId}
                   status={selectedAppointment.status}
                 />
-                {![ "COMPLETED", "CANCELLED" ].includes(
+                {!["COMPLETED", "CANCELLED"].includes(
                   selectedAppointment.status,
                 ) && (
                   <button
