@@ -632,59 +632,106 @@ export function AppointmentCalendar({
         >
           {!editing ? (
             <div className="space-y-4">
-              <div>
-                <p className="text-xl font-semibold text-slate-900">
-                  {selectedAppointment.patient.fullName}
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Patient
+                  </dt>
+                  <dd className="mt-1 text-sm font-semibold text-slate-900">
+                    {selectedAppointment.patient.fullName}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Date
+                  </dt>
+                  <dd className="mt-1 text-sm text-slate-700">
+                    {dateLabel(
+                      appointmentDateTime(selectedAppointment.scheduledAt).date,
+                      {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      },
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Time
+                  </dt>
+                  <dd className="mt-1 text-sm text-slate-700">
+                    {appointmentDateTime(selectedAppointment.scheduledAt).time}–
+                    {appointmentEndTime(selectedAppointment)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Appointment type
+                  </dt>
+                  <dd className="mt-1 text-sm text-slate-700">
+                    {selectedAppointment.type}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Dentist
+                  </dt>
+                  <dd className="mt-1 text-sm text-slate-700">
+                    {selectedAppointment.dentistName}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Chair
+                  </dt>
+                  <dd className="mt-1 text-sm text-slate-700">
+                    {selectedAppointment.chairLabel}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Status
+                  </dt>
+                  <dd className="mt-1">
+                    <span
+                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusClass[selectedAppointment.status]}`}
+                    >
+                      {selectedAppointment.status.replaceAll("_", " ")}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+              {selectedAppointment.treatmentVisit && (
+                <p className="text-sm text-slate-600">
+                  Linked to {selectedAppointment.treatmentVisit.treatmentPlan.name},
+                  visit {selectedAppointment.treatmentVisit.visitNumber}
                 </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {dateLabel(
-                    appointmentDateTime(selectedAppointment.scheduledAt).date,
-                    {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    },
-                  )}
-                  {" · "}
-                  {appointmentDateTime(selectedAppointment.scheduledAt).time}–
-                  {appointmentEndTime(selectedAppointment)}
-                </p>
-                <p className="mt-2 text-sm text-slate-700">
-                  {selectedAppointment.type} · {selectedAppointment.dentistName}{" "}
-                  · {selectedAppointment.chairLabel}
-                </p>
-                <p
-                  className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusClass[selectedAppointment.status]}`}
-                >
-                  {selectedAppointment.status.replaceAll("_", " ")}
-                </p>
-                {selectedAppointment.treatmentVisit && (
-                  <p className="mt-3 text-sm text-slate-600">
-                    Linked to{" "}
-                    {selectedAppointment.treatmentVisit.treatmentPlan.name},
-                    visit {selectedAppointment.treatmentVisit.visitNumber}
-                  </p>
-                )}
-                {selectedAppointment.notes && (
-                  <p className="mt-3 whitespace-pre-wrap text-sm text-slate-600">
+              )}
+              {selectedAppointment.notes && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Notes
+                  </h3>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
                     {selectedAppointment.notes}
                   </p>
-                )}
-              </div>
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
                 <Link
                   className="text-sm font-medium text-teal-800 hover:underline"
                   href={`/clinic/${clinicId}/patients/${selectedAppointment.patient.id}`}
                 >
-                  View patient
+                  View patient record
                 </Link>
                 <AppointmentStatusForm
                   appointmentId={selectedAppointment.id}
                   clinicId={clinicId}
                   status={selectedAppointment.status}
                 />
-                {!["COMPLETED", "CANCELLED"].includes(
+                {![ "COMPLETED", "CANCELLED" ].includes(
                   selectedAppointment.status,
                 ) && (
                   <button
