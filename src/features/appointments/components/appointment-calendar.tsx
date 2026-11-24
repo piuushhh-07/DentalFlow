@@ -705,8 +705,9 @@ export function AppointmentCalendar({
               </dl>
               {selectedAppointment.treatmentVisit && (
                 <p className="text-sm text-slate-600">
-                  Linked to {selectedAppointment.treatmentVisit.treatmentPlan.name},
-                  visit {selectedAppointment.treatmentVisit.visitNumber}
+                  Linked to{" "}
+                  {selectedAppointment.treatmentVisit.treatmentPlan.name}, visit{" "}
+                  {selectedAppointment.treatmentVisit.visitNumber}
                 </p>
               )}
               {selectedAppointment.notes && (
