@@ -3180,6 +3180,23 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "4000.00",
       );
 
+      const convertedLead = await freshReader.patientLead.create({
+        data: {
+          clinicId: clinicAId,
+          fullName: patientInput.fullName,
+          phoneNumber: patientInput.phoneNumber,
+          normalizedPhone: patientInput.phoneNumber,
+          convertedPatientId: patientA.id,
+          notes: "Synthetic converted lead retained with patient history.",
+        },
+        select: { id: true },
+      });
+      assert.equal(
+        await deleteClinicPatient(clinicAId, patientA.id),
+        false,
+        "A patient with a converted lead history must be retained.",
+      );
+
       const exportAuditCountBefore =
         await freshReader.patientDataExportAudit.count({
           where: { clinicId: clinicAId, patientId: patientA.id },
@@ -3190,12 +3207,14 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         userAId,
       );
       assert.ok(patientExport);
-      assert.equal(patientExport.formatVersion, 2);
+      assert.equal(patientExport.formatVersion, 3);
       assert.equal(
         patientExport.scope.includesPrivateStorageFileContents,
         false,
       );
       assert.equal(patientExport.scope.excludesPrivateStoragePaths, true);
+      assert.equal(patientExport.patient.convertedLeads.length, 1);
+      assert.equal(patientExport.patient.convertedLeads[0].id, convertedLead.id);
       assert.equal(patientExport.patient.insurancePolicies.length, 1);
       assert.equal(
         patientExport.patient.insurancePolicies[0].provider.id,
