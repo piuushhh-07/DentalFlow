@@ -15,6 +15,8 @@ returns 404; staff members do not receive export access.
   claims, pre-authorizations, claim payments, and related insurance activity.
 - Insurance document metadata and extraction results, excluding the private
   Storage object path.
+- Appointment cancellation requests and their review history.
+- Converted patient leads with lead activities, and dental laboratory orders.
 - Odontogram entries, dental clinical records with findings and audit history,
   and digital prescriptions with medicines and audit history.
 
@@ -26,7 +28,7 @@ returns 404; staff members do not receive export access.
   the successful export is recorded separately in the clinic database.
 - Clinic-wide provider master details and unrelated clinic records are not
   exported.
-- The export does not erase data, prove that every legal access-request
+- The export is a structured snapshot of the patient-linked records listed above; it does not include unrelated unconverted leads or clinic-wide operational records. It does not erase data, prove that every legal access-request
   requirement is satisfied, or cover backups, logs, caches, or subprocessors.
 - This implementation does not define a retention period or automated
   deletion behavior.
