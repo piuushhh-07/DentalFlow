@@ -213,6 +213,8 @@ export async function deleteClinicPatient(clinicId: string, patientId: string) {
       dentalClinicalRecords: { none: {} },
       digitalPrescriptions: { none: {} },
       dataExportAudits: { none: {} },
+      convertedLeads: { none: {} },
+      dentalLabOrders: { none: {} },
     },
   });
 
