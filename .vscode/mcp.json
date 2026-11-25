@@ -1,0 +1,16 @@
+﻿{
+  "servers": {
+    "playwright-test": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "playwright",
+        "run-test-mcp-server"
+      ],
+      "env": {
+        "PLAYWRIGHT_BASE_URL": "https://dental-flow-5mme2z43n-piuushhh-07s-projects.vercel.app"
+      }
+    }
+  },
+  "inputs": []
+}

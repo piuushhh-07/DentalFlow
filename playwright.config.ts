@@ -1,6 +1,8 @@
+
 import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL;
+const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 
 if (!baseURL) {
   throw new Error(
@@ -15,6 +17,7 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   reporter: [["list"]],
+
   use: {
     baseURL,
     ...devices["Desktop Chrome"],
@@ -22,5 +25,12 @@ export default defineConfig({
     trace: "off",
     screenshot: "off",
     video: "off",
+
+    extraHTTPHeaders: bypassSecret
+      ? {
+          "x-vercel-protection-bypass": bypassSecret,
+          "x-vercel-set-bypass-cookie": "true",
+        }
+      : {},
   },
 });
