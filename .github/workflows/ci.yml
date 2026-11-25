@@ -51,7 +51,7 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            BASE_SHA="$(git merge-base "origin/${{ github.event.pull_request.base.ref }}" "$GITHUB_SHA")"
             CHANGED_FILES="$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$GITHUB_SHA" -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.mts' '*.cts' '*.json' '*.md' '*.mdx' '*.css' '*.scss' '*.html' '*.yml' '*.yaml' '*.prisma')"
           elif [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
             CHANGED_FILES="$(git diff --name-only --diff-filter=ACMR "${{ github.event.before }}" "$GITHUB_SHA" -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.mts' '*.cts' '*.json' '*.md' '*.mdx' '*.css' '*.scss' '*.html' '*.yml' '*.yaml' '*.prisma')"
