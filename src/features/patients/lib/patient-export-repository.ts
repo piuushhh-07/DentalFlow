@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/db/prisma";
 
-export const PATIENT_EXPORT_FORMAT_VERSION = 2;
+export const PATIENT_EXPORT_FORMAT_VERSION = 3;
 
 export async function exportClinicPatientData(
   clinicId: string,
@@ -16,6 +16,7 @@ export async function exportClinicPatientData(
       treatmentFinancialEntries: true,
       treatmentEstimates: { include: { lines: true, audits: true } },
       appointments: true,
+      appointmentCancellationRequests: true,
       preventiveRecalls: true,
       messageLogs: true,
       insurancePolicies: {
@@ -54,6 +55,8 @@ export async function exportClinicPatientData(
       odontogramEntries: true,
       dentalClinicalRecords: { include: { findings: true, audits: true } },
       digitalPrescriptions: { include: { medicines: true, audits: true } },
+      convertedLeads: { include: { activities: true } },
+      dentalLabOrders: true,
     },
   });
   if (!patient) return null;
