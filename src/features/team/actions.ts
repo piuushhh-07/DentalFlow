@@ -99,7 +99,7 @@ async function mutateMembership(
         ) {
           const lockKey = `clinic-staff-seats:${clinicId}`;
           await transaction.$queryRaw`
-            SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
+            SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0)) IS NULL
           `;
           await assertStaffInvitationCapacity(transaction, clinicId);
         }
