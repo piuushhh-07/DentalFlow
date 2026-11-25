@@ -11,7 +11,6 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
-import { assertFeatureEnabled } from "@/features/billing/lib/billing-entitlements";
 import {
   insuranceClaimSummarySourcesSchema,
   insuranceDocumentExtractionSchema,
@@ -23,7 +22,6 @@ import {
   calculateOutstandingPaise,
   formatPaise,
   isPolicyUsableOn,
-  validatePolicyReadinessForClaimSubmission,
   validateClaimTransition,
   validatePreAuthorizationTransition,
   type ClaimTransitionContext,
@@ -132,7 +130,6 @@ export async function saveInsuranceClaimSummaryDraft(
   },
 ) {
   return prisma.$transaction(async (transaction) => {
-    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockClaim(transaction, clinicId, claimId);
     const claim = await transaction.insuranceClaim.findFirst({
       where: { id: claimId, clinicId },
@@ -216,7 +213,6 @@ export async function reviewInsuranceClaimSummary(
   claimId: string,
 ) {
   return prisma.$transaction(async (transaction) => {
-    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockClaim(transaction, clinicId, claimId);
     const claim = await transaction.insuranceClaim.findFirst({
       where: { id: claimId, clinicId },
@@ -448,7 +444,6 @@ export async function listInsurancePatients(
   return prisma.patient.findMany({
     where: {
       clinicId,
-      archivedAt: null,
       ...(patientId ? { id: patientId } : {}),
       ...(query
         ? {
@@ -492,8 +487,6 @@ export async function listInsurancePolicies(
                 patient: { fullName: { contains: query, mode: "insensitive" } },
               },
               { provider: { name: { contains: query, mode: "insensitive" } } },
-            { productName: { contains: query, mode: "insensitive" } },
-            { uin: { contains: query, mode: "insensitive" } },
             ],
           }
         : {}),
@@ -504,13 +497,6 @@ export async function listInsurancePolicies(
       id: true,
       patientId: true,
       policyNumber: true,
-      productName: true,
-      uin: true,
-      dentalCoverageStatus: true,
-      policyWordingReference: true,
-      customerInformationSheetReceived: true,
-      preExistingWaitingMonths: true,
-      specificWaitingMonths: true,
       validFrom: true,
       validUntil: true,
       coverageLimit: true,
@@ -536,8 +522,6 @@ export async function listInsurancePoliciesPage(
           OR: [
             { patient: { fullName: { contains: query, mode: "insensitive" } } },
             { provider: { name: { contains: query, mode: "insensitive" } } },
-            { productName: { contains: query, mode: "insensitive" } },
-            { uin: { contains: query, mode: "insensitive" } },
           ],
         }
       : {}),
@@ -590,13 +574,6 @@ export async function createInsurancePolicy(
     patientId: string;
     providerId: string;
     policyNumber: string;
-    productName: string | null;
-    uin: string | null;
-    dentalCoverageStatus: string;
-    policyWordingReference: string | null;
-    customerInformationSheetReceived: boolean;
-    preExistingWaitingMonths: number | null;
-    specificWaitingMonths: number | null;
     memberReference: string | null;
     validFrom: string;
     validUntil: string;
@@ -609,7 +586,7 @@ export async function createInsurancePolicy(
 ) {
   const [patient, provider] = await Promise.all([
     prisma.patient.findFirst({
-      where: { id: input.patientId, clinicId, archivedAt: null },
+      where: { id: input.patientId, clinicId },
       select: { id: true },
     }),
     prisma.insuranceProvider.findFirst({
@@ -624,13 +601,6 @@ export async function createInsurancePolicy(
       patientId: patient.id,
       providerId: provider.id,
       policyNumber: input.policyNumber,
-      productName: input.productName,
-      uin: input.uin,
-      dentalCoverageStatus: input.dentalCoverageStatus,
-      policyWordingReference: input.policyWordingReference,
-      customerInformationSheetReceived: input.customerInformationSheetReceived,
-      preExistingWaitingMonths: input.preExistingWaitingMonths,
-      specificWaitingMonths: input.specificWaitingMonths,
       memberReference: input.memberReference,
       validFrom: databaseDate(input.validFrom),
       validUntil: databaseDate(input.validUntil),
@@ -669,13 +639,11 @@ export async function createInsuranceClaim(
 ) {
   return prisma.$transaction(
     async (transaction) => {
-      await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
       const policy = await transaction.insurancePolicy.findFirst({
         where: {
           id: input.policyId,
           clinicId,
           patientId: input.patientId,
-          patient: { archivedAt: null },
         },
         select: {
           id: true,
@@ -812,7 +780,6 @@ export async function updateInsuranceClaimDetails(
   },
 ) {
   return prisma.$transaction(async (transaction) => {
-    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockClaim(transaction, clinicId, claimId);
     const claim = await transaction.insuranceClaim.findFirst({
       where: { id: claimId, clinicId },
@@ -917,19 +884,12 @@ export async function updateInsuranceClaimStatus(
 ) {
   await prisma.$transaction(
     async (transaction) => {
-      await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
       await lockClaim(transaction, clinicId, claimId);
       const claim = await transaction.insuranceClaim.findFirst({
         where: { id: claimId, clinicId },
         include: {
           payments: { select: { kind: true, amount: true } },
           documents: { select: { status: true } },
-          policy: {
-            select: {
-              dentalCoverageStatus: true,
-              policyWordingReference: true,
-            },
-          },
         },
       });
       if (!claim) throw new InsuranceRecordNotFoundError();
@@ -963,14 +923,6 @@ export async function updateInsuranceClaimStatus(
             status !== InsuranceDocumentStatus.REJECTED,
         ),
       };
-      if (input.status === InsuranceClaimStatus.SUBMITTED) {
-        const policyReadinessIssue = validatePolicyReadinessForClaimSubmission(
-          claim.policy,
-        );
-        if (policyReadinessIssue) {
-          throw new InsuranceValidationError(policyReadinessIssue);
-        }
-      }
       const issue = validateClaimTransition(
         claim.status,
         input.status,
@@ -1039,7 +991,6 @@ export async function scheduleInsuranceFollowUp(
   followUpAt: Date | null,
 ) {
   return prisma.$transaction(async (transaction) => {
-    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     const result = await transaction.insuranceClaim.updateMany({
       where: {
         id: claimId,
@@ -1077,7 +1028,6 @@ export async function createInsurancePayment(
 ) {
   return prisma.$transaction(
     async (transaction) => {
-      await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
       await lockClaim(transaction, clinicId, claimId);
       const claim = await transaction.insuranceClaim.findFirst({
         where: { id: claimId, clinicId },
@@ -1201,7 +1151,6 @@ export async function createInsurancePreAuthorization(
   },
 ) {
   return prisma.$transaction(async (transaction) => {
-    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     const policy = await transaction.insurancePolicy.findFirst({
       where: { id: input.policyId, clinicId, patientId: input.patientId },
       select: { id: true, validFrom: true, validUntil: true },
@@ -1276,7 +1225,6 @@ export async function updateInsurancePreAuthorizationStatus(
   },
 ) {
   return prisma.$transaction(async (transaction) => {
-    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockPreAuthorization(transaction, clinicId, preAuthorizationId);
     const preAuthorization =
       await transaction.insurancePreAuthorization.findFirst({
@@ -1633,7 +1581,6 @@ export async function createInsuranceDocumentRequirement(
   },
 ) {
   return prisma.$transaction(async (transaction) => {
-    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     const claim = await transaction.insuranceClaim.findFirst({
       where: { id: claimId, clinicId },
       select: { id: true },
@@ -1686,7 +1633,6 @@ export async function authorizeInsuranceDocumentUpload(
     storagePath,
   );
   return prisma.$transaction(async (transaction) => {
-    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     const document = await transaction.insuranceDocument.findFirst({
       where: {
         id: documentId,
@@ -1729,7 +1675,6 @@ export async function registerInsuranceDocumentUpload(
   );
   return prisma.$transaction(
     async (transaction) => {
-      await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
       const document = await transaction.insuranceDocument.findFirst({
         where: { id: documentId, claimId, clinicId },
         select: { storagePath: true, status: true },
@@ -1916,7 +1861,6 @@ export async function startInsuranceDocumentExtraction(
   documentId: string,
 ) {
   return prisma.$transaction(async (transaction) => {
-    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockDocument(transaction, clinicId, claimId, documentId);
     const document = await transaction.insuranceDocument.findFirst({
       where: {
@@ -2037,7 +1981,6 @@ export async function updateInsuranceDocumentStatus(
   input: { status: "VERIFIED" | "REJECTED"; rejectionReason: string | null },
 ) {
   return prisma.$transaction(async (transaction) => {
-    await assertFeatureEnabled(transaction, clinicId, "fullInsuranceClaims");
     await lockDocument(transaction, clinicId, claimId, documentId);
     const document = await transaction.insuranceDocument.findFirst({
       where: {

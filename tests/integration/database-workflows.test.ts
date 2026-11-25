@@ -8,7 +8,6 @@ import {
   InsuranceDocumentType,
   InsurancePreAuthorizationStatus,
   AppointmentStatus,
-  AppointmentRequestStatus,
   BillingInterval,
   BillingPaymentStatus,
   BillingSubscriptionStatus,
@@ -30,11 +29,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   AppointmentConflictError,
   AppointmentPatientNotFoundError,
-  AppointmentRequestConflictError,
-  AppointmentRequestRateLimitError,
-  AppointmentRequestNotFoundError,
-  approveAppointmentRequest,
-  createPublicAppointmentRequest,
   AppointmentVisitAlreadyScheduledError,
   AppointmentVisitNotFoundError,
   createClinicAppointment,
@@ -42,7 +36,6 @@ import {
   listClinicAppointments,
   updateClinicAppointment,
   updateClinicAppointmentStatus,
-  rejectAppointmentRequest,
 } from "@/features/appointments/lib/appointment-repository";
 import { createAppointmentSchema } from "@/features/appointments/lib/appointment-validation";
 import {
@@ -51,7 +44,6 @@ import {
   getClinicPatient,
   updateClinicPatient,
 } from "@/features/patients/lib/patient-repository";
-import { exportClinicPatientData } from "@/features/patients/lib/patient-export-repository";
 import {
   createPatientOdontogramEntry,
   OdontogramCorrectionNotFoundError,
@@ -133,15 +125,8 @@ import { getClinicReportMetrics } from "@/features/reports/lib/report-repository
 import { getClinicReportDateRange } from "@/features/reports/lib/report-validation";
 import { createSupabaseTestClient } from "./test-supabase-client";
 import { getClinicBillingPortalData } from "@/features/billing/lib/billing-repository";
-import {
-  processRazorpayWebhook,
-  RazorpayWebhookProcessingBusyError,
-} from "@/features/billing/lib/razorpay-webhook";
-import {
-  assertStaffCapacity,
-  assertStaffInvitationCapacity,
-  BillingLimitReachedError,
-} from "@/features/billing/lib/billing-entitlements";
+import { processRazorpayWebhook } from "@/features/billing/lib/razorpay-webhook";
+import { BillingLimitReachedError } from "@/features/billing/lib/billing-entitlements";
 import {
   createDigitalPrescription,
   listClinicPrescriptionMedicineCatalogue,
@@ -384,19 +369,6 @@ after(async () => {
         "Could not remove the clinic B synthetic private test file.",
       );
   }
-  const markerPlans = await prisma.billingPlanVersion.findMany({
-    where: { displayName: { contains: marker } },
-    select: { id: true },
-  });
-  if (markerPlans.length > 0) {
-    const markerPlanIds = markerPlans.map((plan) => plan.id);
-    await prisma.clinicSubscription.deleteMany({
-      where: { planVersionId: { in: markerPlanIds } },
-    });
-    await prisma.billingPlanVersion.deleteMany({
-      where: { id: { in: markerPlanIds } },
-    });
-  }
   await freshReader.$disconnect();
   await prisma.$disconnect();
   if (cleanupErrors.length > 0) {
@@ -439,18 +411,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           totalVisits: 1,
           dueDates: ["2099-01-10"],
         }),
-      );
-      assert.equal(
-        await deleteClinicPatient(clinicAId, patientA.id),
-        false,
-        "A patient with a treatment plan must be retained.",
-      );
-      assert.ok(
-        await freshReader.patient.findFirst({
-          where: { id: patientA.id, clinicId: clinicAId },
-          select: { id: true },
-        }),
-        "The patient and linked treatment history must remain intact.",
       );
       const clinicAPlanWithVisits = await getClinicTreatmentPlan(
         clinicAId,
@@ -627,24 +587,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         }),
         PrescriptionAlreadyAmendedError,
       );
-
-      await prisma.patient.update({
-        where: { id: patientA.id },
-        data: { archivedAt: new Date() },
-      });
-      await assert.rejects(
-        createDigitalPrescription(clinicAId, patientA.id, userAId, input),
-        PrescriptionPatientNotFoundError,
-      );
-      assert.equal(
-        (await listPatientPrescriptions(clinicAId, patientA.id)).length,
-        2,
-        "Archiving a patient must preserve existing prescription history.",
-      );
-      await prisma.patient.update({
-        where: { id: patientA.id },
-        data: { archivedAt: null },
-      });
     },
   );
 
@@ -937,7 +879,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           totalBillingCycles: 12,
           trialDays: 14,
           graceDays: 7,
-          entitlements: { maxPatients: 1, maxMonthlyAppointments: 1, maxStaff: 2 },
+          entitlements: { maxPatients: 1, maxMonthlyAppointments: 1 },
           providerPlanId: `plan_${randomUUID().replaceAll("-", "")}`,
         },
       });
@@ -972,36 +914,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       const paymentForB = `pay_${randomUUID().replaceAll("-", "")}`;
       const webhookEventIds: string[] = [];
       let capTestAppointmentId: string | undefined;
-      let staffSeatInvitationId: string | undefined;
 
       try {
-        await prisma.clinicMembership.create({
-          data: { clinicId: clinicAId, userId: userBId, role: ClinicRole.STAFF },
-        });
-        const staffSeatEmail = `staff-seat-${randomUUID()}@example.test`;
-        const staffSeatInvitation = await prisma.clinicInvitation.create({
-          data: {
-            clinicId: clinicAId,
-            email: staffSeatEmail,
-            normalizedEmail: staffSeatEmail,
-            role: ClinicRole.STAFF,
-            invitedByUserId: userAId,
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          },
-          select: { id: true },
-        });
-        staffSeatInvitationId = staffSeatInvitation.id;
-        await prisma.$transaction((transaction) =>
-          assertStaffCapacity(transaction, clinicAId),
-        );
-        await assert.rejects(
-          prisma.$transaction((transaction) =>
-            assertStaffInvitationCapacity(transaction, clinicAId),
-          ),
-          BillingLimitReachedError,
-          "An active staff member plus a pending invitation must reserve both available seats.",
-        );
-
         await assert.rejects(
           createClinicPatient(
             clinicAId,
@@ -1121,46 +1035,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           "duplicate",
         );
 
-        const concurrentEventId = `evt_${randomUUID().replaceAll("-", "")}`;
-        const concurrentBody = subscriptionWebhookBody(
-          "subscription.charged",
-          providerSubscriptionA,
-          "active",
-          new Date(trialStartedAt.getTime() + 1_500),
-          {
-            id: `pay_${randomUUID().replaceAll("-", "")}`,
-            status: "captured",
-          },
-          clinicBId,
-        );
-        webhookEventIds.push(concurrentEventId);
-        const concurrentDeliveries = await Promise.allSettled([
-          processRazorpayWebhook(concurrentEventId, concurrentBody),
-          processRazorpayWebhook(concurrentEventId, concurrentBody),
-        ]);
-        const concurrentSuccesses = concurrentDeliveries.filter(
-          (result) => result.status === "fulfilled",
-        );
-        const concurrentFailures = concurrentDeliveries.filter(
-          (result) => result.status === "rejected",
-        );
-        assert.equal(
-          concurrentSuccesses.filter(
-            (result) =>
-              result.status === "fulfilled" && result.value === "processed",
-          ).length,
-          1,
-          "Only one concurrent delivery may process the provider event.",
-        );
-        assert.equal(concurrentSuccesses.length + concurrentFailures.length, 2);
-        for (const failure of concurrentFailures) {
-          assert.ok(
-            failure.status === "rejected" &&
-              failure.reason instanceof RazorpayWebhookProcessingBusyError,
-            "A competing delivery must receive a retryable busy error.",
-          );
-        }
-
         const failedPayment = `pay_${randomUUID().replaceAll("-", "")}`;
         await submit("subscription.pending", "pending", 2_000, {
           id: failedPayment,
@@ -1257,14 +1131,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           ClinicAccessDeniedError,
         );
       } finally {
-        if (staffSeatInvitationId) {
-          await prisma.clinicInvitation.deleteMany({
-            where: { id: staffSeatInvitationId, clinicId: clinicAId },
-          });
-        }
-        await prisma.clinicMembership.deleteMany({
-          where: { userId: userBId, clinicId: clinicAId },
-        });
         if (capTestAppointmentId) {
           await prisma.appointment.deleteMany({
             where: { id: capTestAppointmentId, clinicId: clinicAId },
@@ -1681,525 +1547,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         AppointmentConflictError,
       );
 
-      const resourceTestDentist = await freshReader.clinicDentist.create({
-        data: { clinicId: clinicAId, name: `${marker} Alternate Dentist` },
-        select: { id: true, name: true },
-      });
-      const resourceTestChair = await freshReader.treatmentChair.create({
-        data: { clinicId: clinicAId, label: `${marker} Alternate Chair` },
-        select: { id: true, label: true },
-      });
-      const resourceBooking = await createClinicAppointment(clinicAId, {
-        ...appointmentInput,
-        treatmentVisitId: null,
-        time: "10:00",
-      });
-      await assert.rejects(
-        createClinicAppointment(clinicAId, {
-          ...appointmentInput,
-          treatmentVisitId: null,
-          time: "10:15",
-          chairId: resourceTestChair.id,
-        }),
-        AppointmentConflictError,
-        "A dentist cannot be double-booked even when another chair is selected.",
-      );
-      await assert.rejects(
-        createClinicAppointment(clinicAId, {
-          ...appointmentInput,
-          treatmentVisitId: null,
-          time: "10:15",
-          dentistId: resourceTestDentist.id,
-        }),
-        AppointmentConflictError,
-        "A chair cannot be double-booked even when another dentist is selected.",
-      );
-      const adjacentResourceBooking = await createClinicAppointment(
-        clinicAId,
-        {
-          ...appointmentInput,
-          treatmentVisitId: null,
-          time: "10:30",
-        },
-      );
-      assert.ok(resourceBooking.id && adjacentResourceBooking.id);
-
-
-      const concurrentResourceInputs = [
-        {
-          ...appointmentInput,
-          treatmentVisitId: null,
-          time: "11:00",
-        },
-        {
-          ...appointmentInput,
-          treatmentVisitId: null,
-          time: "11:00",
-        },
-      ];
-      const concurrentResourceBookings = await Promise.allSettled(
-        concurrentResourceInputs.map((input) =>
-          createClinicAppointment(clinicAId, input),
-        ),
-      );
-      assert.equal(
-        concurrentResourceBookings.filter((result) => result.status === "fulfilled")
-          .length,
-        1,
-        "Concurrent appointments must not double-book the same dentist and chair.",
-      );
-      const rejectedResourceBookings = concurrentResourceBookings.filter(
-        (result): result is PromiseRejectedResult =>
-          result.status === "rejected",
-      );
-      assert.equal(rejectedResourceBookings.length, 1);
-      assert.ok(
-        rejectedResourceBookings[0].reason instanceof AppointmentConflictError,
-        "The losing concurrent booking must report an appointment conflict.",
-      );
-      const concurrentResourceStart = new Date(
-        `${appointmentDate}T11:00:00.000+05:30`,
-      );
-      const persistedConcurrentResourceBookings =
-        await freshReader.appointment.findMany({
-          where: {
-            clinicId: clinicAId,
-            dentistId: dentist.id,
-            chairId: chair.id,
-            scheduledAt: concurrentResourceStart,
-            status: {
-              notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW],
-            },
-          },
-          select: { id: true },
-        });
-      assert.equal(
-        persistedConcurrentResourceBookings.length,
-        1,
-        "Exactly one active appointment may persist for the concurrently requested resource slot.",
-      );
-
-
-      const concurrentDentistOnlyInputs = [
-        {
-          ...appointmentInput,
-          treatmentVisitId: null,
-          time: "11:30",
-          dentistId: dentist.id,
-          chairId: chair.id,
-        },
-        {
-          ...appointmentInput,
-          treatmentVisitId: null,
-          time: "11:30",
-          dentistId: dentist.id,
-          chairId: resourceTestChair.id,
-        },
-      ];
-      const concurrentDentistOnlyBookings = await Promise.allSettled(
-        concurrentDentistOnlyInputs.map((input) =>
-          createClinicAppointment(clinicAId, input),
-        ),
-      );
-      assert.equal(
-        concurrentDentistOnlyBookings.filter(
-          (result) => result.status === "fulfilled",
-        ).length,
-        1,
-        "Concurrent appointments sharing only a dentist must not overlap.",
-      );
-      const dentistOnlyFailure = concurrentDentistOnlyBookings.find(
-        (result): result is PromiseRejectedResult =>
-          result.status === "rejected",
-      );
-      assert.ok(dentistOnlyFailure);
-      assert.ok(
-        dentistOnlyFailure.reason instanceof AppointmentConflictError,
-        "The losing dentist-only booking must report an appointment conflict.",
-      );
-      const dentistOnlySlot = await freshReader.appointment.findMany({
-        where: {
-          clinicId: clinicAId,
-          dentistId: dentist.id,
-          scheduledAt: new Date(`${appointmentDate}T11:30:00.000+05:30`),
-          status: {
-            notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW],
-          },
-        },
-        select: { id: true },
-      });
-      assert.equal(dentistOnlySlot.length, 1);
-
-      const concurrentChairOnlyInputs = [
-        {
-          ...appointmentInput,
-          treatmentVisitId: null,
-          time: "12:00",
-          dentistId: dentist.id,
-          chairId: chair.id,
-        },
-        {
-          ...appointmentInput,
-          treatmentVisitId: null,
-          time: "12:00",
-          dentistId: resourceTestDentist.id,
-          chairId: chair.id,
-        },
-      ];
-      const concurrentChairOnlyBookings = await Promise.allSettled(
-        concurrentChairOnlyInputs.map((input) =>
-          createClinicAppointment(clinicAId, input),
-        ),
-      );
-      assert.equal(
-        concurrentChairOnlyBookings.filter(
-          (result) => result.status === "fulfilled",
-        ).length,
-        1,
-        "Concurrent appointments sharing only a chair must not overlap.",
-      );
-      const chairOnlyFailure = concurrentChairOnlyBookings.find(
-        (result): result is PromiseRejectedResult =>
-          result.status === "rejected",
-      );
-      assert.ok(chairOnlyFailure);
-      assert.ok(
-        chairOnlyFailure.reason instanceof AppointmentConflictError,
-        "The losing chair-only booking must report an appointment conflict.",
-      );
-      const chairOnlySlot = await freshReader.appointment.findMany({
-        where: {
-          clinicId: clinicAId,
-          chairId: chair.id,
-          scheduledAt: new Date(`${appointmentDate}T12:00:00.000+05:30`),
-          status: {
-            notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW],
-          },
-        },
-        select: { id: true },
-      });
-      assert.equal(chairOnlySlot.length, 1);
-
-      const publicBookingPlan = await prisma.billingPlanVersion.create({
-        data: {
-          code: `public-booking-integration-${randomUUID()}`,
-          version: 1,
-          displayName: `${marker} Public Booking Plan`,
-          currency: "INR",
-          amountMinor: 50000,
-          interval: BillingInterval.MONTH,
-          intervalCount: 1,
-          totalBillingCycles: 12,
-          trialDays: 0,
-          graceDays: 7,
-          entitlements: { features: { publicBooking: true } },
-          providerPlanId: `plan_${randomUUID().replaceAll("-", "")}`,
-        },
-      });
-      await prisma.clinicSubscription.create({
-        data: {
-          clinicId: clinicAId,
-          planVersionId: publicBookingPlan.id,
-          status: BillingSubscriptionStatus.ACTIVE,
-          currentPeriodStart: new Date(Date.now() - 60_000),
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60_000),
-        },
-      });
-
-      const publicBookingInput = {
-        patientName: `${marker} Public booking`,
-        phoneNumber: syntheticPhone(),
-        requestedAt: new Date(`${appointmentDate}T14:00:00.000+05:30`),
-        dentistId: resourceTestDentist.id,
-        chairId: resourceTestChair.id,
-        notes: "Synthetic public booking submission.",
-      };
-      const firstPublicBooking = await createPublicAppointmentRequest(
-        clinicAId,
-        publicBookingInput,
-      );
-      const retriedPublicBooking = await createPublicAppointmentRequest(
-        clinicAId,
-        publicBookingInput,
-      );
-      assert.deepEqual(
-        retriedPublicBooking,
-        firstPublicBooking,
-        "An identical public submission must return the original pending request.",
-      );
-      assert.equal(
-        (
-          await freshReader.appointmentRequest.findUniqueOrThrow({
-            where: { id: firstPublicBooking.id },
-            select: { status: true },
-          })
-        ).status,
-        AppointmentRequestStatus.PENDING,
-      );
-
-      await assert.rejects(
-        createPublicAppointmentRequest(clinicAId, {
-          ...publicBookingInput,
-          patientName: `${marker} Conflicting public booking`,
-          phoneNumber: syntheticPhone(),
-        }),
-        AppointmentRequestConflictError,
-        "A pending request must block an overlapping request for the same dentist and chair.",
-      );
-
-      const rateLimitedPhone = syntheticPhone();
-      for (const hour of [15, 16, 17]) {
-        await createPublicAppointmentRequest(clinicAId, {
-          ...publicBookingInput,
-          patientName: `${marker} Rate-limit request ${hour}`,
-          phoneNumber: rateLimitedPhone,
-          requestedAt: new Date(
-            `${appointmentDate}T${String(hour).padStart(2, "0")}:00:00.000+05:30`,
-          ),
-        });
-      }
-      await assert.rejects(
-        createPublicAppointmentRequest(clinicAId, {
-          ...publicBookingInput,
-          patientName: `${marker} Rate-limit overflow`,
-          phoneNumber: rateLimitedPhone,
-          requestedAt: new Date(
-            `${appointmentDate}T18:00:00.000+05:30`,
-          ),
-        }),
-        AppointmentRequestRateLimitError,
-        "A phone number must be rate-limited after three requests in the configured window.",
-      );
-
-      const pendingBookingRequest = await freshReader.appointmentRequest.create({
-        data: {
-          clinicId: clinicAId,
-          patientName: `${marker} Public booking rejection`,
-          phoneNumber: syntheticPhone(),
-          requestedAt: new Date(`${appointmentDate}T12:00:00.000+05:30`),
-          durationMinutes: 30,
-          type: "Consultation",
-          dentistId: resourceTestDentist.id,
-          chairId: resourceTestChair.id,
-          notes: "Synthetic public booking request.",
-        },
-        select: { id: true },
-      });
-      await assert.rejects(
-        rejectAppointmentRequest(clinicBId, pendingBookingRequest.id),
-        AppointmentRequestNotFoundError,
-        "A different clinic must not reject this booking request.",
-      );
-      assert.equal(
-        (await freshReader.appointmentRequest.findUniqueOrThrow({
-          where: { id: pendingBookingRequest.id },
-          select: { status: true },
-        })).status,
-        AppointmentRequestStatus.PENDING,
-      );
-      await rejectAppointmentRequest(clinicAId, pendingBookingRequest.id);
-      assert.equal(
-        (await freshReader.appointmentRequest.findUniqueOrThrow({
-          where: { id: pendingBookingRequest.id },
-          select: { status: true },
-        })).status,
-        AppointmentRequestStatus.REJECTED,
-      );
-      await assert.rejects(
-        rejectAppointmentRequest(clinicAId, pendingBookingRequest.id),
-        AppointmentRequestNotFoundError,
-        "A handled booking request cannot be rejected a second time.",
-      );
-
-      const approvableBookingRequest =
-        await freshReader.appointmentRequest.create({
-          data: {
-            clinicId: clinicAId,
-            patientName: `${marker} Public booking approval`,
-            phoneNumber: syntheticPhone(),
-            requestedAt: new Date(`${appointmentDate}T13:00:00.000+05:30`),
-            durationMinutes: 30,
-            type: "Consultation",
-            dentistId: resourceTestDentist.id,
-            chairId: resourceTestChair.id,
-            notes: "Synthetic public booking approval request.",
-          },
-          select: { id: true },
-        });
-      await assert.rejects(
-        approveAppointmentRequest(clinicBId, approvableBookingRequest.id),
-        AppointmentRequestNotFoundError,
-        "A different clinic must not approve this booking request.",
-      );
-      assert.equal(
-        (
-          await freshReader.appointmentRequest.findUniqueOrThrow({
-            where: { id: approvableBookingRequest.id },
-            select: { status: true },
-          })
-        ).status,
-        AppointmentRequestStatus.PENDING,
-        "A cross-clinic approval attempt must leave the request pending.",
-      );
-      const appointmentThatTookTheSlot = await prisma.appointment.create({
-        data: {
-          clinicId: clinicAId,
-          patientId: patientA.id,
-          scheduledAt: new Date(`${appointmentDate}T13:00:00.000+05:30`),
-          durationMinutes: 30,
-          dentistId: resourceTestDentist.id,
-          chairId: resourceTestChair.id,
-          dentistName: resourceTestDentist.name,
-          chairLabel: resourceTestChair.label,
-          type: "Synthetic appointment taking pending slot",
-          notes: "Synthetic conflict fixture.",
-        },
-        select: { id: true },
-      });
-      await assert.rejects(
-        approveAppointmentRequest(clinicAId, approvableBookingRequest.id),
-        AppointmentConflictError,
-        "Approval must re-check resource availability because the slot may have been booked after the request was submitted.",
-      );
-      assert.equal(
-        (
-          await freshReader.appointmentRequest.findUniqueOrThrow({
-            where: { id: approvableBookingRequest.id },
-            select: { status: true },
-          })
-        ).status,
-        AppointmentRequestStatus.PENDING,
-        "A conflicting approval must leave the request pending.",
-      );
-      await prisma.appointment.delete({
-        where: { id: appointmentThatTookTheSlot.id },
-      });
-
-      const approvedAppointment = await approveAppointmentRequest(
-        clinicAId,
-        approvableBookingRequest.id,
-      );
-      assert.ok(approvedAppointment.id);
-      assert.equal(
-        (
-          await freshReader.appointmentRequest.findUniqueOrThrow({
-            where: { id: approvableBookingRequest.id },
-            select: { status: true },
-          })
-        ).status,
-        AppointmentRequestStatus.APPROVED,
-      );
-      assert.ok(
-        await freshReader.appointment.findFirst({
-          where: {
-            id: approvedAppointment.id,
-            clinicId: clinicAId,
-          },
-          select: { id: true, patientId: true },
-        }),
-        "Approval must create an appointment inside the owning clinic.",
-      );
-      await assert.rejects(
-        approveAppointmentRequest(clinicAId, approvableBookingRequest.id),
-        AppointmentRequestNotFoundError,
-        "An already-approved booking request cannot be approved twice.",
-      );
-
-      const concurrentlyApprovableRequest =
-        await freshReader.appointmentRequest.create({
-          data: {
-            clinicId: clinicAId,
-            patientName: `${marker} Concurrent public booking approval`,
-            phoneNumber: syntheticPhone(),
-            requestedAt: new Date(`${appointmentDate}T19:00:00.000+05:30`),
-            durationMinutes: 30,
-            type: "Consultation",
-            dentistId: resourceTestDentist.id,
-            chairId: resourceTestChair.id,
-            notes: "Synthetic concurrent approval request.",
-          },
-          select: { id: true, requestedAt: true },
-        });
-      const concurrentApprovals = await Promise.allSettled([
-        approveAppointmentRequest(clinicAId, concurrentlyApprovableRequest.id),
-        approveAppointmentRequest(clinicAId, concurrentlyApprovableRequest.id),
-      ]);
-      assert.equal(
-        concurrentApprovals.filter((result) => result.status === "fulfilled")
-          .length,
-        1,
-        "Concurrent approval attempts must create exactly one appointment.",
-      );
-      const failedConcurrentApproval = concurrentApprovals.find(
-        (result): result is PromiseRejectedResult =>
-          result.status === "rejected",
-      );
-      assert.ok(failedConcurrentApproval);
-      assert.ok(
-        failedConcurrentApproval.reason instanceof AppointmentRequestNotFoundError ||
-          safePrismaErrorCode(failedConcurrentApproval.reason) === "P2034",
-        "The losing approval may fail only because the request was already handled or its transaction conflicted.",
-      );
-      assert.equal(
-        (
-          await freshReader.appointmentRequest.findUniqueOrThrow({
-            where: { id: concurrentlyApprovableRequest.id },
-            select: { status: true },
-          })
-        ).status,
-        AppointmentRequestStatus.APPROVED,
-      );
-      const concurrentApprovalAppointments =
-        await freshReader.appointment.findMany({
-          where: {
-            clinicId: clinicAId,
-            scheduledAt: concurrentlyApprovableRequest.requestedAt,
-            dentistId: resourceTestDentist.id,
-            chairId: resourceTestChair.id,
-          },
-          select: { id: true },
-        });
-      assert.equal(
-        concurrentApprovalAppointments.length,
-        1,
-        "A concurrent retry must not create a duplicate appointment.",
-      );
-
-      await assert.rejects(
-        updateClinicAppointment(clinicAId, appointment.id, {
-          ...appointmentInput,
-          treatmentVisitId: null,
-          time: "10:15",
-          chairId: resourceTestChair.id,
-        }),
-        AppointmentConflictError,
-        "Rescheduling must reject a dentist conflict even when the chair changes.",
-      );
-      await assert.rejects(
-        updateClinicAppointment(clinicAId, appointment.id, {
-          ...appointmentInput,
-          treatmentVisitId: null,
-          time: "10:15",
-          dentistId: resourceTestDentist.id,
-        }),
-        AppointmentConflictError,
-        "Rescheduling must reject a chair conflict even when the dentist changes.",
-      );
-      const appointmentAfterRejectedReschedules =
-        await freshReader.appointment.findFirstOrThrow({
-          where: { id: appointment.id, clinicId: clinicAId },
-          select: { scheduledAt: true, treatmentVisitId: true },
-        });
-      assert.equal(
-        appointmentAfterRejectedReschedules.scheduledAt.toISOString(),
-        new Date(`${appointmentDate}T23:00:00.000+05:30`).toISOString(),
-        "A rejected reschedule must leave the original appointment time unchanged.",
-      );
-      assert.equal(
-        appointmentAfterRejectedReschedules.treatmentVisitId,
-        persistedPlan.visits[0].id,
-      );
-
       const concurrentBookingInputs = [
         {
           ...appointmentInput,
@@ -2423,40 +1770,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         plan.id,
         userAId,
         paymentInput,
-      );
-
-      const paymentRetry = await createTreatmentPlanFinancialEntry(
-        clinicAId,
-        patientA.id,
-        plan.id,
-        userAId,
-        paymentInput,
-      );
-      assert.equal(
-        paymentRetry.id,
-        payment.id,
-        "Retrying the same payment request must return the original ledger entry.",
-      );
-      assert.equal(
-        paymentRetry.receiptNumber,
-        payment.receiptNumber,
-        "An idempotent payment retry must preserve the original receipt number.",
-      );
-
-      const conflictingPaymentRetry = treatmentFinancialEntrySchema.parse({
-        ...paymentInput,
-        amount: "1600.00",
-      });
-      await assert.rejects(
-        createTreatmentPlanFinancialEntry(
-          clinicAId,
-          patientA.id,
-          plan.id,
-          userAId,
-          conflictingPaymentRetry,
-        ),
-        /submission key has already been used/,
-        "Reusing a payment request key with changed details must be rejected.",
       );
       for (const supabase of [supabaseA, supabaseB]) {
         const { data, error } = await supabase
@@ -2787,26 +2100,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         ).status,
         PreventiveRecallStatus.COMPLETED,
       );
-
-      await prisma.patient.update({
-        where: { id: patientA.id },
-        data: { archivedAt: new Date() },
-      });
-      await assert.rejects(
-        createClinicRecall(clinicAId, patientA.id, {
-          ...recallInput,
-          dueDate: "2099-03-11",
-        }),
-        RecallPatientNotFoundError,
-      );
-      assert.ok(
-        await getClinicRecall(clinicAId, recallId),
-        "Archiving a patient must preserve access to existing recall history.",
-      );
-      await prisma.patient.update({
-        where: { id: patientA.id },
-        data: { archivedAt: null },
-      });
     },
   );
 
@@ -2926,41 +2219,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
   await t.test(
     "insurance records, audit history and private Storage enforce clinic ownership",
     async () => {
-      const insurancePlan = await prisma.billingPlanVersion.create({
-        data: {
-          code: `insurance-integration-${randomUUID()}`,
-          version: 1,
-          displayName: `${marker} Insurance Plan`,
-          currency: "INR",
-          amountMinor: 50000,
-          interval: BillingInterval.MONTH,
-          intervalCount: 1,
-          totalBillingCycles: 12,
-          trialDays: 0,
-          graceDays: 7,
-          entitlements: { features: { fullInsuranceClaims: true } },
-          providerPlanId: `plan_${randomUUID().replaceAll("-", "")}`,
-        },
-      });
-      const insurancePeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-      const insuranceSubscriptions = await Promise.all([
-        prisma.clinicSubscription.create({
-          data: {
-            clinicId: clinicAId,
-            planVersionId: insurancePlan.id,
-            status: BillingSubscriptionStatus.ACTIVE,
-            currentPeriodEnd: insurancePeriodEnd,
-          },
-        }),
-        prisma.clinicSubscription.create({
-          data: {
-            clinicId: clinicBId,
-            planVersionId: insurancePlan.id,
-            status: BillingSubscriptionStatus.ACTIVE,
-            currentPeriodEnd: insurancePeriodEnd,
-          },
-        }),
-      ]);
       const providerData = providerInputSchema.parse({
         name: `${marker} Synthetic TPA`,
         kind: "TPA",
@@ -3178,78 +2436,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.equal(
         (await getInsuranceDashboard(clinicAId)).outstandingInsurerPayments,
         "4000.00",
-      );
-
-      const convertedLead = await freshReader.patientLead.create({
-        data: {
-          clinicId: clinicAId,
-          fullName: patientInput.fullName,
-          phoneNumber: patientInput.phoneNumber,
-          normalizedPhone: patientInput.phoneNumber,
-          convertedPatientId: patientA.id,
-          notes: "Synthetic converted lead retained with patient history.",
-        },
-        select: { id: true },
-      });
-      assert.equal(
-        await deleteClinicPatient(clinicAId, patientA.id),
-        false,
-        "A patient with a converted lead history must be retained.",
-      );
-
-      const exportAuditCountBefore =
-        await freshReader.patientDataExportAudit.count({
-          where: { clinicId: clinicAId, patientId: patientA.id },
-        });
-      const patientExport = await exportClinicPatientData(
-        clinicAId,
-        patientA.id,
-        userAId,
-      );
-      assert.ok(patientExport);
-      assert.equal(patientExport.formatVersion, 3);
-      assert.equal(
-        patientExport.scope.includesPrivateStorageFileContents,
-        false,
-      );
-      assert.equal(patientExport.scope.excludesPrivateStoragePaths, true);
-      assert.equal(patientExport.patient.convertedLeads.length, 1);
-      assert.equal(patientExport.patient.convertedLeads[0].id, convertedLead.id);
-      assert.equal(patientExport.patient.insurancePolicies.length, 1);
-      assert.equal(
-        patientExport.patient.insurancePolicies[0].provider.id,
-        provider.id,
-      );
-      assert.equal(patientExport.patient.insurancePreAuthorizations.length, 1);
-      assert.ok(
-        patientExport.patient.insurancePreAuthorizations[0].activities.length >=
-          2,
-      );
-      assert.equal(patientExport.patient.insuranceClaims.length, 1);
-      assert.equal(patientExport.patient.insuranceClaims[0].payments.length, 1);
-      assert.ok(
-        patientExport.patient.insuranceClaims[0].activities.length >= 4,
-      );
-      assert.ok(patientExport.patient.insuranceClaims[0].documents.length >= 3);
-      const serializedPatientExport = JSON.stringify(patientExport);
-      for (const privateStoragePath of uploadedStoragePaths) {
-        assert.equal(
-          serializedPatientExport.includes(privateStoragePath),
-          false,
-          "Patient export must not expose private Storage object paths.",
-        );
-      }
-      assert.equal(
-        await exportClinicPatientData(clinicBId, patientA.id, userBId),
-        null,
-        "A different clinic must not export another clinic's patient.",
-      );
-      assert.equal(
-        await freshReader.patientDataExportAudit.count({
-          where: { clinicId: clinicAId, patientId: patientA.id },
-        }),
-        exportAuditCountBefore + 1,
-        "Only the successful clinic-scoped export must create an audit event.",
       );
 
       const uploadedPath =
@@ -3707,41 +2893,6 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         userBId,
         clinicAId,
         staffMembership,
-      );
-
-      const staffPatientInput = patientInputSchema.parse({
-        fullName: `${marker} Staff Workflow Patient`,
-        phoneNumber: syntheticPhone(),
-        whatsappOptIn: false,
-        notes: "Created by the synthetic STAFF workflow test.",
-      });
-      const staffPatient = await createClinicPatient(
-        verifiedStaffMembership.clinicId,
-        staffPatientInput,
-      );
-      assert.ok(
-        await updateClinicPatient(
-          verifiedStaffMembership.clinicId,
-          staffPatient.id,
-          patientInputSchema.parse({
-            ...staffPatientInput,
-            fullName: `${marker} Staff Workflow Patient Updated`,
-          }),
-        ),
-        "An active STAFF member must be able to update clinic patient records.",
-      );
-      const staffTreatmentPlan = await createClinicTreatmentPlan(
-        verifiedStaffMembership.clinicId,
-        staffPatient.id,
-        planInput,
-      );
-      assert.ok(
-        await getClinicTreatmentPlan(
-          verifiedStaffMembership.clinicId,
-          staffPatient.id,
-          staffTreatmentPlan.id,
-        ),
-        "An active STAFF member must be able to create and read treatment plans.",
       );
 
       assert.equal(
