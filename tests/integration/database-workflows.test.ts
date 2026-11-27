@@ -1467,6 +1467,46 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "Authenticated browser writes to clinical chart data must be denied.",
       );
 
+      const odontogramCountBeforeCrossClinicInsert =
+        await freshReader.odontogramEntry.count({
+          where: {
+            clinicId: clinicAId,
+            patientId: patientA.id,
+          },
+        });
+      const {
+        data: crossClinicOdontogramInsert,
+        error: crossClinicOdontogramInsertError,
+      } = await supabaseB
+        .from("odontogram_entries")
+        .insert({
+          clinicId: clinicAId,
+          patientId: patientA.id,
+          createdByUserId: userAId,
+          toothNumber: 17,
+          dentition: OdontogramDentition.PERMANENT,
+          entryType: OdontogramEntryType.FINDING,
+          finding: OdontogramFinding.DECAYED,
+          surfaces: [OdontogramSurface.OCCLUSAL],
+          notes: "Cross-clinic browser insert must be denied.",
+        })
+        .select("id");
+      assert.ok(
+        crossClinicOdontogramInsertError ||
+          !crossClinicOdontogramInsert?.length,
+        "Clinic B must not insert odontogram entries into Clinic A.",
+      );
+      assert.equal(
+        await freshReader.odontogramEntry.count({
+          where: {
+            clinicId: clinicAId,
+            patientId: patientA.id,
+          },
+        }),
+        odontogramCountBeforeCrossClinicInsert,
+        "A cross-clinic browser insert must not change Clinic A's chart.",
+      );
+
       const recordInput = dentalClinicalRecordInputSchema.parse({
         chiefComplaints: "Pain on biting in the upper right quadrant.",
         clinicalExamination:
