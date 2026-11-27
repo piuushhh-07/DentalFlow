@@ -1,33 +1,21 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { matchesWhatsAppCronBearerToken } from "@/features/messages/lib/whatsapp-cron-auth";
 import {
   getWhatsAppCloudApiConfig,
   WhatsAppConfigurationError,
 } from "@/features/messages/lib/whatsapp-cloud-api";
 import { sendDueWhatsAppAppointmentReminders } from "@/features/messages/lib/whatsapp-automation";
 
-function matchesBearerToken(request: NextRequest, expected: string): boolean {
-  if (expected.length < 32) {
-    return false;
-  }
-
-  const authorization = request.headers.get("authorization") ?? "";
-  const supplied = authorization.startsWith("Bearer ")
-    ? authorization.slice("Bearer ".length)
-    : "";
-  const expectedBuffer = Buffer.from(expected);
-  const suppliedBuffer = Buffer.from(supplied);
-  return (
-    expectedBuffer.length === suppliedBuffer.length &&
-    timingSafeEqual(expectedBuffer, suppliedBuffer)
-  );
-}
-
 export async function POST(request: NextRequest) {
   // Authenticate before validating the rest of the integration config so
   // unauthenticated callers cannot distinguish configuration failures.
-  if (!matchesBearerToken(request, process.env.WHATSAPP_CRON_SECRET ?? "")) {
+  if (
+    !matchesWhatsAppCronBearerToken(
+      request.headers.get("authorization"),
+      process.env.WHATSAPP_CRON_SECRET ?? "",
+    )
+  ) {
     return NextResponse.json(
       { error: "Unauthorized." },
       { status: 401, headers: { "Cache-Control": "no-store" } },
