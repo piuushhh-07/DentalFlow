@@ -2,6 +2,19 @@ import { timingSafeEqual } from "node:crypto";
 
 const MIN_CRON_SECRET_LENGTH = 32;
 
+export type WhatsAppCronMethod = "GET" | "POST";
+
+export function getWhatsAppCronExpectedSecret(
+  method: WhatsAppCronMethod,
+  secrets: { cronSecret?: string; whatsappCronSecret?: string },
+): string {
+  if (method === "GET") {
+    return secrets.cronSecret ?? "";
+  }
+
+  return secrets.whatsappCronSecret ?? "";
+}
+
 export function matchesWhatsAppCronBearerToken(
   authorization: string | null,
   expected: string,
