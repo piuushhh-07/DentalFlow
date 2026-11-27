@@ -2797,6 +2797,23 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         clinicBDocument.id,
         clinicBStoragePath,
       );
+
+      const clinicAReadOfClinicBFile = await supabaseA.storage
+        .from("dentalflow-insurance-private")
+        .download(clinicBStoragePath);
+      assert.ok(
+        clinicAReadOfClinicBFile.error || !clinicAReadOfClinicBFile.data,
+        "Clinic A must not read Clinic B's private insurance document.",
+      );
+
+      const clinicBReadOfClinicAFile = await supabaseB.storage
+        .from("dentalflow-insurance-private")
+        .download(uploadedStoragePaths[0]);
+      assert.ok(
+        clinicBReadOfClinicAFile.error || !clinicBReadOfClinicAFile.data,
+        "Clinic B must not read Clinic A's private insurance document.",
+      );
+
       await supabaseA.storage
         .from("dentalflow-insurance-private")
         .remove([clinicBStoragePath]);
