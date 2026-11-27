@@ -677,6 +677,33 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "Clinic B must not read audit entries for Clinic A prescriptions.",
       );
 
+      const originalPrescriptionMedicine =
+        await freshReader.digitalPrescriptionMedicine.findFirstOrThrow({
+          where: {
+            clinicId: clinicAId,
+            patientId: patientA.id,
+            prescriptionId: original.id,
+          },
+          select: { id: true },
+        });
+      const {
+        data: crossClinicPrescriptionMedicineRead,
+        error: crossClinicPrescriptionMedicineReadError,
+      } = await supabaseB
+        .from("digital_prescription_medicines")
+        .select("id, medicineName, dosage")
+        .eq("id", originalPrescriptionMedicine.id);
+      assert.equal(
+        crossClinicPrescriptionMedicineReadError,
+        null,
+        "A cross-clinic prescription medicine read should be safely filtered by Supabase.",
+      );
+      assert.deepEqual(
+        crossClinicPrescriptionMedicineRead,
+        [],
+        "Clinic B must not read medicine details for Clinic A prescriptions.",
+      );
+
       const originalHistory = await listPatientPrescriptions(
         clinicAId,
         patientA.id,
