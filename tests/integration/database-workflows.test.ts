@@ -1005,17 +1005,15 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         };
 
         const reusedPaymentEventId = `evt_${randomUUID().replaceAll("-", "")}`;
-        const crossClinicPaymentReuse = submit(
-          "subscription.charged",
-          "active",
-          500,
-          { id: paymentForB, status: "captured" },
-          reusedPaymentEventId,
-        );
         await assert.rejects(
-          crossClinicPaymentReuse,
+          submit(
+            "subscription.charged",
+            "active",
+            500,
+            { id: paymentForB, status: "captured" },
+            reusedPaymentEventId,
+          ),
           /The provider payment is associated with another clinic/,
-          "Clinic A must not reuse Clinic B’s payment.",
         );
         const preservedClinicBPayment =
           await freshReader.billingPayment.findUniqueOrThrow({
