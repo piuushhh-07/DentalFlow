@@ -124,9 +124,11 @@ export async function sendWhatsAppTemplateMessage(
 }
 
 /**
- * Only retry failures where the provider returned a definitive client-error
- * response. Network timeouts, transport failures, server errors, and local
- * delivery bookkeeping failures can have an unknown delivery outcome.
+ * Only retry definitive provider client errors that are safe to retry
+ * without provider-supplied backoff metadata. HTTP 429 is deliberately
+ * excluded: retrying it on the next cron run can amplify rate limiting.
+ * Network timeouts, transport failures, server errors, and local delivery
+ * bookkeeping failures can have an unknown delivery outcome.
  */
 export function canRetryWhatsAppDeliveryFailure(
   failureCode: string | null,
@@ -135,5 +137,5 @@ export function canRetryWhatsAppDeliveryFailure(
   const match = /^(\d{3}):/.exec(failureCode);
   if (!match) return false;
   const status = Number(match[1]);
-  return status >= 400 && status < 500;
+  return status >= 400 && status < 500 && status !== 429;
 }
