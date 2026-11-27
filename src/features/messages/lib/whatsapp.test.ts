@@ -42,21 +42,22 @@ describe("WhatsApp reminder safeguards", () => {
       clinicPhone: "+91 98765 43210",
     });
 
-    it("uses the Meta template parameter order without adding clinical details", () => {
-      assert.deepEqual(
-        buildWhatsAppTemplateParameters({
-          patientName: "Anu",
-          clinicName: "DentalFlow Clinic",
-          appointmentTime: "16 Nov, 10:30 am",
-        }),
-        ["Anu", "DentalFlow Clinic", "16 Nov, 10:30 am"],
-      );
-    });
     assert.match(message, /Anu/);
     assert.match(message, /DentalFlow Clinic/);
     assert.match(message, /16 Oct 2026/);
-    assert.match(message, /\+91 98765 43210/);
+    assert.match(message, /\\+91 98765 43210/);
     assert.doesNotMatch(message, /root canal|diagnosis|implant/i);
+  });
+
+  it("uses the Meta template parameter order without adding clinical details", () => {
+    assert.deepEqual(
+      buildWhatsAppTemplateParameters({
+        patientName: "Anu",
+        clinicName: "DentalFlow Clinic",
+        appointmentTime: "16 Nov, 10:30 am",
+      }),
+      ["Anu", "DentalFlow Clinic", "16 Nov, 10:30 am"],
+    );
   });
 
   it("requires both opt-in and a recorded consent timestamp", () => {
