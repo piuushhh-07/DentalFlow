@@ -9,6 +9,7 @@ import {
 import { prisma } from "@/lib/db/prisma";
 import { buildWhatsAppReminderContent } from "@/features/messages/lib/whatsapp-reminder-content";
 import {
+  buildWhatsAppTemplateParameters,
   getWhatsAppCloudApiConfig,
   sendWhatsAppTemplateMessage,
   WhatsAppDeliveryError,
