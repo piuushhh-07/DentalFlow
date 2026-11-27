@@ -15,12 +15,17 @@ import {
   sendWhatsAppTemplateMessage,
   WhatsAppDeliveryError,
 } from "@/features/messages/lib/whatsapp-cloud-api";
+import {
+  buildWhatsAppReminderCursorFilter,
+  getWhatsAppReminderPageCursor,
+  type WhatsAppReminderCursor,
+} from "@/features/messages/lib/whatsapp-reminder-pagination";
 
 const MAX_DELIVERY_ATTEMPTS = 3;
 
 async function listDueAppointments(
   now: Date,
-  after?: { scheduledAt: Date; id: string },
+  after?: WhatsAppReminderCursor,
 ) {
   const startsAt = new Date(now.getTime() + 23.5 * 60 * 60_000);
   const endsAt = new Date(now.getTime() + 24.5 * 60 * 60_000);
@@ -33,14 +38,7 @@ async function listDueAppointments(
         whatsappOptIn: true,
         whatsappOptedInAt: { not: null },
       },
-      ...(after
-        ? {
-            OR: [
-              { scheduledAt: { gt: after.scheduledAt } },
-              { scheduledAt: after.scheduledAt, id: { gt: after.id } },
-            ],
-          }
-        : {}),
+      ...buildWhatsAppReminderCursorFilter(after),
     },
     orderBy: [{ scheduledAt: "asc" }, { id: "asc" }],
     take: 100,
@@ -151,15 +149,14 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
   let sent = 0;
   let failed = 0;
   let skipped = 0;
-  let after: { scheduledAt: Date; id: string } | undefined;
+  let after: WhatsAppReminderCursor | undefined;
 
   // Keyset pagination prevents already-claimed reminders in the first page
   // from permanently occupying the batch limit and starving later clinics.
   while (true) {
     const appointments = await listDueAppointments(now, after);
     if (appointments.length === 0) break;
-    const lastAppointment = appointments[appointments.length - 1];
-    after = { scheduledAt: lastAppointment.scheduledAt, id: lastAppointment.id };
+    after = getWhatsAppReminderPageCursor(appointments);
 
     for (const appointment of appointments) {
       const appointmentTime = new Intl.DateTimeFormat("en-IN", {
