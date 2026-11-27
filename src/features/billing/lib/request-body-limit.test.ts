@@ -19,7 +19,7 @@ function streamOf(...chunks: number[][]): ReadableStream<Uint8Array> {
 
 test("reads a request body within the configured byte limit", async () => {
   const body = await readRequestBodyWithLimit(streamOf([1, 2], [3, 4]), 4);
-  assert.deepEqual([...body], [1, 2, 3, 4]);
+  assert.deepEqual(Array.from(body), [1, 2, 3, 4]);
 });
 
 test("accepts a request body exactly at the configured byte limit", async () => {
