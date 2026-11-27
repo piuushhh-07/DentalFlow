@@ -133,7 +133,7 @@ export function canRetryWhatsAppDeliveryFailure(
   failureCode: string | null,
 ): boolean {
   if (!failureCode) return false;
-  const match = /^(\\d{3}):/.exec(failureCode);
+  const match = /^(\d{3}):/.exec(failureCode);
   if (!match) return false;
   const status = Number(match[1]);
   return status >= 400 && status < 500;
