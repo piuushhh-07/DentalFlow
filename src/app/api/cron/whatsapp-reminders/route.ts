@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { matchesWhatsAppCronBearerToken } from "@/features/messages/lib/whatsapp-cron-auth";
+import {
+  getWhatsAppCronExpectedSecret,
+  matchesWhatsAppCronBearerToken,
+} from "@/features/messages/lib/whatsapp-cron-auth";
 import {
   getWhatsAppCloudApiConfig,
   WhatsAppConfigurationError,
@@ -58,13 +61,20 @@ async function handleWhatsAppReminderCron(
 
 // Vercel Cron sends GET requests and supplies CRON_SECRET as a bearer token.
 export async function GET(request: NextRequest) {
-  return handleWhatsAppReminderCron(request, process.env.CRON_SECRET ?? "");
+  return handleWhatsAppReminderCron(
+    request,
+    getWhatsAppCronExpectedSecret("GET", {
+      cronSecret: process.env.CRON_SECRET,
+    }),
+  );
 }
 
 // Keep the existing authenticated POST entry point for manual invocations.
 export async function POST(request: NextRequest) {
   return handleWhatsAppReminderCron(
     request,
-    process.env.WHATSAPP_CRON_SECRET ?? "",
+    getWhatsAppCronExpectedSecret("POST", {
+      whatsappCronSecret: process.env.WHATSAPP_CRON_SECRET,
+    }),
   );
 }
