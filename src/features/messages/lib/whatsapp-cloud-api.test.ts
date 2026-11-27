@@ -188,8 +188,6 @@ describe("WhatsApp delivery retry classification", () => {
   });
 });
 
-
-
 describe("WhatsApp Cloud API configuration", () => {
   it(
     "does not require a cron secret to validate provider delivery settings",
