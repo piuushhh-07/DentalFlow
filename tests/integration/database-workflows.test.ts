@@ -1829,6 +1829,13 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       );
       const summary = await getClinicTreatmentFinanceSummary(clinicAId);
       assert.equal(summary.collectionsThisMonth, 1250);
+      const otherClinicSummary =
+        await getClinicTreatmentFinanceSummary(clinicBId);
+      assert.equal(
+        otherClinicSummary.collectionsThisMonth,
+        0,
+        "Clinic B's raw SQL finance summary must not include Clinic A's collections.",
+      );
       const persistedEntries =
         await freshReader.treatmentFinancialEntry.findMany({
           where: { clinicId: clinicAId, treatmentPlanId: plan.id },
