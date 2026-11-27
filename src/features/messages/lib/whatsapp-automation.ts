@@ -1,6 +1,10 @@
 import "server-only";
 
-import { AppointmentStatus, MessageLogStatus, Prisma } from "@prisma/client";
+import {
+  AppointmentStatus,
+  MessageLogStatus,
+  Prisma,
+} from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -17,9 +21,7 @@ async function listDueAppointments(now: Date) {
   const endsAt = new Date(now.getTime() + 24.5 * 60 * 60_000);
   return prisma.appointment.findMany({
     where: {
-      status: {
-        in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED],
-      },
+      status: { in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED] },
       scheduledAt: { gte: startsAt, lt: endsAt },
       clinic: { automatedWhatsAppEnabled: true },
       patient: {
@@ -143,8 +145,7 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
       clinicName: appointment.clinic.name,
       appointmentTime,
     });
-    const scheduledAtIso = appointment.scheduledAt.toISOString();
-    const reminderKey = `${appointment.id}:${scheduledAtIso}`;
+    const reminderKey = `${appointment.id}:${appointment.scheduledAt.toISOString()}`;
     const messageSnapshot = JSON.stringify({
       template: config.templateName,
       language: config.templateLanguage,
@@ -174,9 +175,7 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
           clinicId: appointment.clinicId,
           patientId: appointment.patientId,
           scheduledAt: appointment.scheduledAt,
-          status: {
-            in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED],
-          },
+          status: { in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED] },
           clinic: { automatedWhatsAppEnabled: true },
           patient: {
             whatsappOptIn: true,
