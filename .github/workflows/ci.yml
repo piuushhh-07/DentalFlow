@@ -49,9 +49,9 @@ jobs:
 
       - name: Capture exact Prettier output temporarily
         run: |
-          npx prettier --write src/features/messages/lib/whatsapp-automation.ts
+          npx prettier --write src/features/messages/lib/whatsapp-cloud-api.test.ts
           echo "FORMAT_RESULT_BEGIN"
-          base64 -w0 src/features/messages/lib/whatsapp-automation.ts
+          base64 -w0 src/features/messages/lib/whatsapp-cloud-api.test.ts
           echo
           echo "FORMAT_RESULT_END"
 
