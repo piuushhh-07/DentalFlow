@@ -2,6 +2,7 @@ import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  canRetryWhatsAppDeliveryFailure,
   sendWhatsAppTemplateMessage,
   WhatsAppDeliveryError,
 } from "@/features/messages/lib/whatsapp-cloud-api";
@@ -160,5 +161,25 @@ describe("WhatsApp Cloud API provider contract", () => {
     } finally {
       fetchMock.mock.restore();
     }
+  });
+});
+
+
+describe("WhatsApp delivery retry classification", () => {
+  it("retries definitive provider client errors", () => {
+    assert.equal(canRetryWhatsAppDeliveryFailure("400:131000"), true);
+    assert.equal(canRetryWhatsAppDeliveryFailure("429:4"), true);
+  });
+
+  it("does not retry failures with an unknown delivery outcome", () => {
+    assert.equal(canRetryWhatsAppDeliveryFailure("0:TIMEOUT"), false);
+    assert.equal(canRetryWhatsAppDeliveryFailure("0:NETWORK_ERROR"), false);
+    assert.equal(canRetryWhatsAppDeliveryFailure("500:2"), false);
+    assert.equal(canRetryWhatsAppDeliveryFailure("DELIVERY_ERROR"), false);
+    assert.equal(
+      canRetryWhatsAppDeliveryFailure("ELIGIBILITY_CHANGED_BEFORE_DELIVERY"),
+      false,
+    );
+    assert.equal(canRetryWhatsAppDeliveryFailure(null), false);
   });
 });
