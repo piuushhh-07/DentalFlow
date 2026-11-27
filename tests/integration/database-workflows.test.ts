@@ -704,6 +704,24 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "Clinic B must not read medicine details for Clinic A prescriptions.",
       );
 
+      const {
+        data: crossClinicPrescriptionRead,
+        error: crossClinicPrescriptionReadError,
+      } = await supabaseB
+        .from("digital_prescriptions")
+        .select("id, diagnosisNotes, additionalAdvice")
+        .eq("id", original.id);
+      assert.equal(
+        crossClinicPrescriptionReadError,
+        null,
+        "A cross-clinic prescription read should be safely filtered by Supabase.",
+      );
+      assert.deepEqual(
+        crossClinicPrescriptionRead,
+        [],
+        "Clinic B must not read prescription details for Clinic A patients.",
+      );
+
       const originalHistory = await listPatientPrescriptions(
         clinicAId,
         patientA.id,
