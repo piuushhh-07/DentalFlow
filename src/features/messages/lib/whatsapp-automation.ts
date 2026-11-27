@@ -1,10 +1,6 @@
 import "server-only";
 
-import {
-  AppointmentStatus,
-  MessageLogStatus,
-  Prisma,
-} from "@prisma/client";
+import { AppointmentStatus, MessageLogStatus, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -147,9 +143,8 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
       clinicName: appointment.clinic.name,
       appointmentTime,
     });
-    const reminderKey = `${appointment.id}:${
-      appointment.scheduledAt.toISOString()
-    }`;
+    const scheduledAtIso = appointment.scheduledAt.toISOString();
+    const reminderKey = `${appointment.id}:${scheduledAtIso}`;
     const messageSnapshot = JSON.stringify({
       template: config.templateName,
       language: config.templateLanguage,
@@ -180,10 +175,7 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
           patientId: appointment.patientId,
           scheduledAt: appointment.scheduledAt,
           status: {
-            in: [
-              AppointmentStatus.SCHEDULED,
-              AppointmentStatus.CONFIRMED,
-            ],
+            in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED],
           },
           clinic: { automatedWhatsAppEnabled: true },
           patient: {
