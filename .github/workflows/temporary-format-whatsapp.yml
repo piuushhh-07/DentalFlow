@@ -1,0 +1,24 @@
+name: Temporary WhatsApp formatter
+on:
+  push:
+    branches:
+      - fix/whatsapp-reminder-last-moment-consent-check
+permissions:
+  contents: read
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format exact file and print encoded result
+        run: |
+          npx prettier --write src/features/messages/lib/whatsapp-automation.ts
+          echo "FORMAT_RESULT_BEGIN"
+          base64 -w0 src/features/messages/lib/whatsapp-automation.ts
+          echo
+          echo "FORMAT_RESULT_END"
