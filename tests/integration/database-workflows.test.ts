@@ -3077,6 +3077,111 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
   );
 
   await t.test(
+    "cashbook day-close history remains scoped to its owning clinic",
+    async () => {
+      const businessDate = new Date("2026-11-27T00:00:00.000Z");
+      const closeA = await prisma.cashRegisterClose.create({
+        data: {
+          clinicId: clinicAId,
+          closedByUserId: userAId,
+          businessDate,
+          openingCash: "1000.00",
+          cashCollections: "500.00",
+          cashRefunds: "50.00",
+          cashExpenses: "200.00",
+          expectedCash: "1250.00",
+          countedCash: "1240.00",
+          cashVariance: "-10.00",
+          notes: "Synthetic Clinic A cashbook close.",
+        },
+      });
+      const closeB = await prisma.cashRegisterClose.create({
+        data: {
+          clinicId: clinicBId,
+          closedByUserId: userBId,
+          businessDate,
+          openingCash: "2000.00",
+          cashCollections: "900.00",
+          cashRefunds: "25.00",
+          cashExpenses: "300.00",
+          expectedCash: "2575.00",
+          countedCash: "2580.00",
+          cashVariance: "5.00",
+          notes: "Synthetic Clinic B cashbook close.",
+        },
+      });
+
+      const [closesForA, closesForB] = await Promise.all([
+        freshReader.cashRegisterClose.findMany({
+          where: { clinicId: clinicAId },
+          orderBy: [{ businessDate: "desc" }],
+          take: 30,
+          select: {
+            id: true,
+            businessDate: true,
+            openingCash: true,
+            cashCollections: true,
+            cashRefunds: true,
+            cashExpenses: true,
+            expectedCash: true,
+            countedCash: true,
+            cashVariance: true,
+            upiCollections: true,
+            cardCollections: true,
+            bankTransferCollections: true,
+            otherCollections: true,
+            closedAt: true,
+          },
+        }),
+        freshReader.cashRegisterClose.findMany({
+          where: { clinicId: clinicBId },
+          orderBy: [{ businessDate: "desc" }],
+          take: 30,
+          select: {
+            id: true,
+            businessDate: true,
+            openingCash: true,
+            cashCollections: true,
+            cashRefunds: true,
+            cashExpenses: true,
+            expectedCash: true,
+            countedCash: true,
+            cashVariance: true,
+            upiCollections: true,
+            cardCollections: true,
+            bankTransferCollections: true,
+            otherCollections: true,
+            closedAt: true,
+          },
+        }),
+      ]);
+
+      assert.ok(closesForA.some((close) => close.id === closeA.id));
+      assert.ok(
+        !closesForA.some((close) => close.id === closeB.id),
+        "Clinic A's cashbook history must not expose Clinic B's close.",
+      );
+      assert.ok(closesForB.some((close) => close.id === closeB.id));
+      assert.ok(
+        !closesForB.some((close) => close.id === closeA.id),
+        "Clinic B's cashbook history must not expose Clinic A's close.",
+      );
+      assert.equal(
+        Number(
+          closesForA.find((close) => close.id === closeA.id)?.expectedCash,
+        ),
+        1250,
+      );
+      assert.equal(
+        Number(
+          closesForB.find((close) => close.id === closeB.id)?.expectedCash,
+        ),
+        2575,
+      );
+    },
+  );
+
+  await t.test(
     "vendor bill payments remain scoped to their owning clinic",
     async () => {
       const billDate = new Date("2026-11-01T00:00:00.000Z");
