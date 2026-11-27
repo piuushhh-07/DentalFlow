@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   canRetryWhatsAppDeliveryFailure,
+  getWhatsAppCloudApiConfig,
   sendWhatsAppTemplateMessage,
   WhatsAppDeliveryError,
 } from "@/features/messages/lib/whatsapp-cloud-api";
@@ -13,7 +14,6 @@ const config = {
   templateName: "appointment_reminder",
   templateLanguage: "en",
   graphApiVersion: "v22.0",
-  cronSecret: "x".repeat(32),
 };
 
 describe("WhatsApp Cloud API provider contract", () => {
@@ -185,4 +185,46 @@ describe("WhatsApp delivery retry classification", () => {
     );
     assert.equal(canRetryWhatsAppDeliveryFailure(null), false);
   });
+});
+
+describe("WhatsApp Cloud API configuration", () => {
+  it(
+    "does not require a cron secret to validate provider delivery settings",
+    () => {
+      const keys = [
+        "WHATSAPP_CLOUD_API_TOKEN",
+        "WHATSAPP_PHONE_NUMBER_ID",
+        "WHATSAPP_BUSINESS_TEMPLATE_NAME",
+        "WHATSAPP_TEMPLATE_LANGUAGE",
+        "WHATSAPP_GRAPH_API_VERSION",
+        "WHATSAPP_CRON_SECRET",
+      ] as const;
+      const previous = Object.fromEntries(
+        keys.map((key) => [key, process.env[key]]),
+      );
+
+      try {
+        process.env.WHATSAPP_CLOUD_API_TOKEN = "test-token";
+        process.env.WHATSAPP_PHONE_NUMBER_ID = "123456789012";
+        process.env.WHATSAPP_BUSINESS_TEMPLATE_NAME = "appointment_reminder";
+        process.env.WHATSAPP_TEMPLATE_LANGUAGE = "en";
+        process.env.WHATSAPP_GRAPH_API_VERSION = "v22.0";
+        delete process.env.WHATSAPP_CRON_SECRET;
+
+        const config = getWhatsAppCloudApiConfig();
+        assert.equal(config.token, "test-token");
+        assert.equal(config.phoneNumberId, "123456789012");
+        assert.equal("cronSecret" in config, false);
+      } finally {
+        for (const key of keys) {
+          const value = previous[key];
+          if (value === undefined) {
+            delete process.env[key];
+          } else {
+            process.env[key] = value;
+          }
+        }
+      }
+    },
+  );
 });

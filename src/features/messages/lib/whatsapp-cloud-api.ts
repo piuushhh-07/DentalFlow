@@ -10,7 +10,6 @@ const configSchema = z.object({
   templateName: z.string().regex(/^[a-z0-9_]{1,120}$/),
   templateLanguage: z.string().regex(/^[a-z]{2,3}(?:_[A-Z]{2})?$/),
   graphApiVersion: z.string().regex(/^v\d+\.\d+$/),
-  cronSecret: z.string().min(32),
 });
 
 export class WhatsAppConfigurationError extends Error {
@@ -37,7 +36,6 @@ export function getWhatsAppCloudApiConfig() {
     templateName: process.env.WHATSAPP_BUSINESS_TEMPLATE_NAME,
     templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE ?? "en",
     graphApiVersion: process.env.WHATSAPP_GRAPH_API_VERSION ?? "v22.0",
-    cronSecret: process.env.WHATSAPP_CRON_SECRET,
   });
   if (!parsed.success) {
     throw new WhatsAppConfigurationError([
