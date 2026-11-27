@@ -29,7 +29,10 @@ describe("WhatsApp reminder keyset pagination", () => {
     const cursor = getWhatsAppReminderPageCursor([
       { scheduledAt, id: "appointment-1" },
       { scheduledAt, id: "appointment-2" },
-      { scheduledAt: new Date("2026-12-01T10:15:00.000Z"), id: "appointment-3" },
+      {
+        scheduledAt: new Date("2026-12-01T10:15:00.000Z"),
+        id: "appointment-3",
+      },
     ]);
 
     assert.deepEqual(cursor, {
