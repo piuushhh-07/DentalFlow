@@ -1492,7 +1492,11 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       );
       const persistedRecord =
         await freshReader.dentalClinicalRecord.findFirstOrThrow({
-          where: { id: record.id, clinicId: clinicAId, patientId: patientA.id },
+          where: {
+            id: record.id,
+            clinicId: clinicAId,
+            patientId: patientA.id,
+          },
           include: { findings: true, audits: true },
         });
       assert.equal(
@@ -1502,23 +1506,29 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.equal(persistedRecord.findings[0]?.toothNumber, 16);
       assert.equal(persistedRecord.audits.length, 1);
 
-      const { data: crossClinicRecordUpdate, error: crossClinicRecordUpdateError } =
-        await supabaseB
-          .from("dental_clinical_records")
-          .update({ chiefComplaints: "Unauthorized cross-clinic clinical update" })
-          .eq("id", record.id)
-          .select("id");
+      const {
+        data: crossClinicRecordUpdate,
+        error: crossClinicRecordUpdateError,
+      } = await supabaseB
+        .from("dental_clinical_records")
+        .update({
+          chiefComplaints: "Unauthorized cross-clinic clinical update",
+        })
+        .eq("id", record.id)
+        .select("id");
       assert.ok(
         crossClinicRecordUpdateError || !crossClinicRecordUpdate?.length,
         "A different clinic's authenticated browser session must not update this clinical record.",
       );
 
-      const { data: crossClinicRecordDelete, error: crossClinicRecordDeleteError } =
-        await supabaseB
-          .from("dental_clinical_records")
-          .delete()
-          .eq("id", record.id)
-          .select("id");
+      const {
+        data: crossClinicRecordDelete,
+        error: crossClinicRecordDeleteError,
+      } = await supabaseB
+        .from("dental_clinical_records")
+        .delete()
+        .eq("id", record.id)
+        .select("id");
       assert.ok(
         crossClinicRecordDeleteError || !crossClinicRecordDelete?.length,
         "A different clinic's authenticated browser session must not delete this clinical record.",
