@@ -65,35 +65,45 @@ export async function sendWhatsAppTemplateMessage(
   },
 ): Promise<string> {
   const to = toWhatsAppNumber(input.phoneNumber);
-  const response = await fetch(
-    `https://graph.facebook.com/${config.graphApiVersion}/${config.phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        "Content-Type": "application/json",
-      },
-      signal: AbortSignal.timeout(WHATSAPP_PROVIDER_TIMEOUT_MS),
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to,
-        type: "template",
-        template: {
-          name: config.templateName,
-          language: { code: config.templateLanguage },
-          components: [
-            {
-              type: "body",
-              parameters: input.parameters.map((text) => ({
-                type: "text",
-                text,
-              })),
-            },
-          ],
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://graph.facebook.com/${config.graphApiVersion}/${config.phoneNumberId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.token}`,
+          "Content-Type": "application/json",
         },
-      }),
-    },
-  );
+        signal: AbortSignal.timeout(WHATSAPP_PROVIDER_TIMEOUT_MS),
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to,
+          type: "template",
+          template: {
+            name: config.templateName,
+            language: { code: config.templateLanguage },
+            components: [
+              {
+                type: "body",
+                parameters: input.parameters.map((text) => ({
+                  type: "text",
+                  text,
+                })),
+              },
+            ],
+          },
+        }),
+      },
+    );
+  } catch (error) {
+    const providerCode =
+      error instanceof Error && error.name === "TimeoutError"
+        ? "TIMEOUT"
+        : "NETWORK_ERROR";
+    throw new WhatsAppDeliveryError(0, providerCode);
+  }
+
   const body: unknown = await response.json().catch(() => null);
   const providerResponseSchema = z.object({
     messages: z.array(z.object({ id: z.string().min(1) })).optional(),
