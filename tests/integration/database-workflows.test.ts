@@ -2515,6 +2515,40 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           .select("id")
           .eq("id", claim.id);
       assert.ok(browserClaimReadError || !browserVisibleClaims?.length);
+
+      const { data: browserClaimUpdate, error: browserClaimUpdateError } =
+        await supabaseB
+          .from("insurance_claims")
+          .update({ treatmentDetails: "Unauthorized cross-clinic update" })
+          .eq("id", claim.id)
+          .select("id");
+      assert.ok(
+        browserClaimUpdateError || !browserClaimUpdate?.length,
+        "A different clinic's authenticated browser session must not update this insurance claim.",
+      );
+
+      const { data: browserClaimDelete, error: browserClaimDeleteError } =
+        await supabaseB
+          .from("insurance_claims")
+          .delete()
+          .eq("id", claim.id)
+          .select("id");
+      assert.ok(
+        browserClaimDeleteError || !browserClaimDelete?.length,
+        "A different clinic's authenticated browser session must not delete this insurance claim.",
+      );
+
+      const claimAfterDeniedBrowserWrites =
+        await freshReader.insuranceClaim.findFirst({
+          where: { id: claim.id, clinicId: clinicAId },
+          select: { id: true, treatmentDetails: true },
+        });
+      assert.ok(claimAfterDeniedBrowserWrites);
+      assert.equal(
+        claimAfterDeniedBrowserWrites.treatmentDetails,
+        claimData.treatmentDetails,
+        "Denied cross-clinic browser writes must leave the insurance claim unchanged.",
+      );
       assert.equal(
         claimInputSchema.safeParse({
           ...claimData,
