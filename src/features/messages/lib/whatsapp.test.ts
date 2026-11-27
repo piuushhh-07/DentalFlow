@@ -45,7 +45,7 @@ describe("WhatsApp reminder safeguards", () => {
     assert.match(message, /Anu/);
     assert.match(message, /DentalFlow Clinic/);
     assert.match(message, /16 Oct 2026/);
-    assert.match(message, /\\+91 98765 43210/);
+    assert.match(message, /\+91 98765 43210/);
     assert.doesNotMatch(message, /root canal|diagnosis|implant/i);
   });
 
