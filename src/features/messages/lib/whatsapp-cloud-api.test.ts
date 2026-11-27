@@ -167,7 +167,11 @@ describe("WhatsApp Cloud API provider contract", () => {
 describe("WhatsApp delivery retry classification", () => {
   it("retries definitive provider client errors", () => {
     assert.equal(canRetryWhatsAppDeliveryFailure("400:131000"), true);
-    assert.equal(canRetryWhatsAppDeliveryFailure("429:4"), true);
+    assert.equal(canRetryWhatsAppDeliveryFailure("401:4"), true);
+  });
+
+  it("does not immediately retry provider rate limits without backoff metadata", () => {
+    assert.equal(canRetryWhatsAppDeliveryFailure("429:4"), false);
   });
 
   it("does not retry failures with an unknown delivery outcome", () => {
