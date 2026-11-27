@@ -8,6 +8,10 @@ import {
 import { sendDueWhatsAppAppointmentReminders } from "@/features/messages/lib/whatsapp-automation";
 
 function matchesBearerToken(request: NextRequest, expected: string): boolean {
+  if (expected.length < 32) {
+    return false;
+  }
+
   const authorization = request.headers.get("authorization") ?? "";
   const supplied = authorization.startsWith("Bearer ")
     ? authorization.slice("Bearer ".length)
@@ -21,9 +25,17 @@ function matchesBearerToken(request: NextRequest, expected: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  let config;
+  // Authenticate before validating the rest of the integration config so
+  // unauthenticated callers cannot distinguish configuration failures.
+  if (!matchesBearerToken(request, process.env.WHATSAPP_CRON_SECRET ?? "")) {
+    return NextResponse.json(
+      { error: "Unauthorized." },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   try {
-    config = getWhatsAppCloudApiConfig();
+    getWhatsAppCloudApiConfig();
   } catch (error) {
     if (error instanceof WhatsAppConfigurationError) {
       console.error("WhatsApp reminder job is not configured.", {
@@ -35,12 +47,6 @@ export async function POST(request: NextRequest) {
       );
     }
     throw error;
-  }
-  if (!matchesBearerToken(request, config.cronSecret)) {
-    return NextResponse.json(
-      { error: "Unauthorized." },
-      { status: 401, headers: { "Cache-Control": "no-store" } },
-    );
   }
 
   try {
