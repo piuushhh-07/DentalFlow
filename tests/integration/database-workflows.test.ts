@@ -1004,6 +1004,46 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           return result;
         };
 
+        const reusedPaymentEventId = `evt_${randomUUID().replaceAll("-", "")}`;
+        await assert.rejects(
+          submit(
+            "subscription.charged",
+            "active",
+            500,
+            { id: paymentForB, status: "captured" },
+            reusedPaymentEventId,
+          ),
+          /The provider payment is associated with another clinic/,
+          "A payment already owned by Clinic B must not be attached to Clinic A.",
+        );
+        const preservedClinicBPayment =
+          await freshReader.billingPayment.findUniqueOrThrow({
+            where: { providerPaymentId: paymentForB },
+          });
+        assert.equal(preservedClinicBPayment.clinicId, clinicBId);
+        assert.equal(
+          preservedClinicBPayment.subscriptionId,
+          subscriptionB.id,
+        );
+        assert.equal(
+          preservedClinicBPayment.status,
+          BillingPaymentStatus.SUCCEEDED,
+        );
+        assert.equal(
+          await freshReader.billingPayment.count({
+            where: { providerPaymentId: paymentForB, clinicId: clinicAId },
+          }),
+          0,
+        );
+        assert.equal(
+          (
+            await freshReader.billingWebhookEvent.findUniqueOrThrow({
+              where: { providerEventId: reusedPaymentEventId },
+            })
+          ).status,
+          "FAILED",
+        );
+
         const authenticatedEventId = `evt_${randomUUID().replaceAll("-", "")}`;
         assert.equal(
           await submit(
