@@ -3166,8 +3166,18 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         !closesForB.some((close) => close.id === closeA.id),
         "Clinic B's cashbook history must not expose Clinic A's close.",
       );
-      assert.equal(Number(closesForA.find((close) => close.id === closeA.id)?.expectedCash), 1250);
-      assert.equal(Number(closesForB.find((close) => close.id === closeB.id)?.expectedCash), 2575);
+      assert.equal(
+        Number(
+          closesForA.find((close) => close.id === closeA.id)?.expectedCash,
+        ),
+        1250,
+      );
+      assert.equal(
+        Number(
+          closesForB.find((close) => close.id === closeB.id)?.expectedCash,
+        ),
+        2575,
+      );
     },
   );
 
