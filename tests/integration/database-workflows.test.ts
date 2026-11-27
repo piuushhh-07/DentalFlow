@@ -2814,6 +2814,32 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "Clinic B must not read Clinic A's private insurance document.",
       );
 
+      const revokedAt = new Date();
+      const revokedMembership = await prisma.clinicMembership.updateMany({
+        where: {
+          userId: userBId,
+          clinicId: clinicBId,
+          active: true,
+          revokedAt: null,
+        },
+        data: { active: false, revokedAt },
+      });
+      assert.equal(revokedMembership.count, 1);
+      try {
+        const revokedMemberRead = await supabaseB.storage
+          .from("dentalflow-insurance-private")
+          .download(clinicBStoragePath);
+        assert.ok(
+          revokedMemberRead.error || !revokedMemberRead.data,
+          "A revoked clinic member must lose access to that clinic's private insurance files.",
+        );
+      } finally {
+        await prisma.clinicMembership.updateMany({
+          where: { userId: userBId, clinicId: clinicBId, revokedAt },
+          data: { active: true, revokedAt: null },
+        });
+      }
+
       await supabaseA.storage
         .from("dentalflow-insurance-private")
         .remove([clinicBStoragePath]);
