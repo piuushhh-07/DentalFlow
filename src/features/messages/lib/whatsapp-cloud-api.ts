@@ -54,11 +54,7 @@ export function buildWhatsAppTemplateParameters(input: {
   clinicName: string;
   appointmentTime: string;
 }): string[] {
-  return [
-    input.patientName,
-    input.clinicName,
-    input.appointmentTime,
-  ];
+  return [input.patientName, input.clinicName, input.appointmentTime];
 }
 
 export async function sendWhatsAppTemplateMessage(
