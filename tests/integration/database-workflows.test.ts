@@ -2217,14 +2217,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       );
       assert.equal(otherClinicQueue.items.length, 0);
 
-      const clinicASummary = await getFollowUpSummary(
-        clinicAId,
-        clinicToday,
-      );
-      const clinicBSummary = await getFollowUpSummary(
-        clinicBId,
-        clinicToday,
-      );
+      const clinicASummary = await getFollowUpSummary(clinicAId, clinicToday);
+      const clinicBSummary = await getFollowUpSummary(clinicBId, clinicToday);
       assert.ok(clinicASummary["reminder-sent"] >= 1);
       assert.equal(
         clinicBSummary["reminder-sent"],
