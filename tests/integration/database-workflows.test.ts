@@ -78,7 +78,10 @@ import {
 } from "@/features/recalls/lib/recall-repository";
 import { getClinicToday } from "@/features/follow-ups/lib/follow-up-validation";
 import { isDuplicateActiveRecall } from "@/features/recalls/lib/recall-validation";
-import { listFollowUpQueue } from "@/features/follow-ups/lib/follow-up-repository";
+import {
+  getFollowUpSummary,
+  listFollowUpQueue,
+} from "@/features/follow-ups/lib/follow-up-repository";
 import { WhatsAppConsentRequiredError } from "@/features/messages/lib/whatsapp";
 import {
   recordManualWhatsAppReminder,
@@ -2213,6 +2216,15 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         clinicToday,
       );
       assert.equal(otherClinicQueue.items.length, 0);
+
+      const clinicASummary = await getFollowUpSummary(clinicAId, clinicToday);
+      const clinicBSummary = await getFollowUpSummary(clinicBId, clinicToday);
+      assert.ok(clinicASummary["reminder-sent"] >= 1);
+      assert.equal(
+        clinicBSummary["reminder-sent"],
+        0,
+        "Raw SQL follow-up summary must not count another clinic's reminders.",
+      );
     },
   );
 
