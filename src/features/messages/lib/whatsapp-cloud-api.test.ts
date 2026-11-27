@@ -64,10 +64,10 @@ describe("WhatsApp Cloud API provider contract", () => {
       globalThis,
       "fetch",
       async () =>
-        new Response(
-          JSON.stringify({ error: { code: 131000 } }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        ),
+        new Response(JSON.stringify({ error: { code: 131000 } }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }),
     );
 
     try {
