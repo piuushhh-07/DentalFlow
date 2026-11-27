@@ -12,6 +12,7 @@ import {
   BillingPaymentStatus,
   BillingSubscriptionStatus,
   ClinicRole,
+  PaymentMethod,
   OdontogramDentition,
   OdontogramEntryType,
   OdontogramFinding,
@@ -22,6 +23,7 @@ import {
   TreatmentEstimateStatus,
   TreatmentType,
   TreatmentVisitStatus,
+  VendorBillStatus,
   PrismaClient,
 } from "@prisma/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -3071,6 +3073,85 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         ClinicAccessDeniedError,
         "A revoked membership must remain auditable but lose access immediately.",
       );
+    },
+  );
+
+  await t.test(
+    "vendor bill payments remain scoped to their owning clinic",
+    async () => {
+      const billDate = new Date("2026-11-01T00:00:00.000Z");
+      const dueDate = new Date("2026-11-30T00:00:00.000Z");
+      const billA = await prisma.vendorBill.create({
+        data: {
+          clinicId: clinicAId,
+          recordedByUserId: userAId,
+          vendorName: `${marker} Vendor A`,
+          invoiceNumber: randomUUID(),
+          description: "Synthetic vendor bill A",
+          category: "Dental supplies",
+          billDate,
+          dueDate,
+          amount: "500.00",
+          status: VendorBillStatus.OPEN,
+        },
+      });
+      const billB = await prisma.vendorBill.create({
+        data: {
+          clinicId: clinicBId,
+          recordedByUserId: userBId,
+          vendorName: `${marker} Vendor B`,
+          invoiceNumber: randomUUID(),
+          description: "Synthetic vendor bill B",
+          category: "Dental supplies",
+          billDate,
+          dueDate,
+          amount: "800.00",
+          status: VendorBillStatus.OPEN,
+        },
+      });
+      await prisma.vendorBillPayment.createMany({
+        data: [
+          {
+            clinicId: clinicAId,
+            billId: billA.id,
+            recordedByUserId: userAId,
+            amount: "125.00",
+            paymentMethod: PaymentMethod.CASH,
+          },
+          {
+            clinicId: clinicBId,
+            billId: billB.id,
+            recordedByUserId: userBId,
+            amount: "275.00",
+            paymentMethod: PaymentMethod.CASH,
+          },
+        ],
+      });
+
+      const [paymentsForA, paymentsForB, crossClinicA, crossClinicB] =
+        await Promise.all([
+          freshReader.vendorBillPayment.aggregate({
+            where: { clinicId: clinicAId, billId: billA.id },
+            _sum: { amount: true },
+          }),
+          freshReader.vendorBillPayment.aggregate({
+            where: { clinicId: clinicBId, billId: billB.id },
+            _sum: { amount: true },
+          }),
+          freshReader.vendorBillPayment.aggregate({
+            where: { clinicId: clinicAId, billId: billB.id },
+            _sum: { amount: true },
+          }),
+          freshReader.vendorBillPayment.aggregate({
+            where: { clinicId: clinicBId, billId: billA.id },
+            _sum: { amount: true },
+          }),
+        ]);
+
+      assert.equal(Number(paymentsForA._sum.amount ?? 0), 125);
+      assert.equal(Number(paymentsForB._sum.amount ?? 0), 275);
+      assert.equal(Number(crossClinicA._sum.amount ?? 0), 0);
+      assert.equal(Number(crossClinicB._sum.amount ?? 0), 0);
     },
   );
 
