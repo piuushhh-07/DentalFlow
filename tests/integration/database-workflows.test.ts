@@ -600,6 +600,65 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "A cross-clinic browser insert must not add a prescription audit entry.",
       );
 
+      const originalPrescriptionAudit =
+        await freshReader.digitalPrescriptionAudit.findFirstOrThrow({
+          where: {
+            clinicId: clinicAId,
+            patientId: patientA.id,
+            prescriptionId: original.id,
+          },
+        });
+      const {
+        data: crossClinicPrescriptionAuditUpdate,
+        error: crossClinicPrescriptionAuditUpdateError,
+      } = await supabaseB
+        .from("digital_prescription_audits")
+        .update({
+          action: "TAMPERED",
+          note: "Unauthorized cross-clinic audit modification",
+        })
+        .eq("id", originalPrescriptionAudit.id)
+        .select("id");
+      assert.ok(
+        crossClinicPrescriptionAuditUpdateError ||
+          !crossClinicPrescriptionAuditUpdate?.length,
+        "Clinic B must not modify audit entries for Clinic A prescriptions.",
+      );
+      assert.equal(
+        (
+          await freshReader.digitalPrescriptionAudit.findUniqueOrThrow({
+            where: { id: originalPrescriptionAudit.id },
+          })
+        ).action,
+        "CREATED",
+        "A cross-clinic browser update must leave the prescription audit action unchanged.",
+      );
+
+      const {
+        data: crossClinicPrescriptionAuditDelete,
+        error: crossClinicPrescriptionAuditDeleteError,
+      } = await supabaseB
+        .from("digital_prescription_audits")
+        .delete()
+        .eq("id", originalPrescriptionAudit.id)
+        .select("id");
+      assert.ok(
+        crossClinicPrescriptionAuditDeleteError ||
+          !crossClinicPrescriptionAuditDelete?.length,
+        "Clinic B must not delete audit entries for Clinic A prescriptions.",
+      );
+      assert.equal(
+        await freshReader.digitalPrescriptionAudit.count({
+          where: {
+            clinicId: clinicAId,
+            patientId: patientA.id,
+            prescriptionId: original.id,
+          },
+        }),
+        prescriptionAuditCountBeforeCrossClinicInsert,
+        "Cross-clinic browser mutations must not remove prescription audit history.",
+      );
+
       const originalHistory = await listPatientPrescriptions(
         clinicAId,
         patientA.id,
