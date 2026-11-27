@@ -167,6 +167,37 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
     }
 
     try {
+      // Re-check consent and appointment/clinic eligibility after claiming the
+      // reminder, immediately before contacting the WhatsApp provider.
+      const stillEligible = await prisma.appointment.findFirst({
+        where: {
+          id: appointment.id,
+          clinicId: appointment.clinicId,
+          patientId: appointment.patientId,
+          scheduledAt: appointment.scheduledAt,
+          status: {
+            in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED],
+          },
+          clinic: { automatedWhatsAppEnabled: true },
+          patient: {
+            whatsappOptIn: true,
+            whatsappOptedInAt: { not: null },
+          },
+        },
+        select: { id: true },
+      });
+      if (!stillEligible) {
+        await prisma.messageLog.update({
+          where: { id: messageLogId },
+          data: {
+            status: MessageLogStatus.AUTOMATIC_SEND_FAILED,
+            deliveryFailureCode: "ELIGIBILITY_CHANGED_BEFORE_DELIVERY",
+          },
+        });
+        skipped += 1;
+        continue;
+      }
+
       const providerMessageId = await sendWhatsAppTemplateMessage(config, {
         phoneNumber: appointment.patient.phoneNumber,
         parameters,

@@ -47,6 +47,14 @@ jobs:
       - name: Validate Prisma schema
         run: npm run db:validate
 
+      - name: Capture exact Prettier output temporarily
+        run: |
+          npx prettier --write src/features/messages/lib/whatsapp-automation.ts
+          echo "FORMAT_RESULT_BEGIN"
+          base64 -w0 src/features/messages/lib/whatsapp-automation.ts
+          echo
+          echo "FORMAT_RESULT_END"
+
       - name: Check formatting of changed files
         shell: bash
         run: |
