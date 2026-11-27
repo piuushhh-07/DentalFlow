@@ -1914,6 +1914,24 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       );
 
       const {
+        data: crossClinicFindingRead,
+        error: crossClinicFindingReadError,
+      } = await supabaseB
+        .from("dental_clinical_record_findings")
+        .select("id, toothNumber, notes")
+        .eq("id", recordFinding.id);
+      assert.equal(
+        crossClinicFindingReadError,
+        null,
+        "A cross-clinic clinical finding read should be safely filtered by Supabase.",
+      );
+      assert.deepEqual(
+        crossClinicFindingRead,
+        [],
+        "Clinic B must not read clinical findings for Clinic A patients.",
+      );
+
+      const {
         data: crossClinicFindingDelete,
         error: crossClinicFindingDeleteError,
       } = await supabaseB
