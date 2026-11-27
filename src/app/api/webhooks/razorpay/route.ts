@@ -7,6 +7,10 @@ import {
   processRazorpayWebhook,
 } from "@/features/billing/lib/razorpay-webhook";
 import { verifyRazorpayWebhookSignature } from "@/features/billing/lib/razorpay-signature";
+import {
+  readRequestBodyWithLimit,
+  RequestBodyTooLargeError,
+} from "@/features/billing/lib/request-body-limit";
 
 export const runtime = "nodejs";
 
@@ -32,12 +36,17 @@ export async function POST(request: Request) {
 
   const eventId = request.headers.get("x-razorpay-event-id") ?? "";
   const signature = request.headers.get("x-razorpay-signature") ?? "";
-  const rawBytes = new Uint8Array(await request.arrayBuffer());
-  if (rawBytes.byteLength > maxWebhookBytes) {
-    return NextResponse.json(
-      { error: "Webhook body is too large." },
-      { status: 413 },
-    );
+  let rawBytes: Uint8Array;
+  try {
+    rawBytes = await readRequestBodyWithLimit(request.body, maxWebhookBytes);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json(
+        { error: "Webhook body is too large." },
+        { status: 413 },
+      );
+    }
+    throw error;
   }
   if (!verifyRazorpayWebhookSignature(rawBytes, signature, webhookSecret)) {
     return NextResponse.json(
