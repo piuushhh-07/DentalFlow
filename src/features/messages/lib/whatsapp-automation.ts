@@ -7,6 +7,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { buildWhatsAppReminderContent } from "@/features/messages/lib/whatsapp-reminder-content";
 import {
   buildWhatsAppTemplateParameters,
   getWhatsAppCloudApiConfig,
@@ -214,33 +215,26 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
 
       // Use the latest patient and clinic details, not the values captured
       // when the due-appointment batch was first loaded.
-      const latestAppointmentTime = new Intl.DateTimeFormat("en-IN", {
-        dateStyle: "medium",
-        timeStyle: "short",
-        timeZone: stillEligible.clinic.timeZone,
-      }).format(appointment.scheduledAt);
-      const latestParameters = buildWhatsAppTemplateParameters({
+      const latestContent = buildWhatsAppReminderContent({
         patientName: stillEligible.patient.fullName,
         clinicName: stillEligible.clinic.name,
-        appointmentTime: latestAppointmentTime,
-      });
-      const latestMessageSnapshot = JSON.stringify({
-        template: config.templateName,
-        language: config.templateLanguage,
-        parameters: latestParameters,
+        timeZone: stillEligible.clinic.timeZone,
+        scheduledAt: appointment.scheduledAt,
+        templateName: config.templateName,
+        templateLanguage: config.templateLanguage,
       });
 
       await prisma.messageLog.update({
         where: { id: messageLogId },
         data: {
           recipientPhoneSnapshot: stillEligible.patient.phoneNumber,
-          messageSnapshot: latestMessageSnapshot,
+          messageSnapshot: latestContent.messageSnapshot,
         },
       });
 
       const providerMessageId = await sendWhatsAppTemplateMessage(config, {
         phoneNumber: stillEligible.patient.phoneNumber,
-        parameters: latestParameters,
+        parameters: latestContent.parameters,
       });
       await prisma.messageLog.update({
         where: { id: messageLogId },
