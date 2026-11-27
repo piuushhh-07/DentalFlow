@@ -123,7 +123,6 @@ export async function sendWhatsAppTemplateMessage(
   return parsed.data.messages[0].id;
 }
 
-
 /**
  * Only retry failures where the provider returned a definitive client-error
  * response. Network timeouts, transport failures, server errors, and local
