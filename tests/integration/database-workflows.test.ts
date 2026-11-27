@@ -1674,6 +1674,24 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         OdontogramPatientNotFoundError,
       );
 
+      const {
+        data: crossClinicOdontogramRead,
+        error: crossClinicOdontogramReadError,
+      } = await supabaseB
+        .from("odontogram_entries")
+        .select("id, toothNumber, finding, notes")
+        .eq("id", original.id);
+      assert.equal(
+        crossClinicOdontogramReadError,
+        null,
+        "A cross-clinic odontogram read should be safely filtered by Supabase.",
+      );
+      assert.deepEqual(
+        crossClinicOdontogramRead,
+        [],
+        "Clinic B must not read odontogram entries for Clinic A patients.",
+      );
+
       const { data: browserVisible, error: browserReadError } = await supabaseA
         .from("odontogram_entries")
         .select("id")
