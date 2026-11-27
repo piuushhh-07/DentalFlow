@@ -18,7 +18,10 @@ import {
 
 const MAX_DELIVERY_ATTEMPTS = 3;
 
-async function listDueAppointments(now: Date) {
+async function listDueAppointments(
+  now: Date,
+  after?: { scheduledAt: Date; id: string },
+) {
   const startsAt = new Date(now.getTime() + 23.5 * 60 * 60_000);
   const endsAt = new Date(now.getTime() + 24.5 * 60 * 60_000);
   return prisma.appointment.findMany({
@@ -30,8 +33,16 @@ async function listDueAppointments(now: Date) {
         whatsappOptIn: true,
         whatsappOptedInAt: { not: null },
       },
+      ...(after
+        ? {
+            OR: [
+              { scheduledAt: { gt: after.scheduledAt } },
+              { scheduledAt: after.scheduledAt, id: { gt: after.id } },
+            ],
+          }
+        : {}),
     },
-    orderBy: { scheduledAt: "asc" },
+    orderBy: [{ scheduledAt: "asc" }, { id: "asc" }],
     take: 100,
     select: {
       id: true,
@@ -137,12 +148,20 @@ async function claimAutomaticReminder(input: {
 
 export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
   const config = getWhatsAppCloudApiConfig();
-  const appointments = await listDueAppointments(now);
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  let after: { scheduledAt: Date; id: string } | undefined;
 
-  for (const appointment of appointments) {
+  // Keyset pagination prevents already-claimed reminders in the first page
+  // from permanently occupying the batch limit and starving later clinics.
+  while (true) {
+    const appointments = await listDueAppointments(now, after);
+    if (appointments.length === 0) break;
+    const lastAppointment = appointments[appointments.length - 1];
+    after = { scheduledAt: lastAppointment.scheduledAt, id: lastAppointment.id };
+
+    for (const appointment of appointments) {
     const appointmentTime = new Intl.DateTimeFormat("en-IN", {
       dateStyle: "medium",
       timeStyle: "short",
@@ -272,6 +291,7 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
         errorName: error instanceof Error ? error.name : "UnknownError",
       });
       failed += 1;
+    }
     }
   }
 
