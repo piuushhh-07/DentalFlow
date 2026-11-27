@@ -1546,6 +1546,36 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.equal(persistedRecord.findings[0]?.toothNumber, 16);
       assert.equal(persistedRecord.audits.length, 1);
 
+      const clinicalRecordCountBeforeCrossClinicInsert =
+        await freshReader.dentalClinicalRecord.count({
+          where: { clinicId: clinicAId, patientId: patientA.id },
+        });
+      const {
+        data: crossClinicClinicalRecordInsert,
+        error: crossClinicClinicalRecordInsertError,
+      } = await supabaseB
+        .from("dental_clinical_records")
+        .insert({
+          clinicId: clinicAId,
+          patientId: patientA.id,
+          createdByUserId: userAId,
+          chiefComplaints: "Unauthorized cross-clinic clinical record",
+          clinicalNotes: "This browser insert must be denied.",
+        })
+        .select("id");
+      assert.ok(
+        crossClinicClinicalRecordInsertError ||
+          !crossClinicClinicalRecordInsert?.length,
+        "Clinic B must not insert clinical records into Clinic A.",
+      );
+      assert.equal(
+        await freshReader.dentalClinicalRecord.count({
+          where: { clinicId: clinicAId, patientId: patientA.id },
+        }),
+        clinicalRecordCountBeforeCrossClinicInsert,
+        "A cross-clinic browser insert must not add a clinical record to Clinic A.",
+      );
+
       const {
         data: crossClinicAuditInsert,
         error: crossClinicAuditInsertError,
