@@ -3155,14 +3155,20 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
 
       const [listedBillsA, listedBillsB] = await Promise.all([
         freshReader.vendorBill.findMany({
-          where: { clinicId: clinicAId, status: { not: VendorBillStatus.VOID } },
+          where: {
+            clinicId: clinicAId,
+            status: { not: VendorBillStatus.VOID },
+          },
           select: {
             id: true,
             payments: { select: { amount: true } },
           },
         }),
         freshReader.vendorBill.findMany({
-          where: { clinicId: clinicBId, status: { not: VendorBillStatus.VOID } },
+          where: {
+            clinicId: clinicBId,
+            status: { not: VendorBillStatus.VOID },
+          },
           select: {
             id: true,
             payments: { select: { amount: true } },
@@ -3174,11 +3180,17 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.ok(listedBillsB.some((bill) => bill.id === billB.id));
       assert.ok(!listedBillsB.some((bill) => bill.id === billA.id));
       assert.equal(
-        Number(listedBillsA.find((bill) => bill.id === billA.id)?.payments[0]?.amount ?? 0),
+        Number(
+          listedBillsA.find((bill) => bill.id === billA.id)?.payments[0]
+            ?.amount ?? 0,
+        ),
         125,
       );
       assert.equal(
-        Number(listedBillsB.find((bill) => bill.id === billB.id)?.payments[0]?.amount ?? 0),
+        Number(
+          listedBillsB.find((bill) => bill.id === billB.id)?.payments[0]
+            ?.amount ?? 0,
+        ),
         275,
       );
     },
