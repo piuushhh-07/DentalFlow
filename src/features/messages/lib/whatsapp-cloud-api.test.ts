@@ -111,4 +111,54 @@ describe("WhatsApp Cloud API provider contract", () => {
       fetchMock.mock.restore();
     }
   });
+
+  it("classifies provider request timeouts without exposing the original error", async () => {
+    const fetchMock = mock.method(globalThis, "fetch", async () => {
+      throw new DOMException("request timed out", "TimeoutError");
+    });
+
+    try {
+      await assert.rejects(
+        sendWhatsAppTemplateMessage(config, {
+          phoneNumber: "9876543210",
+          parameters: ["Anu", "DentalFlow Clinic", "16 Nov, 10:30 am"],
+        }),
+        (error: unknown) => {
+          assert.ok(error instanceof WhatsAppDeliveryError);
+          assert.equal(error.httpStatus, 0);
+          assert.equal(error.providerCode, "TIMEOUT");
+          assert.equal(
+            error.message,
+            "Meta WhatsApp Business message delivery failed.",
+          );
+          return true;
+        },
+      );
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
+
+  it("classifies network failures separately from provider HTTP errors", async () => {
+    const fetchMock = mock.method(globalThis, "fetch", async () => {
+      throw new TypeError("network unavailable");
+    });
+
+    try {
+      await assert.rejects(
+        sendWhatsAppTemplateMessage(config, {
+          phoneNumber: "9876543210",
+          parameters: ["Anu", "DentalFlow Clinic", "16 Nov, 10:30 am"],
+        }),
+        (error: unknown) => {
+          assert.ok(error instanceof WhatsAppDeliveryError);
+          assert.equal(error.httpStatus, 0);
+          assert.equal(error.providerCode, "NETWORK_ERROR");
+          return true;
+        },
+      );
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
 });
