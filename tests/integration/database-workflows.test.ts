@@ -124,6 +124,7 @@ import {
   treatmentFinancialEntrySchema,
   treatmentPlanFinanceSchema,
 } from "@/features/treatments/lib/treatment-finance-validation";
+import { getClinicReceivablesAging } from "@/features/finance/lib/financial-report-repository";
 import { getClinicReportMetrics } from "@/features/reports/lib/report-repository";
 import { getClinicReportDateRange } from "@/features/reports/lib/report-validation";
 import { createSupabaseTestClient } from "./test-supabase-client";
@@ -1829,6 +1830,23 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       );
       const summary = await getClinicTreatmentFinanceSummary(clinicAId);
       assert.equal(summary.collectionsThisMonth, 1250);
+      const receivablesAging = await getClinicReceivablesAging(
+        clinicAId,
+        "Asia/Kolkata",
+      );
+      const otherClinicReceivablesAging = await getClinicReceivablesAging(
+        clinicBId,
+        "Asia/Kolkata",
+      );
+      assert.ok(
+        receivablesAging.items.some((item) => item.id === plan.id),
+        "Clinic A's receivables report must include its outstanding treatment plan.",
+      );
+      assert.equal(
+        otherClinicReceivablesAging.totalPlans,
+        0,
+        "Clinic B's raw SQL receivables report must not include Clinic A's treatment plan.",
+      );
       const otherClinicSummary =
         await getClinicTreatmentFinanceSummary(clinicBId);
       assert.equal(
