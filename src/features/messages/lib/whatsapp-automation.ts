@@ -91,6 +91,10 @@ async function claimAutomaticReminder(input: {
         id: existing.id,
         status: MessageLogStatus.AUTOMATIC_SEND_FAILED,
         deliveryAttemptCount: { lt: MAX_DELIVERY_ATTEMPTS },
+        // The failure classification may have changed since the initial read.
+        // Compare it atomically so an ambiguous delivery is never reclaimed
+        // based on stale retryable state.
+        deliveryFailureCode: existing.deliveryFailureCode,
       },
       data: {
         status: MessageLogStatus.AUTOMATIC_SEND_PENDING,
