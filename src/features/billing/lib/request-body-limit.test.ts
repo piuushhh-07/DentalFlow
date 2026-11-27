@@ -30,23 +30,22 @@ test("accepts a request body exactly at the configured byte limit", async () => 
 test(
   "rejects an oversized streamed body before buffering the remaining chunks",
   async () => {
-  let cancelled = false;
-  const body = new ReadableStream<Uint8Array>({
-    pull(controller) {
-      controller.enqueue(new Uint8Array([1, 2, 3]));
-    },
-    cancel() {
-      cancelled = true;
-    },
-  });
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3]));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
 
-  await assert.rejects(
-    readRequestBodyWithLimit(body, 2),
-    RequestBodyTooLargeError,
-  );
+    await assert.rejects(
+      readRequestBodyWithLimit(body, 2),
+      RequestBodyTooLargeError,
+    );
     assert.equal(cancelled, true);
   },
-);
 
 test("treats a missing request body as an empty byte sequence", async () => {
   const body = await readRequestBodyWithLimit(null, 1);
