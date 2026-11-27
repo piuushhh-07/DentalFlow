@@ -1857,6 +1857,33 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "Denied cross-clinic browser inserts must not add clinical audit entries.",
       );
 
+      const originalClinicalRecordAudit =
+        await freshReader.dentalClinicalRecordAudit.findFirstOrThrow({
+          where: {
+            clinicId: clinicAId,
+            patientId: patientA.id,
+            recordId: record.id,
+          },
+          select: { id: true },
+        });
+      const {
+        data: crossClinicClinicalAuditRead,
+        error: crossClinicClinicalAuditReadError,
+      } = await supabaseB
+        .from("dental_clinical_record_audits")
+        .select("id, action, note")
+        .eq("id", originalClinicalRecordAudit.id);
+      assert.equal(
+        crossClinicClinicalAuditReadError,
+        null,
+        "A cross-clinic clinical audit read should be safely filtered by Supabase.",
+      );
+      assert.deepEqual(
+        crossClinicClinicalAuditRead,
+        [],
+        "Clinic B must not read clinical audit entries for Clinic A patients.",
+      );
+
       const {
         data: crossClinicRecordUpdate,
         error: crossClinicRecordUpdateError,
