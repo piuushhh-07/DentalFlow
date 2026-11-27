@@ -27,7 +27,9 @@ test("accepts a request body exactly at the configured byte limit", async () => 
   assert.deepEqual([...body], [1, 2, 3]);
 });
 
-test("rejects an oversized streamed body before buffering the remaining chunks", async () => {
+test(
+  "rejects an oversized streamed body before buffering the remaining chunks",
+  async () => {
   let cancelled = false;
   const body = new ReadableStream<Uint8Array>({
     pull(controller) {
@@ -42,8 +44,9 @@ test("rejects an oversized streamed body before buffering the remaining chunks",
     readRequestBodyWithLimit(body, 2),
     RequestBodyTooLargeError,
   );
-  assert.equal(cancelled, true);
-});
+    assert.equal(cancelled, true);
+  },
+);
 
 test("treats a missing request body as an empty byte sequence", async () => {
   const body = await readRequestBodyWithLimit(null, 1);
