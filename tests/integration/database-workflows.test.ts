@@ -1867,6 +1867,24 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "A different clinic's authenticated browser session must not delete this clinical record.",
       );
 
+      const {
+        data: crossClinicClinicalRecordRead,
+        error: crossClinicClinicalRecordReadError,
+      } = await supabaseB
+        .from("dental_clinical_records")
+        .select("id, chiefComplaints, clinicalExamination")
+        .eq("id", record.id);
+      assert.equal(
+        crossClinicClinicalRecordReadError,
+        null,
+        "A cross-clinic clinical record read should be safely filtered by Supabase.",
+      );
+      assert.deepEqual(
+        crossClinicClinicalRecordRead,
+        [],
+        "Clinic B must not read clinical records for Clinic A patients.",
+      );
+
       const clinicalRecordAfterDeniedWrites =
         await freshReader.dentalClinicalRecord.findFirst({
           where: { id: record.id, clinicId: clinicAId, patientId: patientA.id },
