@@ -1,10 +1,41 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { matchesWhatsAppCronBearerToken } from "./whatsapp-cron-auth";
+import {
+  getWhatsAppCronExpectedSecret,
+  matchesWhatsAppCronBearerToken,
+} from "./whatsapp-cron-auth";
 
 describe("WhatsApp cron bearer authentication", () => {
   const secret = "a".repeat(32);
+
+  it("uses CRON_SECRET for Vercel GET requests", () => {
+    assert.equal(
+      getWhatsAppCronExpectedSecret("GET", {
+        cronSecret: secret,
+        whatsappCronSecret: "b".repeat(32),
+      }),
+      secret,
+    );
+  });
+
+  it("preserves WHATSAPP_CRON_SECRET for manual POST requests", () => {
+    assert.equal(
+      getWhatsAppCronExpectedSecret("POST", {
+        cronSecret: "a".repeat(32),
+        whatsappCronSecret: secret,
+      }),
+      secret,
+    );
+  });
+
+  it("fails closed when the method-specific secret is missing", () => {
+    assert.equal(getWhatsAppCronExpectedSecret("GET", {}), "");
+    assert.equal(
+      getWhatsAppCronExpectedSecret("POST", { cronSecret: secret }),
+      "",
+    );
+  });
 
   it("accepts the exact configured bearer token", () => {
     assert.equal(
