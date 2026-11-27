@@ -1298,6 +1298,38 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         directInsertError,
         "Authenticated browser writes must be denied by RLS.",
       );
+      const { data: unauthorizedUpdate, error: unauthorizedUpdateError } =
+        await supabaseB
+          .from("patients")
+          .update({ fullName: `${marker} Unauthorized update` })
+          .eq("id", patientA.id)
+          .select("id");
+      assert.ok(
+        unauthorizedUpdateError || !unauthorizedUpdate?.length,
+        "A different clinic's authenticated browser session must not update this patient.",
+      );
+
+      const { data: unauthorizedDelete, error: unauthorizedDeleteError } =
+        await supabaseB
+          .from("patients")
+          .delete()
+          .eq("id", patientA.id)
+          .select("id");
+      assert.ok(
+        unauthorizedDeleteError || !unauthorizedDelete?.length,
+        "A different clinic's authenticated browser session must not delete this patient.",
+      );
+
+      const patientAAfterDeniedWrites = await freshReader.patient.findFirst({
+        where: { id: patientA.id, clinicId: clinicAId },
+        select: { id: true, fullName: true },
+      });
+      assert.ok(patientAAfterDeniedWrites);
+      assert.equal(
+        patientAAfterDeniedWrites.fullName,
+        patientInput.fullName,
+        "Denied cross-clinic browser writes must leave the owner clinic's patient unchanged.",
+      );
     },
   );
 
