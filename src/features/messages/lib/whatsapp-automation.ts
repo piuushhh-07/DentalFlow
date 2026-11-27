@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db/prisma";
 import { buildWhatsAppReminderContent } from "@/features/messages/lib/whatsapp-reminder-content";
 import {
   buildWhatsAppTemplateParameters,
+  canRetryWhatsAppDeliveryFailure,
   getWhatsAppCloudApiConfig,
   sendWhatsAppTemplateMessage,
   WhatsAppDeliveryError,
@@ -74,12 +75,14 @@ async function claimAutomaticReminder(input: {
       id: true,
       status: true,
       deliveryAttemptCount: true,
+      deliveryFailureCode: true,
     },
   });
   if (existing) {
     if (
       existing.status !== MessageLogStatus.AUTOMATIC_SEND_FAILED ||
-      existing.deliveryAttemptCount >= MAX_DELIVERY_ATTEMPTS
+      existing.deliveryAttemptCount >= MAX_DELIVERY_ATTEMPTS ||
+      !canRetryWhatsAppDeliveryFailure(existing.deliveryFailureCode)
     ) {
       return null;
     }
