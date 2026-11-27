@@ -1501,6 +1501,41 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       );
       assert.equal(persistedRecord.findings[0]?.toothNumber, 16);
       assert.equal(persistedRecord.audits.length, 1);
+
+      const { data: crossClinicRecordUpdate, error: crossClinicRecordUpdateError } =
+        await supabaseB
+          .from("dental_clinical_records")
+          .update({ chiefComplaints: "Unauthorized cross-clinic clinical update" })
+          .eq("id", record.id)
+          .select("id");
+      assert.ok(
+        crossClinicRecordUpdateError || !crossClinicRecordUpdate?.length,
+        "A different clinic's authenticated browser session must not update this clinical record.",
+      );
+
+      const { data: crossClinicRecordDelete, error: crossClinicRecordDeleteError } =
+        await supabaseB
+          .from("dental_clinical_records")
+          .delete()
+          .eq("id", record.id)
+          .select("id");
+      assert.ok(
+        crossClinicRecordDeleteError || !crossClinicRecordDelete?.length,
+        "A different clinic's authenticated browser session must not delete this clinical record.",
+      );
+
+      const clinicalRecordAfterDeniedWrites =
+        await freshReader.dentalClinicalRecord.findFirst({
+          where: { id: record.id, clinicId: clinicAId, patientId: patientA.id },
+          select: { id: true, chiefComplaints: true },
+        });
+      assert.ok(clinicalRecordAfterDeniedWrites);
+      assert.equal(
+        clinicalRecordAfterDeniedWrites.chiefComplaints,
+        recordInput.chiefComplaints,
+        "Denied cross-clinic browser writes must leave the clinical record unchanged.",
+      );
+
       await assert.rejects(
         createDentalClinicalRecord(
           clinicBId,
