@@ -207,8 +207,7 @@ describe("WhatsApp Cloud API configuration", () => {
       try {
         process.env.WHATSAPP_CLOUD_API_TOKEN = "test-token";
         process.env.WHATSAPP_PHONE_NUMBER_ID = "123456789012";
-        process.env.WHATSAPP_BUSINESS_TEMPLATE_NAME =
-          "appointment_reminder";
+        process.env.WHATSAPP_BUSINESS_TEMPLATE_NAME = "appointment_reminder";
         process.env.WHATSAPP_TEMPLATE_LANGUAGE = "en";
         process.env.WHATSAPP_GRAPH_API_VERSION = "v22.0";
         delete process.env.WHATSAPP_CRON_SECRET;
