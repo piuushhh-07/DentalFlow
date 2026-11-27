@@ -184,7 +184,21 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
             whatsappOptedInAt: { not: null },
           },
         },
-        select: { id: true },
+        select: {
+          id: true,
+          patient: {
+            select: {
+              fullName: true,
+              phoneNumber: true,
+            },
+          },
+          clinic: {
+            select: {
+              name: true,
+              timeZone: true,
+            },
+          },
+        },
       });
       if (!stillEligible) {
         await prisma.messageLog.update({
@@ -198,9 +212,35 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
         continue;
       }
 
+      // Use the latest patient and clinic details, not the values captured
+      // when the due-appointment batch was first loaded.
+      const latestAppointmentTime = new Intl.DateTimeFormat("en-IN", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: stillEligible.clinic.timeZone,
+      }).format(appointment.scheduledAt);
+      const latestParameters = buildWhatsAppTemplateParameters({
+        patientName: stillEligible.patient.fullName,
+        clinicName: stillEligible.clinic.name,
+        appointmentTime: latestAppointmentTime,
+      });
+      const latestMessageSnapshot = JSON.stringify({
+        template: config.templateName,
+        language: config.templateLanguage,
+        parameters: latestParameters,
+      });
+
+      await prisma.messageLog.update({
+        where: { id: messageLogId },
+        data: {
+          recipientPhoneSnapshot: stillEligible.patient.phoneNumber,
+          messageSnapshot: latestMessageSnapshot,
+        },
+      });
+
       const providerMessageId = await sendWhatsAppTemplateMessage(config, {
-        phoneNumber: appointment.patient.phoneNumber,
-        parameters,
+        phoneNumber: stillEligible.patient.phoneNumber,
+        parameters: latestParameters,
       });
       await prisma.messageLog.update({
         where: { id: messageLogId },
