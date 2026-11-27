@@ -125,7 +125,10 @@ import {
   treatmentPlanFinanceSchema,
 } from "@/features/treatments/lib/treatment-finance-validation";
 import { getClinicReceivablesAging } from "@/features/finance/lib/financial-report-repository";
-import { getClinicReportMetrics } from "@/features/reports/lib/report-repository";
+import {
+  getClinicExpenseReportSummary,
+  getClinicReportMetrics,
+} from "@/features/reports/lib/report-repository";
 import { getClinicReportDateRange } from "@/features/reports/lib/report-validation";
 import { createSupabaseTestClient } from "./test-supabase-client";
 import { getClinicBillingPortalData } from "@/features/billing/lib/billing-repository";
@@ -1653,6 +1656,62 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         otherClinicMetrics.appointments,
         0,
         "Raw SQL report metrics must not expose appointments from another clinic.",
+      );
+
+      const expenseCategoryA = `TENANT_A_${randomUUID()}`;
+      const expenseCategoryB = `TENANT_B_${randomUUID()}`;
+      const expenseDate = new Date();
+      await prisma.clinicExpense.createMany({
+        data: [
+          {
+            clinicId: clinicAId,
+            recordedByUserId: userAId,
+            description: "Synthetic tenant isolation expense A",
+            category: expenseCategoryA,
+            amount: "321.50",
+            expenseDate,
+          },
+          {
+            clinicId: clinicBId,
+            recordedByUserId: userBId,
+            description: "Synthetic tenant isolation expense B",
+            category: expenseCategoryB,
+            amount: "987.50",
+            expenseDate,
+          },
+        ],
+      });
+      const clinicAExpenses = await getClinicExpenseReportSummary(
+        clinicAId,
+        "Asia/Kolkata",
+      );
+      const clinicBExpenses = await getClinicExpenseReportSummary(
+        clinicBId,
+        "Asia/Kolkata",
+      );
+      assert.ok(
+        clinicAExpenses.byCategory.some(
+          (item) => item.category === expenseCategoryA && item.amount === 321.5,
+        ),
+        "Clinic A's expense report must include its own synthetic expense.",
+      );
+      assert.ok(
+        !clinicAExpenses.byCategory.some(
+          (item) => item.category === expenseCategoryB,
+        ),
+        "Clinic A's expense report must not include Clinic B's expense category.",
+      );
+      assert.ok(
+        clinicBExpenses.byCategory.some(
+          (item) => item.category === expenseCategoryB && item.amount === 987.5,
+        ),
+        "Clinic B's expense report must include its own synthetic expense.",
+      );
+      assert.ok(
+        !clinicBExpenses.byCategory.some(
+          (item) => item.category === expenseCategoryA,
+        ),
+        "Clinic B's expense report must not include Clinic A's expense category.",
       );
     },
   );
