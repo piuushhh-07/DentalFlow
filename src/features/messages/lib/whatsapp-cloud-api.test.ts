@@ -127,7 +127,10 @@ describe("WhatsApp Cloud API provider contract", () => {
           assert.ok(error instanceof WhatsAppDeliveryError);
           assert.equal(error.httpStatus, 0);
           assert.equal(error.providerCode, "TIMEOUT");
-          assert.equal(error.message, "Meta WhatsApp Business message delivery failed.");
+          assert.equal(
+            error.message,
+            "Meta WhatsApp Business message delivery failed.",
+          );
           return true;
         },
       );
