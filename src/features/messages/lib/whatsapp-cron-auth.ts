@@ -8,9 +8,11 @@ export function getWhatsAppCronExpectedSecret(
   method: WhatsAppCronMethod,
   secrets: { cronSecret?: string; whatsappCronSecret?: string },
 ): string {
-  return method === "GET"
-    ? secrets.cronSecret ?? ""
-    : secrets.whatsappCronSecret ?? "";
+  if (method === "GET") {
+    return secrets.cronSecret ?? "";
+  }
+
+  return secrets.whatsappCronSecret ?? "";
 }
 
 export function matchesWhatsAppCronBearerToken(
