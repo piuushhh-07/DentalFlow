@@ -1015,7 +1015,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         await assert.rejects(
           crossClinicPaymentReuse,
           /The provider payment is associated with another clinic/,
-          "A payment already owned by Clinic B must not be attached to Clinic A.",
+          "Clinic A must not reuse Clinic B’s payment.",
         );
         const preservedClinicBPayment =
           await freshReader.billingPayment.findUniqueOrThrow({
