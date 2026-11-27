@@ -7,13 +7,16 @@ import {
 } from "@/features/messages/lib/whatsapp-cloud-api";
 import { sendDueWhatsAppAppointmentReminders } from "@/features/messages/lib/whatsapp-automation";
 
-export async function POST(request: NextRequest) {
+async function handleWhatsAppReminderCron(
+  request: NextRequest,
+  expectedSecret: string,
+) {
   // Authenticate before validating the rest of the integration config so
   // unauthenticated callers cannot distinguish configuration failures.
   if (
     !matchesWhatsAppCronBearerToken(
       request.headers.get("authorization"),
-      process.env.WHATSAPP_CRON_SECRET ?? "",
+      expectedSecret,
     )
   ) {
     return NextResponse.json(
@@ -51,4 +54,17 @@ export async function POST(request: NextRequest) {
       { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
+}
+
+// Vercel Cron sends GET requests and supplies CRON_SECRET as a bearer token.
+export async function GET(request: NextRequest) {
+  return handleWhatsAppReminderCron(request, process.env.CRON_SECRET ?? "");
+}
+
+// Keep the existing authenticated POST entry point for manual invocations.
+export async function POST(request: NextRequest) {
+  return handleWhatsAppReminderCron(
+    request,
+    process.env.WHATSAPP_CRON_SECRET ?? "",
+  );
 }
