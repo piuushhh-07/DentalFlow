@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { toWhatsAppNumber } from "@/features/messages/lib/whatsapp";
 
+const WHATSAPP_PROVIDER_TIMEOUT_MS = 15_000;
+
 const configSchema = z.object({
   token: z.string().min(1),
   phoneNumberId: z.string().regex(/^\d{6,30}$/),
@@ -75,6 +77,7 @@ export async function sendWhatsAppTemplateMessage(
         Authorization: `Bearer ${config.token}`,
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(WHATSAPP_PROVIDER_TIMEOUT_MS),
       body: JSON.stringify({
         messaging_product: "whatsapp",
         to,
