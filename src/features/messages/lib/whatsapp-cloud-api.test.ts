@@ -14,7 +14,6 @@ const config = {
   templateName: "appointment_reminder",
   templateLanguage: "en",
   graphApiVersion: "v22.0",
-  cronSecret: "x".repeat(32),
 };
 
 describe("WhatsApp Cloud API provider contract", () => {
@@ -216,7 +215,7 @@ describe("WhatsApp Cloud API configuration", () => {
         assert.equal(config.token, "test-token");
         assert.equal(config.phoneNumberId, "123456789012");
         assert.equal("cronSecret" in config, false);
-      } finally {
+    } finally {
         for (const key of keys) {
           const value = previous[key];
           if (value === undefined) {
