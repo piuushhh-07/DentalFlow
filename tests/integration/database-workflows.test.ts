@@ -1037,10 +1037,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           });
 
         assert.equal(preservedClinicBPayment.clinicId, clinicBId);
-        assert.equal(
-          preservedClinicBPayment.subscriptionId,
-          subscriptionB.id,
-        );
+        assert.equal(preservedClinicBPayment.subscriptionId, subscriptionB.id);
         assert.equal(
           preservedClinicBPayment.status,
           BillingPaymentStatus.SUCCEEDED,
