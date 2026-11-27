@@ -122,3 +122,18 @@ export async function sendWhatsAppTemplateMessage(
   }
   return parsed.data.messages[0].id;
 }
+
+/**
+ * Only retry failures where the provider returned a definitive client-error
+ * response. Network timeouts, transport failures, server errors, and local
+ * delivery bookkeeping failures can have an unknown delivery outcome.
+ */
+export function canRetryWhatsAppDeliveryFailure(
+  failureCode: string | null,
+): boolean {
+  if (!failureCode) return false;
+  const match = /^(\d{3}):/.exec(failureCode);
+  if (!match) return false;
+  const status = Number(match[1]);
+  return status >= 400 && status < 500;
+}
