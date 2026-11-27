@@ -492,6 +492,41 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         userAId,
         input,
       );
+
+      const prescriptionCountBeforeCrossClinicInsert =
+        await freshReader.digitalPrescription.count({
+          where: { clinicId: clinicAId, patientId: patientA.id },
+        });
+      const {
+        data: crossClinicPrescriptionInsert,
+        error: crossClinicPrescriptionInsertError,
+      } = await supabaseB
+        .from("digital_prescriptions")
+        .insert({
+          clinicId: clinicAId,
+          patientId: patientA.id,
+          visitId: clinicAVisit.id,
+          authorUserId: userAId,
+          prescriptionDate: "2026-11-02",
+          diagnosisNotes: "Unauthorized cross-clinic prescription",
+          clinicNameSnapshot: "Synthetic Clinic A",
+          authorNameSnapshot: "Synthetic Dentist A",
+          authorConfirmedAt: new Date().toISOString(),
+        })
+        .select("id");
+      assert.ok(
+        crossClinicPrescriptionInsertError ||
+          !crossClinicPrescriptionInsert?.length,
+        "Clinic B must not insert digital prescriptions into Clinic A.",
+      );
+      assert.equal(
+        await freshReader.digitalPrescription.count({
+          where: { clinicId: clinicAId, patientId: patientA.id },
+        }),
+        prescriptionCountBeforeCrossClinicInsert,
+        "A cross-clinic browser insert must not add a prescription to Clinic A.",
+      );
+
       const originalHistory = await listPatientPrescriptions(
         clinicAId,
         patientA.id,
