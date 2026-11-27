@@ -175,7 +175,9 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
           clinicId: appointment.clinicId,
           patientId: appointment.patientId,
           scheduledAt: appointment.scheduledAt,
-          status: { in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED] },
+          status: {
+            in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED],
+          },
           clinic: { automatedWhatsAppEnabled: true },
           patient: {
             whatsappOptIn: true,
