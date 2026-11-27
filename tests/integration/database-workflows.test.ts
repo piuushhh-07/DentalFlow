@@ -659,6 +659,24 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "Cross-clinic browser mutations must not remove prescription audit history.",
       );
 
+      const {
+        data: crossClinicPrescriptionAuditRead,
+        error: crossClinicPrescriptionAuditReadError,
+      } = await supabaseB
+        .from("digital_prescription_audits")
+        .select("id, action, note")
+        .eq("id", originalPrescriptionAudit.id);
+      assert.equal(
+        crossClinicPrescriptionAuditReadError,
+        null,
+        "A cross-clinic audit read should be safely filtered by Supabase.",
+      );
+      assert.deepEqual(
+        crossClinicPrescriptionAuditRead,
+        [],
+        "Clinic B must not read audit entries for Clinic A prescriptions.",
+      );
+
       const originalHistory = await listPatientPrescriptions(
         clinicAId,
         patientA.id,
