@@ -46,6 +46,7 @@ test(
     );
     assert.equal(cancelled, true);
   },
+);
 
 test("treats a missing request body as an empty byte sequence", async () => {
   const body = await readRequestBodyWithLimit(null, 1);
