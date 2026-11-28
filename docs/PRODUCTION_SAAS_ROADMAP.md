@@ -11,26 +11,26 @@
 
 The tracked PR sequence `#140–#216` contains **77 PRs**:
 
-- **75 merged** (including #213, #214, and #215)
-- **2 open** (#152, the superseded original Razorpay branch; and #216, its clean replacement)
-- **0 counted as completed** for either still-open PR
+- **76 merged** (including #213, #214, #215, and #216)
+- **0 open** in this sequence
+- **1 closed without merge** (#152, superseded by #216)
 
-This is a count of PR-sized changes in that numbered sequence, not a count of all product tasks and not a percentage of production readiness. PR #152 is not mergeable and must not be merged; PR #216 is the active replacement and must pass GitHub Actions before merge.
+This is a count of PR-sized changes in that numbered sequence, not a count of all product tasks and not a percentage of production readiness. PR #152 was closed without merging because its stale branch was not mergeable; its replacement #216 passed GitHub Actions and merged. Follow-on documentation work is tracked in PRs #217 and #218.
 
 - **PR #213 — Supabase Data API grant audit:** merged. GitHub Actions run `46162019841` passed.
 - **PR #213 coverage:** 28 clinic-data tables; asserts RLS enabled and no table-level SELECT/INSERT/UPDATE/DELETE grants for `anon`, `authenticated`, and `service_role`.
 - **Meaning of #213:** completed test coverage only. It does **not** establish complete tenant-isolation verification or prove hosted production-equivalent behavior.
 - **PR #214 — production SaaS roadmap:** merged. GitHub Actions run `46164224050` passed, including build.
 - **PR #215 — tenant access surface catalog:** merged. GitHub Actions run `46164478750` passed, including build. It catalogs 23 Server Action modules, 91 exports, and 3 API route files / 5 handlers; this is inventory only, not per-action authorization proof.
-- **PR #152 — original Razorpay branch:** open but superseded; stale branch is not mergeable. Its earlier CI failed formatting. Do not merge it.
-- **PR #216 — clean Razorpay streaming-body-limit replacement:** open. Latest inspected head `6d0ff442a377fc131346ffd66652548306ffe137`; latest CI rerun is being queued after correcting a formatting issue. A previous run failed typecheck because the test used unsupported Uint8Array iteration; that was corrected to `Array.from`. Merge only after the latest full CI succeeds.
+- **PR #152 — original Razorpay branch:** closed without merging; stale branch was not mergeable and its CI did not pass.
+- **PR #216 — clean Razorpay streaming-body-limit replacement:** merged as `5f66a1e13ac024d6441fd21ae52e3ce84849e7b3`. GitHub Actions run `46165227568` passed unit tests, typecheck, lint, Prisma validation, formatting, and build.
 - **Vercel preview builds:** currently fail with the build-rate-limit response. This is separate from GitHub Actions and does not substitute for source-code CI.
 
-### Razorpay webhook body-limit work — **PR #216 ACTIVE / PR #152 SUPERSEDED**
+### Razorpay webhook body-limit work — **PR #216 MERGED / PR #152 CLOSED WITHOUT MERGE**
 
-The original PR #152 became stale against the evolving master branch and is not mergeable. Its earlier CI run `46163109006` failed the changed-file formatting check. A clean replacement, PR #216, was created from current master with only the route handler, bounded streaming reader, and focused tests.
+The original PR #152 became stale against the evolving master branch and was not mergeable. Its earlier CI run `46163109006` failed the changed-file formatting check, so it was closed without merging. A clean replacement, PR #216, was created from current master with only the route handler, bounded streaming reader, and focused tests.
 
-The first replacement CI run `46164707379` passed unit tests but failed typecheck because the test spread a `Uint8Array` under the repository's TypeScript target. That was corrected to `Array.from`. The next run reached the formatting gate and failed only on the test file; the test descriptions were shortened and reformatted. The latest head is `6d0ff442a377fc131346ffd66652548306ffe137`; the fresh run must pass all required steps before merge. Do not merge #216 unless that exact head passes. Do not merge #152; close it as superseded after the replacement is safely merged.
+The replacement's first CI run `46164707379` failed typecheck because the test spread a `Uint8Array`; that was corrected to `Array.from`. The next run failed formatting on the test file; the test descriptions were shortened and reformatted. Final head `6d0ff442a377fc131346ffd66652548306ffe137` passed the full GitHub Actions run `46165227568`, including build, and was merged as `5f66a1e13ac024d6441fd21ae52e3ce84849e7b3`. PR #152 remains closed without merge.
 
 Vercel preview status is failing due the current build quota. GitHub Actions remains the source-code validation gate while Vercel quota is exhausted.
 
@@ -124,7 +124,7 @@ Use synthetic data only. CI currently does not establish that browser E2E or hos
 
 ### P1.2 Billing lifecycle and entitlements — **PARTIAL**
 
-- Finish Razorpay webhook streaming/body-limit fix in replacement PR #216 only after green GitHub Actions; do not merge superseded PR #152.
+- Razorpay webhook streaming/body-limit fix is merged in PR #216; continue the remaining billing lifecycle and reconciliation tests. PR #152 remains closed without merge.
 - Test sandbox checkout, signature validation, duplicate/replayed events, ambiguous provider outcomes, retries, refunds, cancellations, grace periods, delinquency, plan changes, and reconciliation.
 - Verify tenant-bound server-side entitlements, owner access, staff restrictions, and feature/module limits.
 - Add operator reconciliation and support workflows.
