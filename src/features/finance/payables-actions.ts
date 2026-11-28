@@ -122,9 +122,9 @@ export async function recordVendorBillPayment(formData: FormData): Promise<never
       });
       if (!clinic) throw new Error("CLINIC_NOT_FOUND");
       const requestLockKey = `vendor-bill-payment-request:${membership.clinicId}:${parsed.data.idempotencyKey}`;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${requestLockKey}, 0))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${requestLockKey}, 0)) IS NULL`;
       const lockKey = `vendor-bill-payment:${membership.clinicId}:${parsed.data.billId}`;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0)) IS NULL`;
       const existingPayment = await tx.vendorBillPayment.findUnique({
         where: {
           clinicId_idempotencyKey: {
