@@ -4307,7 +4307,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       const {
         data: clinicAVisibleBillPayment,
         error: clinicAVisibleBillPaymentError,
-      } = await supabaseB
+      } =
+        await supabaseB
         .from("vendor_bill_payments")
         .select("id")
         .eq("billId", billA.id);
@@ -4328,7 +4329,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       const {
         data: clinicBOwnBillPayment,
         error: clinicBOwnBillPaymentError,
-      } = await supabaseB
+      } =
+        await supabaseB
         .from("vendor_bill_payments")
         .select("id")
         .eq("billId", billB.id);
