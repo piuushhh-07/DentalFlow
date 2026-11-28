@@ -33,6 +33,7 @@ The original PR #152 became stale against the evolving master branch and is not 
 The first replacement CI run `46164707379` passed unit tests but failed typecheck because the test spread a `Uint8Array` under the repository's TypeScript target. That was corrected to `Array.from`. The next run reached the formatting gate and failed only on the test file; the test descriptions were shortened and reformatted. The latest head is `6d0ff442a377fc131346ffd66652548306ffe137`; the fresh run must pass all required steps before merge. Do not merge #216 unless that exact head passes. Do not merge #152; close it as superseded after the replacement is safely merged.
 
 Vercel preview status is failing due the current build quota. GitHub Actions remains the source-code validation gate while Vercel quota is exhausted.
+
 ## 2. Readiness rules
 
 Use these labels consistently:
