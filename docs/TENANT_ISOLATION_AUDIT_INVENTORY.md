@@ -11,6 +11,9 @@ Provide a repeatable review plan for proving that one clinic cannot read or muta
 - The integration test file explicitly refuses to run unless `DENTALFLOW_INTEGRATION_RUNNER=verified-disposable-supabase-target`; the supported entry point is `npm run test:integration`.
 - The expanded static discovery catalog in `docs/TENANT_RAW_SQL_INVENTORY.md` lists 15 production source files using Prisma `$queryRaw` and/or `$executeRaw`, including advisory locks, row locks, aggregates, and insurance Storage cleanup queue operations. This expands the earlier four identified report/summary repositories. The catalog is discovery evidence only; each statement still requires query-by-query review for clinic predicates, lock-key scope, joins, and mutation ownership.
 - Insurance document access also uses the private Supabase Storage bucket `dentalflow-insurance-private`; database row isolation alone does not prove object isolation.
+- Expanded raw SQL discovery is recorded in `docs/TENANT_RAW_SQL_INVENTORY.md`: 15 production source files use Prisma `$queryRaw` and/or `$executeRaw`; this is a catalog, not a query-by-query authorization review.
+- The read-only staging snapshot in `docs/STAGING_SECURITY_AUDIT_2026-11-28.md` found 69/69 public tables with RLS enabled, but three billing tables still have broad Data API grants because migration `20261125203000_revoke_billing_data_api_grants` is not applied in staging. Do not apply it without explicit approval.
+- The same staging snapshot found a `SECURITY DEFINER` Storage authorization RPC callable by authenticated users; it is used by Storage policies and needs focused review, not blind revocation.
 
 ## Audit inventory — complete before launch
 
