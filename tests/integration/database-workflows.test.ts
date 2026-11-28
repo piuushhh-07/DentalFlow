@@ -3320,6 +3320,42 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         [],
         "Clinic B must not read insurance payment details for Clinic A claims.",
       );
+      const crossClinicInsurancePaymentUpdate = await supabaseB
+        .from("insurance_payments")
+        .update({ reference: `UNAUTHORIZED-${randomUUID()}` })
+        .eq("id", insurancePayment.id)
+        .select("id");
+      assert.ok(
+        crossClinicInsurancePaymentUpdate.error ||
+          !crossClinicInsurancePaymentUpdate.data?.length,
+        "Clinic B must not update Clinic A's insurance payment.",
+      );
+      const crossClinicInsurancePaymentDelete = await supabaseB
+        .from("insurance_payments")
+        .delete()
+        .eq("id", insurancePayment.id)
+        .select("id");
+      assert.ok(
+        crossClinicInsurancePaymentDelete.error ||
+          !crossClinicInsurancePaymentDelete.data?.length,
+        "Clinic B must not delete Clinic A's insurance payment.",
+      );
+      const unchangedInsurancePayment =
+        await freshReader.insurancePayment.findFirst({
+          where: { id: insurancePayment.id, clinicId: clinicAId },
+          select: { id: true, amount: true, reference: true },
+        });
+      assert.ok(unchangedInsurancePayment);
+      assert.equal(
+        unchangedInsurancePayment.amount.toString(),
+        "1000",
+        "Denied cross-clinic mutations must preserve the insurance payment amount.",
+      );
+      assert.equal(
+        unchangedInsurancePayment.reference,
+        insurancePayment.reference,
+        "Denied cross-clinic mutations must preserve the insurance payment reference.",
+      );
 
       const finalClaim = await freshReader.insuranceClaim.findUniqueOrThrow({
         where: { id: claim.id },
