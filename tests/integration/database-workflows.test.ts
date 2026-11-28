@@ -3176,6 +3176,40 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         [],
         "Clinic B must not read insurance document metadata for Clinic A claims.",
       );
+      const crossClinicInsuranceDocumentUpdate = await supabaseB
+        .from("insurance_documents")
+        .update({ name: "Unauthorized cross-clinic document update" })
+        .eq("id", clinicADocumentForBrowserRead.id)
+        .select("id");
+      assert.ok(
+        crossClinicInsuranceDocumentUpdate.error ||
+          !crossClinicInsuranceDocumentUpdate.data?.length,
+        "Clinic B must not update Clinic A's insurance document metadata.",
+      );
+      const crossClinicInsuranceDocumentDelete = await supabaseB
+        .from("insurance_documents")
+        .delete()
+        .eq("id", clinicADocumentForBrowserRead.id)
+        .select("id");
+      assert.ok(
+        crossClinicInsuranceDocumentDelete.error ||
+          !crossClinicInsuranceDocumentDelete.data?.length,
+        "Clinic B must not delete Clinic A's insurance document metadata.",
+      );
+      const unchangedInsuranceDocument =
+        await freshReader.insuranceDocument.findFirst({
+          where: {
+            id: clinicADocumentForBrowserRead.id,
+            clinicId: clinicAId,
+          },
+          select: { id: true, name: true },
+        });
+      assert.ok(unchangedInsuranceDocument);
+      assert.equal(
+        unchangedInsuranceDocument.name,
+        clinicADocumentForBrowserRead.name,
+        "Denied cross-clinic mutations must preserve Clinic A's insurance document metadata.",
+      );
       const { data: browserVisibleClaims, error: browserClaimReadError } =
         await supabaseB
           .from("insurance_claims")
