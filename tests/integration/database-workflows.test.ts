@@ -4300,8 +4300,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         error: clinicAVisibleBillPaymentError,
       } = await supabaseB
         .from("vendor_bill_payments")
-          .select("id")
-          .eq("billId", billA.id);
+        .select("id")
+        .eq("billId", billA.id);
       assert.ok(
         clinicAVisibleBillPaymentError || !clinicAVisibleBillPayment?.length,
         "Clinic B's authenticated browser client must not read Clinic A's vendor bill payments.",
