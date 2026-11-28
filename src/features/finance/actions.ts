@@ -59,7 +59,9 @@ export async function closeCashRegister(formData: FormData): Promise<never> {
     await prisma.$transaction(async (tx) => {
       await assertFeatureEnabled(tx, membership.clinicId, "expenseManagement");
       const lockKey = `cash-register:${membership.clinicId}:${parsed.data.businessDate}`;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+      await tx.$queryRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0)) IS NULL
+      `;
 
       const existing = await tx.cashRegisterClose.findUnique({
         where: { clinicId_businessDate: { clinicId: membership.clinicId, businessDate } },

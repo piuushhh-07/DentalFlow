@@ -69,3 +69,28 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Capture formatted advisory-lock files for repair
+        if: always() && github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          FILES=(
+            src/features/billing/lib/billing-repository.ts
+            src/features/finance/actions.ts
+            src/features/finance/dentist-payout-actions.ts
+            src/features/finance/payables-actions.ts
+            src/features/team/staff-leave-actions.ts
+          )
+          npx prettier --write "${FILES[@]}"
+          mkdir -p /tmp/dentalflow-prettier
+          for FILE in "${FILES[@]}"; do
+            mkdir -p "/tmp/dentalflow-prettier/$(dirname "$FILE")"
+            cp "$FILE" "/tmp/dentalflow-prettier/$FILE"
+          done
+
+      - name: Upload formatted advisory-lock files
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: prettier-formatted-advisory-lock-files
+          path: /tmp/dentalflow-prettier/
