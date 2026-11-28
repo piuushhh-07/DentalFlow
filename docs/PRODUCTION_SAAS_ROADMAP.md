@@ -9,30 +9,30 @@
 
 ### GitHub PR task count
 
-The tracked PR sequence `#140–#213` contains **74 PRs**:
+The tracked PR sequence `#140–#216` contains **77 PRs**:
 
-- **73 merged** (including #213)
-- **1 open** (#152)
-- **0 counted as completed** for the still-open #152
+- **76 merged** (including #213, #214, #215, and #216)
+- **0 open** in this sequence
+- **1 closed without merge** (#152, superseded by #216)
 
-This is a count of PR-sized changes in that numbered sequence, not a count of all product tasks and not a percentage of production readiness. PR #152 is intentionally excluded from the merged count until its current head passes GitHub Actions and the PR is merged.
+This is a count of PR-sized changes in that numbered sequence, not a count of all product tasks and not a percentage of production readiness. PR #152 was closed without merging because its stale branch was not mergeable; its replacement #216 passed GitHub Actions and merged. Follow-on documentation work is tracked in PRs #217 and #218.
 
 - **PR #213 — Supabase Data API grant audit:** merged. GitHub Actions run `46162019841` passed.
 - **PR #213 coverage:** 28 clinic-data tables; asserts RLS enabled and no table-level SELECT/INSERT/UPDATE/DELETE grants for `anon`, `authenticated`, and `service_role`.
 - **Meaning of #213:** completed test coverage only. It does **not** establish complete tenant-isolation verification or prove hosted production-equivalent behavior.
-- **PR #152 — Razorpay streaming request-body limit:** open; corrected head is awaiting remediation after a failed CI run. Do not merge until a fresh GitHub Actions run passes.
-- **Vercel preview builds:** may be unavailable while the project build quota is exhausted. A Vercel status is not a substitute for required GitHub Actions checks.
+- **PR #214 — production SaaS roadmap:** merged. GitHub Actions run `46164224050` passed, including build.
+- **PR #215 — tenant access surface catalog:** merged. GitHub Actions run `46164478750` passed, including build. It catalogs 23 Server Action modules, 91 exports, and 3 API route files / 5 handlers; this is inventory only, not per-action authorization proof.
+- **PR #152 — original Razorpay branch:** closed without merging; stale branch was not mergeable and its CI did not pass.
+- **PR #216 — clean Razorpay streaming-body-limit replacement:** merged as `5f66a1e13ac024d6441fd21ae52e3ce84849e7b3`. GitHub Actions run `46165227568` passed unit tests, typecheck, lint, Prisma validation, formatting, and build.
+- **Vercel preview builds:** currently fail with the build-rate-limit response. This is separate from GitHub Actions and does not substitute for source-code CI.
 
-### PR #152 current blocker
+### Razorpay webhook body-limit work — **PR #216 MERGED / PR #152 CLOSED WITHOUT MERGE**
 
-Latest inspected head at review time: `d81435604c805005c2eda40401ae44c4421dea63`. GitHub Actions run `46163109006` failed at **Check formatting of changed files**. Unit tests (283), typecheck, lint, and Prisma schema validation passed; build was skipped because the formatting step failed. Prettier reported four files:
+The original PR #152 became stale against the evolving master branch and was not mergeable. Its earlier CI run `46163109006` failed the changed-file formatting check, so it was closed without merging. A clean replacement, PR #216, was created from current master with only the route handler, bounded streaming reader, and focused tests.
 
-- `src/app/api/webhooks/razorpay/route.ts`
-- `src/features/billing/lib/request-body-limit.test.ts`
-- `src/features/messages/lib/whatsapp-automation.ts`
-- `src/features/messages/lib/whatsapp-cloud-api.test.ts`
+The replacement's first CI run `46164707379` failed typecheck because the test spread a `Uint8Array`; that was corrected to `Array.from`. The next run failed formatting on the test file; the test descriptions were shortened and reformatted. Final head `6d0ff442a377fc131346ffd66652548306ffe137` passed the full GitHub Actions run `46165227568`, including build, and was merged as `5f66a1e13ac024d6441fd21ae52e3ce84849e7b3`. PR #152 remains closed without merge.
 
-The test failure is a formatting gate, not evidence of a runtime defect. Correct the formatting on the PR branch, push a new head, inspect the new GitHub Actions run, and merge only if the full required CI workflow succeeds. If CI fails again, inspect the failing step/log and fix it; do not merge on the basis of Vercel status alone.
+Vercel preview status is failing due the current build quota. GitHub Actions remains the source-code validation gate while Vercel quota is exhausted.
 
 ## 2. Readiness rules
 
@@ -124,7 +124,7 @@ Use synthetic data only. CI currently does not establish that browser E2E or hos
 
 ### P1.2 Billing lifecycle and entitlements — **PARTIAL**
 
-- Finish Razorpay webhook streaming/body-limit fix (#152) only after green GitHub Actions.
+- Razorpay webhook streaming/body-limit fix is merged in PR #216; continue the remaining billing lifecycle and reconciliation tests. PR #152 remains closed without merge.
 - Test sandbox checkout, signature validation, duplicate/replayed events, ambiguous provider outcomes, retries, refunds, cancellations, grace periods, delinquency, plan changes, and reconciliation.
 - Verify tenant-bound server-side entitlements, owner access, staff restrictions, and feature/module limits.
 - Add operator reconciliation and support workflows.
