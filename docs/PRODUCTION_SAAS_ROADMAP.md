@@ -9,30 +9,37 @@
 
 ### GitHub PR task count
 
-The tracked PR sequence `#140–#216` contains **77 PRs**:
+The actual PRs in the tracked range `#140–#222` currently total **81 PR-sized changes**:
 
-- **76 merged** (including #213, #214, #215, and #216)
-- **0 open** in this sequence
-- **1 closed without merge** (#152, superseded by #216)
+- **79 merged** (including #213–#219, #221, and #222)
+- **1 open** (#220 — advisory-lock result compatibility; CI formatting failure is being corrected)
+- **1 closed without merge** (#152 — superseded by the clean replacement #216)
 
-This is a count of PR-sized changes in that numbered sequence, not a count of all product tasks and not a percentage of production readiness. PR #152 was closed without merging because its stale branch was not mergeable; its replacement #216 passed GitHub Actions and merged. Follow-on documentation work is tracked in PRs #217 and #218.
+This is a count of actual PRs, not the numeric range length, not all product tasks, and not a percentage of production readiness. #152 is not counted as merged. The latest PR state and exact CI evidence must be checked before changing this count.
 
-- **PR #213 — Supabase Data API grant audit:** merged. GitHub Actions run `46162019841` passed.
-- **PR #213 coverage:** 28 clinic-data tables; asserts RLS enabled and no table-level SELECT/INSERT/UPDATE/DELETE grants for `anon`, `authenticated`, and `service_role`.
-- **Meaning of #213:** completed test coverage only. It does **not** establish complete tenant-isolation verification or prove hosted production-equivalent behavior.
-- **PR #214 — production SaaS roadmap:** merged. GitHub Actions run `46164224050` passed, including build.
-- **PR #215 — tenant access surface catalog:** merged. GitHub Actions run `46164478750` passed, including build. It catalogs 23 Server Action modules, 91 exports, and 3 API route files / 5 handlers; this is inventory only, not per-action authorization proof.
-- **PR #152 — original Razorpay branch:** closed without merging; stale branch was not mergeable and its CI did not pass.
-- **PR #216 — clean Razorpay streaming-body-limit replacement:** merged as `5f66a1e13ac024d6441fd21ae52e3ce84849e7b3`. GitHub Actions run `46165227568` passed unit tests, typecheck, lint, Prisma validation, formatting, and build.
-- **Vercel preview builds:** currently fail with the build-rate-limit response. This is separate from GitHub Actions and does not substitute for source-code CI.
+### Latest verified changes
 
-### Razorpay webhook body-limit work — **PR #216 MERGED / PR #152 CLOSED WITHOUT MERGE**
+- **PR #213 — Supabase Data API grant audit:** merged. GitHub Actions passed. It covers 28 clinic-data tables and asserts RLS enabled plus no table-level SELECT/INSERT/UPDATE/DELETE privileges for `anon`, `authenticated`, and `service_role`. This is completed test coverage only—not complete tenant-isolation verification.
+- **PR #214 — production SaaS roadmap:** merged; GitHub Actions run `46164224050` passed, including build.
+- **PR #215 — tenant access surface catalog:** merged; GitHub Actions run `46164478750` passed, including build. It catalogs 23 Server Action modules, 91 exports, and 3 API route files / 5 handlers. This is inventory, not per-action authorization proof.
+- **PR #216 — Razorpay streaming body limit:** merged as `5f66a1e13ac024d6441fd21ae52e3ce84849e7b3`; GitHub Actions run `46165227568` passed all validation stages, including build. PR #152 was closed without merge as superseded.
+- **PR #217 — progress tracker refresh:** merged; latest GitHub Actions run `46165279788` passed.
+- **PR #218 — raw SQL inventory:** merged; GitHub Actions run `46166708884` passed. The catalog identifies 15 production source files with Prisma `$queryRaw` / `$executeRaw` and preliminarily reviews aggregate, lock, onboarding, and insurance cleanup patterns. It is not exhaustive and does not close the raw SQL audit.
+- **PR #219 — read-only staging security snapshot:** merged; GitHub Actions run `46166080416` passed. Staging showed 69/69 public tables with RLS enabled, but three billing tables still had effective Data API grants; the pending grant-revocation migration was not applied.
+- **PR #221 — read-only production security snapshot:** merged; GitHub Actions run `46166274976` passed. Production showed 69/69 public tables with RLS enabled, but `billing_plan_versions`, `billing_payments`, and `clinic_subscriptions` still had effective table privileges for `anon`, `authenticated`, and `service_role`. The pending migration `20261125203000_revoke_billing_data_api_grants` is absent from the production migration ledger. The inspection session was `postgres`; the deployed Prisma runtime role remains unverified.
+- **PR #222 — public-booking tenant test:** merged; GitHub Actions run `46166903963` passed. The guarded two-clinic integration suite now asserts Clinic A cannot use Clinic B's dentist/chair IDs, including mixed-clinic resources, and rejected requests create no Clinic A request row. Ordinary CI passing does not mean the guarded hosted integration test itself was executed.
+- **PR #220 — advisory-lock result compatibility:** open, not merged. The first CI run `46166120349` and the follow-up `46167011853` failed only at changed-file formatting; unit tests, typecheck, lint, and Prisma validation passed in those runs, while build was skipped. Formatting must be fixed and the exact new head must pass full CI before merge.
+- **Vercel preview builds:** failing due the current build-rate-limit response. This is separate from GitHub Actions and is not treated as source-code failure.
 
-The original PR #152 became stale against the evolving master branch and was not mergeable. Its earlier CI run `46163109006` failed the changed-file formatting check, so it was closed without merging. A clean replacement, PR #216, was created from current master with only the route handler, bounded streaming reader, and focused tests.
+### Current production security blocker — **P0 / NOT APPROVED TO CHANGE**
 
-The replacement's first CI run `46164707379` failed typecheck because the test spread a `Uint8Array`; that was corrected to `Array.from`. The next run failed formatting on the test file; the test descriptions were shortened and reformatted. Final head `6d0ff442a377fc131346ffd66652548306ffe137` passed the full GitHub Actions run `46165227568`, including build, and was merged as `5f66a1e13ac024d6441fd21ae52e3ce84849e7b3`. PR #152 remains closed without merge.
+The production snapshot in `docs/PRODUCTION_SECURITY_AUDIT_2026-11-28.md` records the three billing-table grant drift described above. RLS is enabled, and the inspected browser-facing policies are SELECT-only, so this is not evidence that a cross-clinic exploit succeeded. However, the intended no-Data-API-grants condition is not met.
 
-Vercel preview status is failing due the current build quota. GitHub Actions remains the source-code validation gate while Vercel quota is exhausted.
+The matching migration exists in master and is also pending in staging. It revokes all privileges on those three tables from `anon`, `authenticated`, and `service_role`. Do not apply it to staging or production without explicit approval and a reviewed runtime-access plan. The app's deployed Prisma role/connection path has not yet been proven from the production SQL inspection session.
+
+### What these counts do not mean
+
+PR completion, static review, RLS enabled, and a green unit-test CI run do not certify tenant isolation, backup recovery, Storage-object isolation, privacy compliance, or production readiness. The guarded disposable-Supabase suite, production-equivalent runtime-role checks, E2E, restore drills, and independent review remain separate evidence requirements.
 
 ## 2. Readiness rules
 
@@ -61,7 +68,7 @@ Existing evidence includes server-side membership/role guards, clinic-scoped rep
 
 Remaining work:
 
-1. Exhaustively inventory every exported Server Action, server-rendered tenant-data loader, API route, Prisma repository operation, raw SQL statement, browser table/RPC operation, Storage operation, cron job, payment webhook, and membership lifecycle path.
+1. Complete the per-export review for the 91 Server Action functions catalogued in `docs/TENANT_ACCESS_SURFACE_CATALOG.md`; extend it to server-rendered tenant-data loaders, API routes, Prisma repositories, browser table/RPC operations, Storage, cron jobs, payment webhooks, and membership lifecycle paths.
 2. For each tenant-owned operation, document the trusted clinic-identity source, authorization guard, role, data operation, and positive/negative two-clinic test.
 3. Inspect actual target-project RLS policies, table grants, runtime database role attributes, connection/pooler behavior, and Storage bucket/policy configuration.
 4. Run the guarded disposable Supabase integration suite with two independent synthetic clinic users and production-equivalent runtime role/connection behavior.
@@ -116,7 +123,7 @@ Remaining work:
 
 ### P1.1 End-to-end workflow assurance — **PARTIAL**
 
-Build and run browser E2E coverage for the critical clinic journeys:
+PR #222 adds a guarded two-clinic integration assertion for public-booking resource IDs. It is covered by ordinary CI only as a compiled/test-file change; the gated hosted integration suite has not been demonstrated as executed. Build and run browser E2E coverage for the critical clinic journeys:
 
 - Signup/sign-in, onboarding, clinic selection, owner/staff permissions, invitations/revocation.
 - Patient registration/update, consent, archive/export/retention lifecycle.
@@ -130,7 +137,7 @@ Use synthetic data only. CI currently does not establish that browser E2E or hos
 
 ### P1.2 Billing lifecycle and entitlements — **PARTIAL**
 
-- Razorpay webhook streaming/body-limit fix is merged in PR #216; continue the remaining billing lifecycle and reconciliation tests. PR #152 remains closed without merge.
+- Razorpay webhook streaming/body-limit fix is merged in PR #216; PR #152 remains closed without merge. PR #220 is correcting Prisma's unsupported PostgreSQL advisory-lock `void` query results; do not merge until formatting and all CI stages pass.
 - Test sandbox checkout, signature validation, duplicate/replayed events, ambiguous provider outcomes, retries, refunds, cancellations, grace periods, delinquency, plan changes, and reconciliation.
 - Verify tenant-bound server-side entitlements, owner access, staff restrictions, and feature/module limits.
 - Add operator reconciliation and support workflows.
@@ -260,6 +267,9 @@ A user approval for one operation does not imply approval for another.
 
 - `docs/SAAS_IMPLEMENTATION_PLAN.md` — feature baseline, milestones, rollout/rollback principles, and explicit unknowns.
 - `docs/TENANT_ISOLATION_AUDIT_INVENTORY.md` — tenant access surfaces, evidence, test procedure, and isolation exit criteria.
+- `docs/TENANT_ACCESS_SURFACE_CATALOG.md` — 23 Server Action modules, 91 exports, and API route catalog.
+- `docs/TENANT_RAW_SQL_INVENTORY.md` — 15 production raw-SQL source files and preliminary predicate review.
+- `docs/STAGING_SECURITY_AUDIT_2026-11-28.md` and `docs/PRODUCTION_SECURITY_AUDIT_2026-11-28.md` — read-only environment snapshots and outstanding grant/Storage review items.
 - `docs/OPERATIONS_RUNBOOK.md` — health endpoint semantics, operational triage, deployment checklist, and known operational gaps.
 - `docs/OWNER_STAFF_PERMISSION_MATRIX.md` — role and membership access model.
 - `README.md` — local setup, guarded disposable integration suite, WhatsApp semantics, insurance Storage, and privacy/backup caveats.
