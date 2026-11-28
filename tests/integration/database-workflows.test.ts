@@ -4295,7 +4295,10 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         clinicAVisibleBillError || !clinicAVisibleBill?.length,
         "Clinic B's authenticated browser client must not read Clinic A's vendor bill.",
       );
-      const { data: clinicAVisibleBillPayment, error: clinicAVisibleBillPaymentError } =
+      const {
+        data: clinicAVisibleBillPayment,
+        error: clinicAVisibleBillPaymentError,
+      } =
         await supabaseB
           .from("vendor_bill_payments")
           .select("id")
