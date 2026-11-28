@@ -307,7 +307,9 @@ export async function scheduleClinicPlanChange(clinicId: string, targetPlanVersi
 
   const reservation = await prisma.$transaction(async (transaction) => {
     const lockKey = `clinic-billing-checkout:${clinicId}`;
-    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0)) IS NULL`;
+    await transaction.$queryRaw`
+      SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0)) IS NULL
+    `;
     const current = await transaction.clinicSubscription.findFirst({
       where: { clinicId, status: BillingSubscriptionStatus.ACTIVE, providerSubscriptionId: { not: null } },
       orderBy: { createdAt: "desc" },
