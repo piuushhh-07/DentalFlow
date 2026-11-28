@@ -2913,6 +2913,26 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         crossClinicProviderRead.error || !crossClinicProviderRead.data?.length,
         "Clinic B must not read Clinic A's insurance provider details.",
       );
+      const crossClinicProviderUpdate = await supabaseB
+        .from("insurance_providers")
+        .update({ name: `${marker} unauthorized update` })
+        .eq("id", provider.id)
+        .select("id");
+      assert.ok(
+        crossClinicProviderUpdate.error ||
+          !crossClinicProviderUpdate.data?.length,
+        "Clinic B must not update Clinic A's insurance provider.",
+      );
+      const unchangedProvider = await freshReader.insuranceProvider.findFirst({
+        where: { id: provider.id, clinicId: clinicAId },
+        select: { id: true, name: true },
+      });
+      assert.ok(unchangedProvider);
+      assert.equal(
+        unchangedProvider.name,
+        providerData.name,
+        "Denied cross-clinic updates must preserve Clinic A's provider.",
+      );
       await assert.rejects(
         createInsuranceProvider(clinicAId, providerData),
         (error: unknown) =>
