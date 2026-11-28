@@ -2925,6 +2925,14 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         coverageNotes: "Synthetic test policy only.",
       });
       const policy = await createInsurancePolicy(clinicAId, policyData);
+      const crossClinicPolicyRead = await supabaseB
+        .from("insurance_policies")
+        .select("id")
+        .eq("id", policy.id);
+      assert.ok(
+        crossClinicPolicyRead.error || !crossClinicPolicyRead.data?.length,
+        "Clinic B must not read Clinic A's insurance policy details.",
+      );
       assert.ok(
         await freshReader.insurancePolicy.findFirst({
           where: { id: policy.id, clinicId: clinicAId, patientId: patientA.id },
