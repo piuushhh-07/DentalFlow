@@ -9,7 +9,7 @@ Provide a repeatable review plan for proving that one clinic cannot read or muta
 - Shared server-side membership and role guards are documented in `docs/OWNER_STAFF_PERMISSION_MATRIX.md` and implemented through `requireClinicMembership` / `requireClinicRole`.
 - `tests/integration/database-workflows.test.ts` contains synthetic two-clinic checks using authenticated Supabase clients and Prisma verification. It covers multiple patient, clinical, prescription, insurance, financial, and reporting paths.
 - The integration test file explicitly refuses to run unless `DENTALFLOW_INTEGRATION_RUNNER=verified-disposable-supabase-target`; the supported entry point is `npm run test:integration`.
-- Raw SQL has been identified in at least these repositories: `src/features/finance/lib/financial-report-repository.ts`, `src/features/follow-ups/lib/follow-up-repository.ts`, `src/features/reports/lib/report-repository.ts`, and `src/features/treatments/lib/treatment-finance.ts`. These require query-by-query review for clinic predicates and joins.
+- The expanded static discovery catalog in `docs/TENANT_RAW_SQL_INVENTORY.md` lists 15 production source files using Prisma `$queryRaw` and/or `$executeRaw`, including advisory locks, row locks, aggregates, and insurance Storage cleanup queue operations. This expands the earlier four identified report/summary repositories. The catalog is discovery evidence only; each statement still requires query-by-query review for clinic predicates, lock-key scope, joins, and mutation ownership.
 - Insurance document access also uses the private Supabase Storage bucket `dentalflow-insurance-private`; database row isolation alone does not prove object isolation.
 
 ## Audit inventory — complete before launch
