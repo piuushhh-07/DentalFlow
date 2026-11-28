@@ -2990,6 +2990,23 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         ).status,
         InsurancePreAuthorizationStatus.PARTIALLY_APPROVED,
       );
+      const {
+        data: crossClinicPreAuthorizationRead,
+        error: crossClinicPreAuthorizationReadError,
+      } = await supabaseB
+        .from("insurance_pre_authorizations")
+        .select("id, status, proposedTreatment, requestReference")
+        .eq("id", preAuthorization.id);
+      assert.equal(
+        crossClinicPreAuthorizationReadError,
+        null,
+        "A cross-clinic pre-authorization read should be safely filtered by Supabase.",
+      );
+      assert.deepEqual(
+        crossClinicPreAuthorizationRead,
+        [],
+        "Clinic B must not read Clinic A's insurance pre-authorization details.",
+      );
 
       const claimData = claimInputSchema.parse({
         patientId: patientA.id,
