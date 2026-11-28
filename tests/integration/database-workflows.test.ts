@@ -4149,10 +4149,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         2575,
       );
 
-      const {
-        data: clinicAVisibleClose,
-        error: clinicAVisibleCloseError,
-      } =
+      const { data: clinicAVisibleClose, error: clinicAVisibleCloseError } =
         await supabaseB
           .from("cash_register_closes")
           .select("id")
@@ -4161,10 +4158,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         clinicAVisibleCloseError || !clinicAVisibleClose?.length,
         "Clinic B's authenticated browser client must not read Clinic A's cashbook close.",
       );
-      const {
-        data: clinicBOwnClose,
-        error: clinicBOwnCloseError,
-      } =
+      const { data: clinicBOwnClose, error: clinicBOwnCloseError } =
         await supabaseB
           .from("cash_register_closes")
           .select("id")
@@ -4292,14 +4286,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         275,
       );
 
-      const {
-        data: clinicAVisibleBill,
-        error: clinicAVisibleBillError,
-      } =
-        await supabaseB
-          .from("vendor_bills")
-          .select("id")
-          .eq("id", billA.id);
+      const { data: clinicAVisibleBill, error: clinicAVisibleBillError } =
+        await supabaseB.from("vendor_bills").select("id").eq("id", billA.id);
       assert.ok(
         clinicAVisibleBillError || !clinicAVisibleBill?.length,
         "Clinic B's authenticated browser client must not read Clinic A's vendor bill.",
@@ -4307,29 +4295,19 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       const {
         data: clinicAVisibleBillPayment,
         error: clinicAVisibleBillPaymentError,
-      } =
-        await supabaseB
-          .from("vendor_bill_payments")
-          .select("id")
-          .eq("billId", billA.id);
+      } = await supabaseB
+        .from("vendor_bill_payments")
+        .select("id")
+        .eq("billId", billA.id);
       assert.ok(
         clinicAVisibleBillPaymentError || !clinicAVisibleBillPayment?.length,
         "Clinic B's authenticated browser client must not read Clinic A's vendor bill payments.",
       );
-      const {
-        data: clinicBOwnBill,
-        error: clinicBOwnBillError,
-      } =
-        await supabaseB
-          .from("vendor_bills")
-          .select("id")
-          .eq("id", billB.id);
+      const { data: clinicBOwnBill, error: clinicBOwnBillError } =
+        await supabaseB.from("vendor_bills").select("id").eq("id", billB.id);
       assert.equal(clinicBOwnBillError, null);
       assert.ok(clinicBOwnBill?.some((bill) => bill.id === billB.id));
-      const {
-        data: clinicBOwnBillPayment,
-        error: clinicBOwnBillPaymentError,
-      } =
+      const { data: clinicBOwnBillPayment, error: clinicBOwnBillPaymentError } =
         await supabaseB
           .from("vendor_bill_payments")
           .select("id")
