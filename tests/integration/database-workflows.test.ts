@@ -1473,7 +1473,10 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
             where: { providerEventId: reusedPaymentEventId },
           });
         assert.equal(preservedWebhookEvent.status, "FAILED");
-        assert.equal(preservedWebhookEvent.lastError, rejectedWebhookEvent.lastError);
+        assert.equal(
+          preservedWebhookEvent.lastError,
+          rejectedWebhookEvent.lastError,
+        );
         assert.ok(graceUntil);
         assert.ok(cancellationTime > trialStartedAt);
 
