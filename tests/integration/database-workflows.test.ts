@@ -3078,6 +3078,42 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         [],
         "Clinic B must not read Clinic A's insurance pre-authorization details.",
       );
+      const crossClinicPreAuthorizationUpdate = await supabaseB
+        .from("insurance_pre_authorizations")
+        .update({ proposedTreatment: "Unauthorized cross-clinic update" })
+        .eq("id", preAuthorization.id)
+        .select("id");
+      assert.ok(
+        crossClinicPreAuthorizationUpdate.error ||
+          !crossClinicPreAuthorizationUpdate.data?.length,
+        "Clinic B must not update Clinic A's insurance pre-authorization.",
+      );
+      const crossClinicPreAuthorizationDelete = await supabaseB
+        .from("insurance_pre_authorizations")
+        .delete()
+        .eq("id", preAuthorization.id)
+        .select("id");
+      assert.ok(
+        crossClinicPreAuthorizationDelete.error ||
+          !crossClinicPreAuthorizationDelete.data?.length,
+        "Clinic B must not delete Clinic A's insurance pre-authorization.",
+      );
+      const unchangedPreAuthorization =
+        await freshReader.insurancePreAuthorization.findFirst({
+          where: { id: preAuthorization.id, clinicId: clinicAId },
+          select: { id: true, proposedTreatment: true, status: true },
+        });
+      assert.ok(unchangedPreAuthorization);
+      assert.equal(
+        unchangedPreAuthorization.proposedTreatment,
+        "Synthetic dental procedure",
+        "Denied cross-clinic writes must preserve the pre-authorization details.",
+      );
+      assert.equal(
+        unchangedPreAuthorization.status,
+        InsurancePreAuthorizationStatus.PARTIALLY_APPROVED,
+        "Denied cross-clinic writes must preserve the pre-authorization status.",
+      );
 
       const claimData = claimInputSchema.parse({
         patientId: patientA.id,
