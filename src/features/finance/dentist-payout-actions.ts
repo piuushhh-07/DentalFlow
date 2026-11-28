@@ -79,7 +79,7 @@ export async function createDentistPayout(formData: FormData): Promise<never> {
       }
 
       const lockKey = `dentist-payout-period:${membership.clinicId}:${parsed.data.dentistId}`;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0)) IS NULL`;
       const dentist = await tx.clinicDentist.findFirst({
         where: { id: parsed.data.dentistId, clinicId: membership.clinicId, active: true },
         select: { id: true },
@@ -152,7 +152,7 @@ export async function recordDentistPayoutPayment(formData: FormData): Promise<ne
       }
 
       const lockKey = `dentist-payout-payment:${membership.clinicId}:${parsed.data.payoutId}`;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0)) IS NULL`;
       const payout = await tx.dentistPayout.findFirst({
         where: {
           id: parsed.data.payoutId,
