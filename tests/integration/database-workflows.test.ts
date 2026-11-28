@@ -310,6 +310,36 @@ async function uploadAndVerifyInsuranceDocument(
     status: "VERIFIED",
     rejectionReason: null,
   });
+
+  const ownRead = await supabaseA.rpc(
+    "can_access_insurance_storage_object",
+    { object_name: storagePath, access_mode: "read" },
+  );
+  assert.equal(ownRead.error, null);
+  assert.equal(
+    ownRead.data,
+    true,
+    "The owning clinic's authenticated member may directly evaluate read access for its document.",
+  );
+
+  const crossClinicRead = await supabaseB.rpc(
+    "can_access_insurance_storage_object",
+    { object_name: storagePath, access_mode: "read" },
+  );
+  assert.equal(crossClinicRead.error, null);
+  assert.equal(
+    crossClinicRead.data,
+    false,
+    "A different clinic's authenticated member must receive no access to the document.",
+  );
+
+  const malformedPath = await supabaseA.rpc(
+    "can_access_insurance_storage_object",
+    { object_name: `${clinicAId}/not-a-claim/not-a-document/file.pdf`, access_mode: "read" },
+  );
+  assert.equal(malformedPath.error, null);
+  assert.equal(malformedPath.data, false);
+
   return storagePath;
 }
 
@@ -3651,8 +3681,42 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "Clinic B cannot authorize uploads against Clinic A's claim or document.",
       );
 
+      const verifiedStoragePaths: string[] = [];
       for (const document of storedClaim.documents) {
-        await uploadAndVerifyInsuranceDocument(claim.id, document.id);
+        verifiedStoragePaths.push(
+          await uploadAndVerifyInsuranceDocument(claim.id, document.id),
+        );
+      }
+
+      const membershipRevoked = await prisma.clinicMembership.updateMany({
+        where: { clinicId: clinicAId, userId: userAId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      assert.equal(membershipRevoked.count, 1);
+      try {
+        const revokedMemberRead = await supabaseA.rpc(
+          "can_access_insurance_storage_object",
+          {
+            object_name: verifiedStoragePaths[0],
+            access_mode: "read",
+          },
+        );
+        assert.equal(revokedMemberRead.error, null);
+        assert.equal(
+          revokedMemberRead.data,
+          false,
+          "A revoked clinic member must lose direct RPC authorization for an existing document.",
+        );
+      } finally {
+        const membershipRestored = await prisma.clinicMembership.updateMany({
+          where: {
+            clinicId: clinicAId,
+            userId: userAId,
+            revokedAt: { not: null },
+          },
+          data: { revokedAt: null },
+        });
+        assert.equal(membershipRestored.count, 1);
       }
 
       await updateInsuranceClaimStatus(clinicAId, userAId, claim.id, {

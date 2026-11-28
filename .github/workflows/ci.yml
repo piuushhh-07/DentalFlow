@@ -69,3 +69,18 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Capture formatted integration test file for repair
+        if: always() && github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          npx prettier --write tests/integration/database-workflows.test.ts
+          mkdir -p /tmp/dentalflow-prettier
+          cp tests/integration/database-workflows.test.ts /tmp/dentalflow-prettier/database-workflows.test.ts
+
+      - name: Upload formatted integration test file
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: prettier-formatted-integration-test
+          path: /tmp/dentalflow-prettier/
