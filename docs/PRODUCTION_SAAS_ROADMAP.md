@@ -17,13 +17,11 @@ The tracked PR sequence `#140–#213` contains **74 PRs**:
 
 This is a count of PR-sized changes in that numbered sequence, not a count of all product tasks and not a percentage of production readiness. PR #152 is intentionally excluded from the merged count until its current head passes GitHub Actions and the PR is merged.
 
-| Item | Evidence-backed status |
-| --- | --- |
-| PR #213 — Supabase Data API grant audit | Merged. GitHub Actions run `46162019841` passed. |
-| PR #213 coverage | 28 clinic-data tables; asserts RLS enabled and no table-level SELECT/INSERT/UPDATE/DELETE grants for `anon`, `authenticated`, and `service_role`. |
-| Meaning of #213 | Completed test coverage only. It does **not** establish complete tenant-isolation verification or prove hosted production-equivalent behavior. |
-| PR #152 — Razorpay streaming request-body limit | Open; corrected head is awaiting remediation after a failed CI run. Do not merge until a fresh GitHub Actions run passes. |
-| Vercel preview builds | May be unavailable while the project build quota is exhausted. A Vercel status is not a substitute for required GitHub Actions checks. |
+- **PR #213 — Supabase Data API grant audit:** merged. GitHub Actions run `46162019841` passed.
+- **PR #213 coverage:** 28 clinic-data tables; asserts RLS enabled and no table-level SELECT/INSERT/UPDATE/DELETE grants for `anon`, `authenticated`, and `service_role`.
+- **Meaning of #213:** completed test coverage only. It does **not** establish complete tenant-isolation verification or prove hosted production-equivalent behavior.
+- **PR #152 — Razorpay streaming request-body limit:** open; corrected head is awaiting remediation after a failed CI run. Do not merge until a fresh GitHub Actions run passes.
+- **Vercel preview builds:** may be unavailable while the project build quota is exhausted. A Vercel status is not a substitute for required GitHub Actions checks.
 
 ### PR #152 current blocker
 
