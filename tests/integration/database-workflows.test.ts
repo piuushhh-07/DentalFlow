@@ -1450,20 +1450,20 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           await supabaseB
             .from("billing_plan_versions")
             .insert({
-            code: `browser-${randomUUID()}`,
-            version: 1,
-            displayName: "Browser-created plan",
-            currency: "INR",
-            amountMinor: 1,
-            interval: "MONTH",
-            intervalCount: 1,
-            totalBillingCycles: 1,
-            trialDays: 0,
-            graceDays: 0,
-            entitlements: { maxPatients: 1 },
-            availableForSale: true,
-          })
-          .select("id");
+              code: `browser-${randomUUID()}`,
+              version: 1,
+              displayName: "Browser-created plan",
+              currency: "INR",
+              amountMinor: 1,
+              interval: "MONTH",
+              intervalCount: 1,
+              totalBillingCycles: 1,
+              trialDays: 0,
+              graceDays: 0,
+              entitlements: { maxPatients: 1 },
+              availableForSale: true,
+            })
+            .select("id");
         assert.ok(
           browserPlanInsertError || !browserInsertedPlan?.length,
           "Authenticated clinic users must not create server-managed billing plans.",
