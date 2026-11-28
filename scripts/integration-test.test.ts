@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Prisma } from "@prisma/client";
 import {
+  assertDedicatedTestProjectRef,
   classifyErrorCause,
   describeSupabaseHost,
   formatRuntimeEndpointObservation,
@@ -598,5 +599,22 @@ test("loads test environment values without overriding inherited values", () => 
   assert.equal(
     environment.DENTALFLOW_TEST_DATABASE_URL,
     "postgresql://synthetic",
+  );
+});
+
+test("integration target guard rejects known production and staging projects", () => {
+  assert.throws(
+    () => assertDedicatedTestProjectRef("paelfcdieccydwvtcyeq"),
+    /known production and staging/,
+  );
+  assert.throws(
+    () => assertDedicatedTestProjectRef("zlloccntplmjtmqpntiy"),
+    /known production and staging/,
+  );
+});
+
+test("integration target guard allows a separate disposable project", () => {
+  assert.doesNotThrow(() =>
+    assertDedicatedTestProjectRef("synthetic-disposable-ref"),
   );
 });

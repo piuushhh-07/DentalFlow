@@ -13,6 +13,18 @@ const rootDirectory = path.resolve(
 );
 const confirmationPhrase = "I-UNDERSTAND-THIS-IS-A-DISPOSABLE-TEST-PROJECT";
 const testRunnerGuard = "verified-disposable-supabase-target";
+const applicationProjectRefs = new Set([
+  "paelfcdieccydwvtcyeq",
+  "zlloccntplmjtmqpntiy",
+]);
+
+export function assertDedicatedTestProjectRef(projectRef: string): void {
+  if (applicationProjectRefs.has(projectRef)) {
+    throw new IntegrationTestError(
+      "The integration runner refuses the known production and staging Supabase projects.",
+    );
+  }
+}
 
 class IntegrationTestError extends Error {}
 
@@ -500,6 +512,8 @@ function loadAndValidateTestConfig(): TestDatabaseConfig {
       "DENTALFLOW_TEST_PROJECT_REF has an invalid format.",
     );
   }
+
+  assertDedicatedTestProjectRef(projectRef);
 
   const databaseUrl = required("DENTALFLOW_TEST_DATABASE_URL");
   const directUrl = required("DENTALFLOW_TEST_DIRECT_URL");

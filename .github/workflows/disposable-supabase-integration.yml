@@ -1,0 +1,58 @@
+name: Guarded Disposable Supabase Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_disposable_target:
+        description: "Type yes to prepare and test the dedicated disposable Supabase project"
+        required: true
+        type: choice
+        options:
+          - "no"
+          - "yes"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dentalflow-disposable-supabase-integration
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    if: ${{ inputs.confirm_disposable_target == 'yes' && github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: disposable-integration
+    env:
+      DENTALFLOW_TEST_DATABASE_CONFIRMATION: ${{ secrets.DENTALFLOW_TEST_DATABASE_CONFIRMATION }}
+      DENTALFLOW_TEST_PROJECT_REF: ${{ secrets.DENTALFLOW_TEST_PROJECT_REF }}
+      DENTALFLOW_TEST_DATABASE_URL: ${{ secrets.DENTALFLOW_TEST_DATABASE_URL }}
+      DENTALFLOW_TEST_DIRECT_URL: ${{ secrets.DENTALFLOW_TEST_DIRECT_URL }}
+      DENTALFLOW_TEST_SUPABASE_URL: ${{ secrets.DENTALFLOW_TEST_SUPABASE_URL }}
+      DENTALFLOW_TEST_SUPABASE_ANON_KEY: ${{ secrets.DENTALFLOW_TEST_SUPABASE_ANON_KEY }}
+      DENTALFLOW_TEST_USER_A_EMAIL: ${{ secrets.DENTALFLOW_TEST_USER_A_EMAIL }}
+      DENTALFLOW_TEST_USER_A_PASSWORD: ${{ secrets.DENTALFLOW_TEST_USER_A_PASSWORD }}
+      DENTALFLOW_TEST_USER_B_EMAIL: ${{ secrets.DENTALFLOW_TEST_USER_B_EMAIL }}
+      DENTALFLOW_TEST_USER_B_PASSWORD: ${{ secrets.DENTALFLOW_TEST_USER_B_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Diagnose disposable database connectivity
+        run: npm run test:integration:diagnose
+
+      - name: Prepare the disposable database schema
+        run: npm run test:integration:prepare
+
+      - name: Run two-clinic integration suite
+        run: npm run test:integration
