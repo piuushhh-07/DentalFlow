@@ -1414,6 +1414,61 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         );
 
         const {
+          data: browserUpdatedOwnPayment,
+          error: browserPaymentUpdateError,
+        } = await supabaseB
+          .from("billing_payments")
+          .update({ amountMinor: 1, status: "FAILED" })
+          .eq("id", preservedClinicBPayment.id)
+          .select("id");
+        assert.ok(
+          browserPaymentUpdateError || !browserUpdatedOwnPayment?.length,
+          "Authenticated clinic users must not mutate server-managed billing payments.",
+        );
+
+        const {
+          data: browserDeletedOwnPayment,
+          error: browserPaymentDeleteError,
+        } = await supabaseB
+          .from("billing_payments")
+          .delete()
+          .eq("id", preservedClinicBPayment.id)
+          .select("id");
+        assert.ok(
+          browserPaymentDeleteError || !browserDeletedOwnPayment?.length,
+          "Authenticated clinic users must not delete server-managed billing payments.",
+        );
+
+        const {
+          data: browserInsertedPayment,
+          error: browserPaymentInsertError,
+        } = await supabaseB
+          .from("billing_payments")
+          .insert({
+            clinicId: clinicBId,
+            subscriptionId: subscriptionB.id,
+            providerPaymentId: `pay_${randomUUID().replaceAll("-", "")}`,
+            amountMinor: 1,
+            currency: "INR",
+            status: "SUCCEEDED",
+          })
+          .select("id");
+        assert.ok(
+          browserPaymentInsertError || !browserInsertedPayment?.length,
+          "Authenticated clinic users must not create server-managed billing payments.",
+        );
+
+        const preservedBrowserPayment =
+          await freshReader.billingPayment.findUniqueOrThrow({
+            where: { providerPaymentId: paymentForB },
+          });
+        assert.equal(preservedBrowserPayment.amountMinor, 50000);
+        assert.equal(
+          preservedBrowserPayment.status,
+          BillingPaymentStatus.SUCCEEDED,
+        );
+
+        const {
           data: browserVisibleWebhookEvent,
           error: browserWebhookReadError,
         } = await supabaseB
