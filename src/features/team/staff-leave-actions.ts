@@ -60,7 +60,7 @@ export async function createStaffLeaveRequest(formData: FormData): Promise<never
     await prisma.$transaction(async (transaction) => {
       const lockKey = `staff-leave:${membership.clinicId}:${membership.userId}`;
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
+        SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0)) IS NULL
       `;
       const overlapping = await transaction.clinicStaffLeaveRequest.findFirst({
         where: {
