@@ -3291,6 +3291,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         approvedAmount: "5000.00",
         rejectionReason: null,
       });
+      const insurancePaymentReference = `PAY-${randomUUID()}`;
       const insurancePayment = await createInsurancePayment(
         clinicAId,
         userAId,
@@ -3299,7 +3300,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           kind: "INSURER_PAYMENT",
           amount: "1000.00",
           paidAt: new Date("2099-01-10T12:00:00.000Z"),
-          reference: `PAY-${randomUUID()}`,
+          reference: insurancePaymentReference,
           notes: "Synthetic partial insurer payment.",
         },
       );
@@ -3353,7 +3354,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       );
       assert.equal(
         unchangedInsurancePayment.reference,
-        insurancePayment.reference,
+        insurancePaymentReference,
         "Denied cross-clinic mutations must preserve the insurance payment reference.",
       );
 
