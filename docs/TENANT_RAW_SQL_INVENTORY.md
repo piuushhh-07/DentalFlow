@@ -26,6 +26,7 @@ The search is a discovery aid, not a guarantee that every SQL statement was foun
 - `src/features/treatments/lib/treatment-finance.ts` — Treatment finance summary aggregate. Verify every CTE/source and join is clinic-bound and financial statuses/date ranges match the intended clinic.
 - `src/features/onboarding/lib/prisma-onboarding-repository.ts` — Row lock on the authenticated user's profile during onboarding. This is a user-profile lock, not a clinic-data query; confirm the user ID comes from authenticated server context and membership creation remains user/clinic-safe.
 - `src/features/insurance/lib/insurance-repository.ts` — Row locks for claim/pre-authorization/document; cleanup-path SELECT; cleanup-queue INSERT/DELETE. Verify clinic, claim, and document predicates on every lock/read/delete; cleanup rows must bind storage path and all owning IDs. Review object-level Storage authorization separately.
+
 ## Non-tenant SQL and test-only matches
 
 - `src/app/api/health/route.ts` — public readiness probe `SELECT 1`; not a tenant-data query.
