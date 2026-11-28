@@ -31,7 +31,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   AppointmentConflictError,
   AppointmentPatientNotFoundError,
+  AppointmentResourceNotFoundError,
   AppointmentVisitAlreadyScheduledError,
+  createPublicAppointmentRequest,
   AppointmentVisitNotFoundError,
   createClinicAppointment,
   countClinicAppointments,
@@ -2286,6 +2288,43 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         data: { clinicId: clinicAId, label: `${marker} Chair` },
         select: { id: true },
       });
+      const crossClinicDentist = await prisma.clinicDentist.create({
+        data: { clinicId: clinicBId, name: `${marker} Clinic B Dentist` },
+        select: { id: true },
+      });
+      const crossClinicChair = await prisma.treatmentChair.create({
+        data: { clinicId: clinicBId, label: `${marker} Clinic B Chair` },
+        select: { id: true },
+      });
+      const publicBookingInput = {
+        patientName: `${marker} Public booking patient`,
+        phoneNumber: syntheticPhone(),
+        requestedAt: new Date(Date.now() + 2 * 60 * 60_000),
+        dentistId: crossClinicDentist.id,
+        chairId: crossClinicChair.id,
+        notes: null,
+      };
+      await assert.rejects(
+        createPublicAppointmentRequest(clinicAId, publicBookingInput),
+        AppointmentResourceNotFoundError,
+      );
+      await assert.rejects(
+        createPublicAppointmentRequest(clinicAId, {
+          ...publicBookingInput,
+          dentistId: dentist.id,
+        }),
+        AppointmentResourceNotFoundError,
+      );
+      assert.equal(
+        await freshReader.appointmentRequest.count({
+          where: {
+            clinicId: clinicAId,
+            phoneNumber: publicBookingInput.phoneNumber,
+          },
+        }),
+        0,
+        "Rejected cross-clinic public booking resources must not create a request.",
+      );
       const appointmentInput = createAppointmentSchema.parse({
         patientId: patientA.id,
         treatmentVisitId: persistedPlan.visits[0].id,
