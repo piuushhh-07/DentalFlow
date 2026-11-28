@@ -11,24 +11,21 @@ The search is a discovery aid, not a guarantee that every SQL statement was foun
 
 ## Production source locations
 
-| Source file | Raw SQL purpose | Tenant-scope review focus |
-| --- | --- | --- |
-| `src/features/appointments/lib/appointment-repository.ts` | Advisory locks, public-booking lock timeout, phone/resource locking | Lock keys must include clinic and the relevant resource/phone identity; verify every data read/write in the transaction is also clinic-scoped. |
-| `src/features/auth/lib/invitation-repository.ts` | Advisory lock for staff-seat capacity during invitation activation | Lock key is clinic-specific; verify the membership and capacity queries use the same clinic and current membership state. |
-| `src/features/auth/actions.ts` | Advisory lock for clinic staff-seat invitation creation | Lock key derives from the owner-verified clinic; invitation writes must retain that clinic predicate. |
-| `src/features/team/actions.ts` | Advisory lock during clinic member role/removal operations | Lock key must use the authorized clinic; inspect membership mutation predicates and last-owner protection. |
-| `src/features/team/staff-leave-actions.ts` | Advisory lock for a member's leave request | Lock key includes clinic and user; overlap queries must remain clinic/user scoped. |
-| `src/features/billing/lib/billing-repository.ts` | Advisory lock for checkout and scheduled plan-change reservation | Lock key includes clinic; verify subscription/plan reads and updates use the same clinic and idempotency state. |
-| `src/features/finance/actions.ts` | Advisory lock for cash-register close by clinic/date | Lock key includes clinic and business date; close/read predicates must match. |
-| `src/features/finance/payables-actions.ts` | Advisory locks for vendor-bill payment request idempotency and bill-level concurrency | Both lock keys include clinic; verify vendor bill/payment predicates and idempotency key remain clinic-bound. |
-| `src/features/finance/dentist-payout-actions.ts` | Advisory locks for dentist payout period and payout payment | Lock keys include clinic and dentist/payout; verify dentist and payout lookups use the same clinic. |
-| `src/features/finance/lib/financial-report-repository.ts` | Receivables-aging aggregate query | Every patient, plan, and visit source/join must be constrained to the requested clinic; review subqueries and date boundaries. |
-| `src/features/follow-ups/lib/follow-up-repository.ts` | Follow-up queue count, page data, and summary aggregates | Verify clinic predicate in each union branch, nested source, count query, and summary aggregate; test two-clinic zero/nonzero results. |
-| `src/features/reports/lib/report-repository.ts` | Clinic report aggregate metrics | Verify every scalar subquery uses the same clinic ID and date/status boundary. |
-| `src/features/treatments/lib/treatment-finance.ts` | Treatment finance summary aggregate | Verify every CTE/source and join is clinic-bound and that financial statuses/date ranges match the intended clinic. |
-| `src/features/onboarding/lib/prisma-onboarding-repository.ts` | Row lock on the authenticated user's profile during onboarding | This is a user-profile lock, not a clinic-data query; confirm the user ID comes from authenticated server context and membership creation remains user/clinic-safe. |
-| `src/features/insurance/lib/insurance-repository.ts` | Row locks for claim/pre-authorization/document; cleanup-path SELECT; cleanup-queue INSERT/DELETE | Verify clinic, claim, and document predicates on every lock/read/delete; cleanup rows must bind storage path and all owning IDs. Review object-level Storage authorization separately. |
-
+- `src/features/appointments/lib/appointment-repository.ts` — Advisory locks, public-booking lock timeout, phone/resource locking. Lock keys must include clinic and the relevant resource/phone identity; verify every data read/write in the transaction is also clinic-scoped.
+- `src/features/auth/lib/invitation-repository.ts` — Advisory lock for staff-seat capacity during invitation activation. Lock key is clinic-specific; verify membership and capacity queries use the same clinic and current membership state.
+- `src/features/auth/actions.ts` — Advisory lock for clinic staff-seat invitation creation. Lock key derives from the owner-verified clinic; invitation writes must retain that clinic predicate.
+- `src/features/team/actions.ts` — Advisory lock during clinic member role/removal operations. Lock key must use the authorized clinic; inspect membership mutation predicates and last-owner protection.
+- `src/features/team/staff-leave-actions.ts` — Advisory lock for a member's leave request. Lock key includes clinic and user; overlap queries must remain clinic/user scoped.
+- `src/features/billing/lib/billing-repository.ts` — Advisory lock for checkout and scheduled plan-change reservation. Lock key includes clinic; verify subscription/plan reads and updates use the same clinic and idempotency state.
+- `src/features/finance/actions.ts` — Advisory lock for cash-register close by clinic/date. Lock key includes clinic and business date; close/read predicates must match.
+- `src/features/finance/payables-actions.ts` — Advisory locks for vendor-bill payment request idempotency and bill-level concurrency. Both lock keys include clinic; verify vendor bill/payment predicates and idempotency key remain clinic-bound.
+- `src/features/finance/dentist-payout-actions.ts` — Advisory locks for dentist payout period and payout payment. Lock keys include clinic and dentist/payout; verify dentist and payout lookups use the same clinic.
+- `src/features/finance/lib/financial-report-repository.ts` — Receivables-aging aggregate query. Every patient, plan, and visit source/join must be constrained to the requested clinic; review subqueries and date boundaries.
+- `src/features/follow-ups/lib/follow-up-repository.ts` — Follow-up queue count, page data, and summary aggregates. Verify clinic predicate in each union branch, nested source, count query, and summary aggregate; test two-clinic zero/nonzero results.
+- `src/features/reports/lib/report-repository.ts` — Clinic report aggregate metrics. Verify every scalar subquery uses the same clinic ID and date/status boundary.
+- `src/features/treatments/lib/treatment-finance.ts` — Treatment finance summary aggregate. Verify every CTE/source and join is clinic-bound and financial statuses/date ranges match the intended clinic.
+- `src/features/onboarding/lib/prisma-onboarding-repository.ts` — Row lock on the authenticated user's profile during onboarding. This is a user-profile lock, not a clinic-data query; confirm the user ID comes from authenticated server context and membership creation remains user/clinic-safe.
+- `src/features/insurance/lib/insurance-repository.ts` — Row locks for claim/pre-authorization/document; cleanup-path SELECT; cleanup-queue INSERT/DELETE. Verify clinic, claim, and document predicates on every lock/read/delete; cleanup rows must bind storage path and all owning IDs. Review object-level Storage authorization separately.
 ## Non-tenant SQL and test-only matches
 
 - `src/app/api/health/route.ts` — public readiness probe `SELECT 1`; not a tenant-data query.
