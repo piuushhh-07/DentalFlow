@@ -3208,9 +3208,9 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         data: crossClinicInsurancePaymentRead,
         error: insurancePaymentReadError,
       } = await supabaseB
-          .from("insurance_payments")
-          .select("id, amount, reference")
-          .eq("id", insurancePayment.id);
+        .from("insurance_payments")
+        .select("id, amount, reference")
+        .eq("id", insurancePayment.id);
       assert.equal(
         insurancePaymentReadError,
         null,
