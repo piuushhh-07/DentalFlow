@@ -61,7 +61,7 @@ describe("WhatsApp Cloud API provider contract", () => {
         fetchMock.mock.restore();
       }
     },
-  );;
+  );
 
   it("converts provider errors into a safe delivery error", async () => {
     const fetchMock = mock.method(
@@ -117,7 +117,7 @@ describe("WhatsApp Cloud API provider contract", () => {
         fetchMock.mock.restore();
       }
     },
-  );;
+  );
 
   it(
     "classifies provider request timeouts without exposing the original error",
@@ -147,7 +147,7 @@ describe("WhatsApp Cloud API provider contract", () => {
         fetchMock.mock.restore();
       }
     },
-  );;
+  );
 
   it(
     "classifies network failures separately from provider HTTP errors",
@@ -173,7 +173,7 @@ describe("WhatsApp Cloud API provider contract", () => {
         fetchMock.mock.restore();
       }
     },
-  );;
+  );
 });
 
 describe("WhatsApp delivery retry classification", () => {
@@ -187,7 +187,7 @@ describe("WhatsApp delivery retry classification", () => {
     () => {
       assert.equal(canRetryWhatsAppDeliveryFailure("429:4"), false);
     },
-  );;
+  );
 
   it("does not retry failures with an unknown delivery outcome", () => {
     assert.equal(canRetryWhatsAppDeliveryFailure("0:TIMEOUT"), false);
