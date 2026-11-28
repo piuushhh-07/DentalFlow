@@ -2884,10 +2884,17 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       const clinicASummary = await getFollowUpSummary(clinicAId, clinicToday);
       const clinicBSummary = await getFollowUpSummary(clinicBId, clinicToday);
       assert.ok(clinicASummary["reminder-sent"] >= 1);
-      assert.equal(
-        clinicBSummary["reminder-sent"],
-        0,
-        "Raw SQL follow-up summary must not count another clinic's reminders.",
+      assert.deepEqual(
+        clinicBSummary,
+        {
+          "due-today": 0,
+          overdue: 0,
+          "reminder-sent": 0,
+          confirmed: 0,
+          "no-response": 0,
+          completed: 0,
+        },
+        "Every raw SQL follow-up summary metric must remain isolated to the requested clinic.",
       );
     },
   );
