@@ -14,18 +14,66 @@ Provide a repeatable review plan for proving that one clinic cannot read or muta
 
 ## Audit inventory — complete before launch
 
-| Surface | Required inventory | Required proof | Current state |
-| --- | --- | --- | --- |
-| Server Actions | Every exported action under `src/features/**/actions.ts`; record its clinic source, guard, role, and repository calls | Cross-clinic read/write tests at the action boundary, including forged clinic and record IDs | Not yet exhaustively inventoried |
-| Server-rendered pages and loaders | Every clinic page and server component that reads tenant data | A user from clinic B cannot load clinic A records by changing route/query identifiers | Not yet exhaustively inventoried |
-| Route handlers / API endpoints | Every `src/app/api/**/route.ts` handler, including cron and webhook routes | Correct authentication model; tenant scope derived from trusted server context, not caller-supplied clinic IDs | Not yet exhaustively inventoried |
-| Prisma repositories | Every read, create, update, delete, aggregate, nested relation, and transaction | Clinic scope on the parent and all linked records; composite relations prevent cross-clinic links | Partially covered by integration tests |
-| Raw SQL | Every `$queryRaw` / `$executeRaw` call, including CTEs, unions, joins, and subqueries | Clinic predicate applied to every tenant-owned source; adversarial two-clinic fixture returns only the selected clinic | Identified examples; not fully reviewed |
-| Supabase browser / REST access | Every browser-client table operation and RPC | Authenticated Clinic B cannot select, insert, update, or delete Clinic A rows; policy behavior verified on disposable hosted Supabase | Partially covered; expand table/action matrix |
-| Supabase Storage | Every bucket, upload/download/list/delete/sign operation and path builder | Cross-clinic object read/write/delete denied; malformed paths, wrong claim/document IDs, MIME/size constraints, and cleanup failures tested | Insurance bucket has targeted coverage; full inventory pending |
-| Background jobs and integrations | Cron, WhatsApp, payment webhooks, scheduled tasks, and retries | Authentication before work; clinic ownership revalidated at execution; idempotency and stale-claim behavior tested | Selected WhatsApp and Razorpay cases covered |
-| Membership lifecycle | Invite, role change, revoke, clinic switch, multi-clinic membership | Revocation and downgrade take effect on the next request; role is re-read server-side | Some focused tests exist; full action-level matrix pending |
-| Database roles and RLS | Actual production-equivalent runtime role, grants, policies, and owner/bypass attributes | Two-clinic tests run with the same role and connection path used by the deployed app; direct REST and Prisma behavior both recorded | Production-equivalent role/policy verification outstanding |
+### Server Actions
+
+- **Required inventory:** Every exported action under `src/features/**/actions.ts`; record its clinic source, guard, role, and repository calls.
+- **Required proof:** Cross-clinic read/write tests at the action boundary, including forged clinic and record IDs.
+- **Current state:** Not yet exhaustively inventoried.
+
+### Server-rendered pages and loaders
+
+- **Required inventory:** Every clinic page and server component that reads tenant data.
+- **Required proof:** A user from clinic B cannot load clinic A records by changing route/query identifiers.
+- **Current state:** Not yet exhaustively inventoried.
+
+### Route handlers and API endpoints
+
+- **Required inventory:** Every `src/app/api/**/route.ts` handler, including cron and webhook routes.
+- **Required proof:** Correct authentication model; tenant scope derived from trusted server context, not caller-supplied clinic IDs.
+- **Current state:** Not yet exhaustively inventoried.
+
+### Prisma repositories
+
+- **Required inventory:** Every read, create, update, delete, aggregate, nested relation, and transaction.
+- **Required proof:** Clinic scope on the parent and all linked records; composite relations prevent cross-clinic links.
+- **Current state:** Partially covered by integration tests.
+
+### Raw SQL
+
+- **Required inventory:** Every `$queryRaw` / `$executeRaw` call, including CTEs, unions, joins, and subqueries.
+- **Required proof:** Clinic predicate applied to every tenant-owned source; adversarial two-clinic fixture returns only the selected clinic.
+- **Current state:** Identified examples; not fully reviewed.
+
+### Supabase browser and REST access
+
+- **Required inventory:** Every browser-client table operation and RPC.
+- **Required proof:** Authenticated Clinic B cannot select, insert, update, or delete Clinic A rows; policy behavior verified on disposable hosted Supabase.
+- **Current state:** Partially covered; expand table/action matrix.
+
+### Supabase Storage
+
+- **Required inventory:** Every bucket, upload/download/list/delete/sign operation, and path builder.
+- **Required proof:** Cross-clinic object read/write/delete denied; malformed paths, wrong claim/document IDs, MIME/size constraints, and cleanup failures tested.
+- **Current state:** Insurance bucket has targeted coverage; full inventory pending.
+
+### Background jobs and integrations
+
+- **Required inventory:** Cron, WhatsApp, payment webhooks, scheduled tasks, and retries.
+- **Required proof:** Authentication before work; clinic ownership revalidated at execution; idempotency and stale-claim behavior tested.
+- **Current state:** Selected WhatsApp and Razorpay cases covered.
+
+### Membership lifecycle
+
+- **Required inventory:** Invite, role change, revoke, clinic switch, and multi-clinic membership.
+- **Required proof:** Revocation and downgrade take effect on the next request; role is re-read server-side.
+- **Current state:** Some focused tests exist; full action-level matrix pending.
+
+### Database roles and RLS
+
+- **Required inventory:** Actual production-equivalent runtime role, grants, policies, and owner/bypass attributes.
+- **Required proof:** Two-clinic tests run with the same role and connection path used by the deployed app; direct REST and Prisma behavior both recorded.
+- **Current state:** Production-equivalent role/policy verification outstanding.
+
 
 ## Review procedure
 
