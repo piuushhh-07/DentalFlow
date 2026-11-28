@@ -4149,7 +4149,10 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         2575,
       );
 
-      const { data: clinicAVisibleClose, error: clinicAVisibleCloseError } =
+      const {
+        data: clinicAVisibleClose,
+        error: clinicAVisibleCloseError,
+      } =
         await supabaseB
           .from("cash_register_closes")
           .select("id")
@@ -4158,7 +4161,10 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         clinicAVisibleCloseError || !clinicAVisibleClose?.length,
         "Clinic B's authenticated browser client must not read Clinic A's cashbook close.",
       );
-      const { data: clinicBOwnClose, error: clinicBOwnCloseError } =
+      const {
+        data: clinicBOwnClose,
+        error: clinicBOwnCloseError,
+      } =
         await supabaseB
           .from("cash_register_closes")
           .select("id")
@@ -4286,7 +4292,10 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         275,
       );
 
-      const { data: clinicAVisibleBill, error: clinicAVisibleBillError } =
+      const {
+        data: clinicAVisibleBill,
+        error: clinicAVisibleBillError,
+      } =
         await supabaseB
           .from("vendor_bills")
           .select("id")
@@ -4306,7 +4315,10 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         clinicAVisibleBillPaymentError || !clinicAVisibleBillPayment?.length,
         "Clinic B's authenticated browser client must not read Clinic A's vendor bill payments.",
       );
-      const { data: clinicBOwnBill, error: clinicBOwnBillError } =
+      const {
+        data: clinicBOwnBill,
+        error: clinicBOwnBillError,
+      } =
         await supabaseB
           .from("vendor_bills")
           .select("id")
