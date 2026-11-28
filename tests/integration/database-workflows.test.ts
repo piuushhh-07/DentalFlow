@@ -3014,6 +3014,25 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.equal(storedClaim.documents.length, 3);
       assert.ok(storedClaim.activities.length >= 4);
       assert.equal(await getInsuranceClaim(clinicBId, claim.id), null);
+      const clinicAActivityForBrowserRead = storedClaim.activities[0];
+      assert.ok(clinicAActivityForBrowserRead);
+      const {
+        data: crossClinicInsuranceActivityRead,
+        error: crossClinicInsuranceActivityReadError,
+      } = await supabaseB
+        .from("insurance_activities")
+        .select("id, type, summary, details")
+        .eq("id", clinicAActivityForBrowserRead.id);
+      assert.equal(
+        crossClinicInsuranceActivityReadError,
+        null,
+        "A cross-clinic insurance activity read should be safely filtered by Supabase.",
+      );
+      assert.deepEqual(
+        crossClinicInsuranceActivityRead,
+        [],
+        "Clinic B must not read insurance activity metadata for Clinic A claims.",
+      );
       const clinicADocumentForBrowserRead = storedClaim.documents[0];
       assert.ok(clinicADocumentForBrowserRead);
       const {
