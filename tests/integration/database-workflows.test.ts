@@ -1403,10 +1403,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         assert.ifError(clinicBOwnSubscriptionError);
         assert.equal(clinicBOwnSubscription?.length, 1);
 
-        const {
-          data: clinicAVisiblePlan,
-          error: clinicAPlanReadError,
-        } = await supabaseA
+        const { data: clinicAVisiblePlan, error: clinicAPlanReadError } =
+          await supabaseA
           .from("billing_plan_versions")
           .select("id, code, availableForSale")
           .eq("id", billingPlan.id);
@@ -1417,10 +1415,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           ),
           "Authenticated clinics must be able to read an available billing plan.",
         );
-        const {
-          data: clinicBVisiblePlan,
-          error: clinicBPlanReadError,
-        } = await supabaseB
+        const { data: clinicBVisiblePlan, error: clinicBPlanReadError } =
+          await supabaseB
           .from("billing_plan_versions")
           .select("id")
           .eq("id", billingPlan.id);
@@ -1430,10 +1426,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           "The shared billing catalogue must be readable across clinics.",
         );
 
-        const {
-          data: browserUpdatedPlan,
-          error: browserPlanUpdateError,
-        } = await supabaseB
+        const { data: browserUpdatedPlan, error: browserPlanUpdateError } =
+          await supabaseB
           .from("billing_plan_versions")
           .update({ amountMinor: 1, availableForSale: false })
           .eq("id", billingPlan.id)
@@ -1442,10 +1436,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           browserPlanUpdateError || !browserUpdatedPlan?.length,
           "Authenticated clinic users must not alter server-managed billing plans.",
         );
-        const {
-          data: browserDeletedPlan,
-          error: browserPlanDeleteError,
-        } = await supabaseB
+        const { data: browserDeletedPlan, error: browserPlanDeleteError } =
+          await supabaseB
           .from("billing_plan_versions")
           .delete()
           .eq("id", billingPlan.id)
@@ -1454,10 +1446,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           browserPlanDeleteError || !browserDeletedPlan?.length,
           "Authenticated clinic users must not delete server-managed billing plans.",
         );
-        const {
-          data: browserInsertedPlan,
-          error: browserPlanInsertError,
-        } = await supabaseB
+        const { data: browserInsertedPlan, error: browserPlanInsertError } =
+          await supabaseB
           .from("billing_plan_versions")
           .insert({
             code: `browser-${randomUUID()}`,
