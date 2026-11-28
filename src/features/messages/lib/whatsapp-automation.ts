@@ -147,7 +147,8 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
       clinicName: appointment.clinic.name,
       appointmentTime,
     });
-    const reminderKey = `${appointment.id}:${appointment.scheduledAt.toISOString()}`;
+    const reminderKey = `${appointment.id}:
+      ${appointment.scheduledAt.toISOString()}`;
     const messageSnapshot = JSON.stringify({
       template: config.templateName,
       language: config.templateLanguage,
@@ -194,7 +195,8 @@ export async function sendDueWhatsAppAppointmentReminders(now = new Date()) {
         },
       });
       console.error("Automated WhatsApp reminder failed.", {
-        status: error instanceof WhatsAppDeliveryError ? error.httpStatus : null,
+        status:
+          error instanceof WhatsAppDeliveryError ? error.httpStatus : null,
         providerCode:
           error instanceof WhatsAppDeliveryError
             ? error.providerCode
