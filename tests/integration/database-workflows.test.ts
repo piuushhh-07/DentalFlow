@@ -1120,6 +1120,7 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           graceDays: 7,
           entitlements: { maxPatients: 1, maxMonthlyAppointments: 1 },
           providerPlanId: `plan_${randomUUID().replaceAll("-", "")}`,
+          availableForSale: true,
         },
       });
       const providerSubscriptionA = `sub_${randomUUID().replaceAll("-", "")}`;
@@ -1401,6 +1402,88 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           .eq("id", subscriptionB.id);
         assert.ifError(clinicBOwnSubscriptionError);
         assert.equal(clinicBOwnSubscription?.length, 1);
+
+        const {
+          data: clinicAVisiblePlan,
+          error: clinicAPlanReadError,
+        } = await supabaseA
+          .from("billing_plan_versions")
+          .select("id, code, availableForSale")
+          .eq("id", billingPlan.id);
+        assert.ifError(clinicAPlanReadError);
+        assert.ok(
+          clinicAVisiblePlan?.some(
+            (plan) => plan.id === billingPlan.id && plan.availableForSale,
+          ),
+          "Authenticated clinics must be able to read an available billing plan.",
+        );
+        const {
+          data: clinicBVisiblePlan,
+          error: clinicBPlanReadError,
+        } = await supabaseB
+          .from("billing_plan_versions")
+          .select("id")
+          .eq("id", billingPlan.id);
+        assert.ifError(clinicBPlanReadError);
+        assert.ok(
+          clinicBVisiblePlan?.some((plan) => plan.id === billingPlan.id),
+          "The shared billing catalogue must be readable across clinics.",
+        );
+
+        const {
+          data: browserUpdatedPlan,
+          error: browserPlanUpdateError,
+        } = await supabaseB
+          .from("billing_plan_versions")
+          .update({ amountMinor: 1, availableForSale: false })
+          .eq("id", billingPlan.id)
+          .select("id");
+        assert.ok(
+          browserPlanUpdateError || !browserUpdatedPlan?.length,
+          "Authenticated clinic users must not alter server-managed billing plans.",
+        );
+        const {
+          data: browserDeletedPlan,
+          error: browserPlanDeleteError,
+        } = await supabaseB
+          .from("billing_plan_versions")
+          .delete()
+          .eq("id", billingPlan.id)
+          .select("id");
+        assert.ok(
+          browserPlanDeleteError || !browserDeletedPlan?.length,
+          "Authenticated clinic users must not delete server-managed billing plans.",
+        );
+        const {
+          data: browserInsertedPlan,
+          error: browserPlanInsertError,
+        } = await supabaseB
+          .from("billing_plan_versions")
+          .insert({
+            code: `browser-${randomUUID()}`,
+            version: 1,
+            displayName: "Browser-created plan",
+            currency: "INR",
+            amountMinor: 1,
+            interval: "MONTH",
+            intervalCount: 1,
+            totalBillingCycles: 1,
+            trialDays: 0,
+            graceDays: 0,
+            entitlements: { maxPatients: 1 },
+            availableForSale: true,
+          })
+          .select("id");
+        assert.ok(
+          browserPlanInsertError || !browserInsertedPlan?.length,
+          "Authenticated clinic users must not create server-managed billing plans.",
+        );
+        const preservedBillingPlan =
+          await freshReader.billingPlanVersion.findUniqueOrThrow({
+            where: { id: billingPlan.id },
+          });
+        assert.equal(preservedBillingPlan.amountMinor, 50000);
+        assert.equal(preservedBillingPlan.availableForSale, true);
 
         const {
           data: browserUpdatedSubscription,
