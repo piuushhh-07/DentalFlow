@@ -74,7 +74,6 @@ Provide a repeatable review plan for proving that one clinic cannot read or muta
 - **Required proof:** Two-clinic tests run with the same role and connection path used by the deployed app; direct REST and Prisma behavior both recorded.
 - **Current state:** Production-equivalent role/policy verification outstanding.
 
-
 ## Review procedure
 
 1. Enumerate files and exported entry points for each surface above. Keep a path, operation, clinic-identity source, authorization guard, and test reference for every entry.
