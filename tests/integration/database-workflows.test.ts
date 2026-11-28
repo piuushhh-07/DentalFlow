@@ -4313,11 +4313,13 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           .eq("id", billB.id);
       assert.equal(clinicBOwnBillError, null);
       assert.ok(clinicBOwnBill?.some((bill) => bill.id === billB.id));
-      const { data: clinicBOwnBillPayment, error: clinicBOwnBillPaymentError } =
-        await supabaseB
-          .from("vendor_bill_payments")
-          .select("id")
-          .eq("billId", billB.id);
+      const {
+        data: clinicBOwnBillPayment,
+        error: clinicBOwnBillPaymentError,
+      } = await supabaseB
+        .from("vendor_bill_payments")
+        .select("id")
+        .eq("billId", billB.id);
       assert.equal(clinicBOwnBillPaymentError, null);
       assert.ok(clinicBOwnBillPayment?.length);
     },
