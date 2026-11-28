@@ -26,7 +26,7 @@ test(
   "accepts a request body exactly at the configured byte limit",
   async () => {
     const body = await readRequestBodyWithLimit(streamOf([1, 2, 3]), 3);
-    assert.deepEqual([...body], [1, 2, 3]);
+    assert.deepEqual(Array.from(body), [1, 2, 3]);
   },
 );
 
