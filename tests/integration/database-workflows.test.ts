@@ -2238,6 +2238,22 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         "Raw SQL report metrics must not expose appointments from another clinic.",
       );
 
+      assert.deepEqual(
+        otherClinicMetrics,
+        {
+          activePatients: 0,
+          appointments: 0,
+          pendingTreatmentVisits: 0,
+          overdueTreatmentVisits: 0,
+          pendingPreventiveRecalls: 0,
+          overduePreventiveRecalls: 0,
+          manuallyRecordedWhatsAppMessages: 0,
+          confirmedFollowUps: 0,
+          completedTreatmentPlans: 0,
+        },
+        "Every raw SQL report metric must remain isolated to the requested clinic.",
+      );
+
       const expenseCategoryA = `TENANT_A_${randomUUID()}`;
       const expenseCategoryB = `TENANT_B_${randomUUID()}`;
       const expenseDate = new Date();
