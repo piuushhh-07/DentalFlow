@@ -3495,6 +3495,25 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           name: `${marker} replaceable document`,
         },
       );
+      const malformedStoragePaths = [
+        `${clinicBId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`,
+        `${clinicAId}/${claim.id}/${randomUUID()}/${randomUUID()}.pdf`,
+        `${clinicAId}/${claim.id}/${replaceableDocument.id}/../${randomUUID()}.pdf`,
+        `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.exe`,
+      ];
+      for (const malformedPath of malformedStoragePaths) {
+        await assert.rejects(
+          authorizeInsuranceDocumentUpload(
+            clinicAId,
+            claim.id,
+            replaceableDocument.id,
+            malformedPath,
+          ),
+          InsuranceRecordNotFoundError,
+          "Insurance uploads must reject paths outside the exact clinic/claim/document namespace and allowed filename format.",
+        );
+      }
+
       const originalPath = `${clinicAId}/${claim.id}/${replaceableDocument.id}/${randomUUID()}.pdf`;
       uploadedStoragePaths.push(originalPath);
       await authorizeInsuranceDocumentUpload(
