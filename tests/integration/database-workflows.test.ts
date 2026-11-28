@@ -1402,6 +1402,49 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         assert.ifError(clinicBOwnSubscriptionError);
         assert.equal(clinicBOwnSubscription?.length, 1);
 
+        const {
+          data: browserUpdatedSubscription,
+          error: browserSubscriptionUpdateError,
+        } = await supabaseB
+          .from("clinic_subscriptions")
+          .update({ status: "CANCELLED" })
+          .eq("id", subscriptionB.id)
+          .select("id");
+        assert.ok(
+          browserSubscriptionUpdateError || !browserUpdatedSubscription?.length,
+          "Authenticated clinic owners must not mutate server-managed subscription state.",
+        );
+
+        const {
+          data: browserDeletedSubscription,
+          error: browserSubscriptionDeleteError,
+        } = await supabaseB
+          .from("clinic_subscriptions")
+          .delete()
+          .eq("id", subscriptionB.id)
+          .select("id");
+        assert.ok(
+          browserSubscriptionDeleteError || !browserDeletedSubscription?.length,
+          "Authenticated clinic owners must not delete server-managed subscriptions.",
+        );
+
+        const {
+          data: browserInsertedSubscription,
+          error: browserSubscriptionInsertError,
+        } = await supabaseB
+          .from("clinic_subscriptions")
+          .insert({
+            clinicId: clinicBId,
+            planVersionId: billingPlan.id,
+            status: "CHECKOUT_PENDING",
+          })
+          .select("id");
+        assert.ok(
+          browserSubscriptionInsertError ||
+            !browserInsertedSubscription?.length,
+          "Authenticated clinic owners must not create server-managed subscriptions.",
+        );
+
         const { data: clinicBOwnPayment, error: clinicBOwnPaymentError } =
           await supabaseB
             .from("billing_payments")
