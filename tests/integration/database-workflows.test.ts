@@ -4574,6 +4574,95 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
   );
 
   await t.test(
+    "clinic data tables deny Supabase Data API privileges to every API role",
+    async () => {
+      const access = await freshReader.$queryRaw<
+        Array<{
+          tableName: string;
+          rowLevelSecurity: boolean;
+          roleName: string;
+          canSelect: boolean;
+          canInsert: boolean;
+          canUpdate: boolean;
+          canDelete: boolean;
+        }>
+      >`
+        WITH expected_tables(table_name) AS (
+          SELECT unnest(ARRAY[
+            'appointment_requests',
+            'appointments',
+            'billing_plan_versions',
+            'billing_payments',
+            'billing_webhook_events',
+            'clinic_dentists',
+            'clinic_invitations',
+            'clinic_memberships',
+            'clinic_subscriptions',
+            'clinics',
+            'insurance_activities',
+            'insurance_claims',
+            'insurance_documents',
+            'insurance_payments',
+            'insurance_policies',
+            'insurance_pre_authorizations',
+            'insurance_providers',
+            'message_logs',
+            'message_templates',
+            'patient_data_export_audits',
+            'patients',
+            'preventive_recalls',
+            'treatment_catalogue_items',
+            'treatment_chairs',
+            'treatment_financial_entries',
+            'treatment_plans',
+            'treatment_visits',
+            'user_profiles'
+          ]::text[])
+        ),
+        api_roles(role_name) AS (
+          VALUES ('anon'), ('authenticated'), ('service_role')
+        )
+        SELECT
+          expected_tables.table_name AS "tableName",
+          c.relrowsecurity AS "rowLevelSecurity",
+          api_roles.role_name AS "roleName",
+          has_table_privilege(api_roles.role_name, c.oid, 'SELECT') AS "canSelect",
+          has_table_privilege(api_roles.role_name, c.oid, 'INSERT') AS "canInsert",
+          has_table_privilege(api_roles.role_name, c.oid, 'UPDATE') AS "canUpdate",
+          has_table_privilege(api_roles.role_name, c.oid, 'DELETE') AS "canDelete"
+        FROM expected_tables
+        JOIN pg_class c ON c.relname = expected_tables.table_name
+        JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'
+        CROSS JOIN api_roles
+        ORDER BY expected_tables.table_name, api_roles.role_name
+      `;
+
+      assert.equal(
+        access.length,
+        28 * 3,
+        "Every clinic data table must be checked against anon, authenticated, and service_role.",
+      );
+      for (const table of access) {
+        assert.equal(
+          table.rowLevelSecurity,
+          true,
+          `RLS must remain enabled for public.${table.tableName}.`,
+        );
+        assert.deepEqual(
+          {
+            select: table.canSelect,
+            insert: table.canInsert,
+            update: table.canUpdate,
+            delete: table.canDelete,
+          },
+          { select: false, insert: false, update: false, delete: false },
+          `Supabase Data API role ${table.roleName} must have no table privileges on public.${table.tableName}.`,
+        );
+      }
+    },
+  );
+
+  await t.test(
     "synthetic Supabase Auth session can be signed out",
     async () => {
       const authenticated = await supabaseB.auth.getUser();
