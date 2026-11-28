@@ -40,6 +40,7 @@ The matching migration exists in master and is also pending in staging. It revok
 ### What these counts do not mean
 
 PR completion, static review, RLS enabled, and a green unit-test CI run do not certify tenant isolation, backup recovery, Storage-object isolation, privacy compliance, or production readiness. The guarded disposable-Supabase suite, production-equivalent runtime-role checks, E2E, restore drills, and independent review remain separate evidence requirements.
+
 ## 2. Readiness rules
 
 Use these labels consistently:
