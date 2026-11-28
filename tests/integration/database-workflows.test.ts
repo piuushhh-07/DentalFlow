@@ -2973,6 +2973,34 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           where: { id: policy.id, clinicId: clinicAId, patientId: patientA.id },
         }),
       );
+      const crossClinicPolicyUpdate = await supabaseB
+        .from("insurance_policies")
+        .update({ coverageNotes: "Unauthorized cross-clinic policy update" })
+        .eq("id", policy.id)
+        .select("id");
+      assert.ok(
+        crossClinicPolicyUpdate.error || !crossClinicPolicyUpdate.data?.length,
+        "Clinic B must not update Clinic A's insurance policy.",
+      );
+      const crossClinicPolicyDelete = await supabaseB
+        .from("insurance_policies")
+        .delete()
+        .eq("id", policy.id)
+        .select("id");
+      assert.ok(
+        crossClinicPolicyDelete.error || !crossClinicPolicyDelete.data?.length,
+        "Clinic B must not delete Clinic A's insurance policy.",
+      );
+      const unchangedPolicy = await freshReader.insurancePolicy.findFirst({
+        where: { id: policy.id, clinicId: clinicAId },
+        select: { id: true, coverageNotes: true },
+      });
+      assert.ok(unchangedPolicy);
+      assert.equal(
+        unchangedPolicy.coverageNotes,
+        policyData.coverageNotes,
+        "Denied cross-clinic policy mutations must preserve Clinic A's policy.",
+      );
 
       const preAuthorization = await createInsurancePreAuthorization(
         clinicAId,
