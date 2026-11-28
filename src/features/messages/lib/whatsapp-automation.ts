@@ -21,7 +21,9 @@ async function listDueAppointments(now: Date) {
   const endsAt = new Date(now.getTime() + 24.5 * 60 * 60_000);
   return prisma.appointment.findMany({
     where: {
-      status: { in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED] },
+      status: {
+        in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED],
+      },
       scheduledAt: { gte: startsAt, lt: endsAt },
       clinic: { automatedWhatsAppEnabled: true },
       patient: {
