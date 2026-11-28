@@ -1412,6 +1412,71 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           clinicBOwnPayment?.some((payment) => payment.id === paymentForB),
           "Clinic B must be able to read its own billing payment.",
         );
+
+        const {
+          data: browserVisibleWebhookEvent,
+          error: browserWebhookReadError,
+        } = await supabaseB
+          .from("billing_webhook_events")
+          .select("providerEventId")
+          .eq("providerEventId", reusedPaymentEventId);
+        assert.ok(
+          browserWebhookReadError || !browserVisibleWebhookEvent?.length,
+          "Authenticated clinic users must not read private billing webhook events.",
+        );
+
+        const {
+          data: browserUpdatedWebhookEvent,
+          error: browserWebhookUpdateError,
+        } = await supabaseB
+          .from("billing_webhook_events")
+          .update({ lastError: "browser-tampering-attempt" })
+          .eq("providerEventId", reusedPaymentEventId)
+          .select("providerEventId");
+        assert.ok(
+          browserWebhookUpdateError || !browserUpdatedWebhookEvent?.length,
+          "Authenticated clinic users must not update private billing webhook events.",
+        );
+
+        const {
+          data: browserDeletedWebhookEvent,
+          error: browserWebhookDeleteError,
+        } = await supabaseB
+          .from("billing_webhook_events")
+          .delete()
+          .eq("providerEventId", reusedPaymentEventId)
+          .select("providerEventId");
+        assert.ok(
+          browserWebhookDeleteError || !browserDeletedWebhookEvent?.length,
+          "Authenticated clinic users must not delete private billing webhook events.",
+        );
+
+        const {
+          data: browserInsertedWebhookEvent,
+          error: browserWebhookInsertError,
+        } = await supabaseB
+          .from("billing_webhook_events")
+          .insert({
+            providerEventId: `evt_${randomUUID().replaceAll("-", "")}`,
+            eventType: "subscription.browser_attempt",
+            eventCreatedAt: trialStartedAt.toISOString(),
+            payload: { source: "authenticated-browser" },
+          })
+          .select("providerEventId");
+        assert.ok(
+          browserWebhookInsertError || !browserInsertedWebhookEvent?.length,
+          "Authenticated clinic users must not insert private billing webhook events.",
+        );
+
+        const preservedWebhookEvent =
+          await freshReader.billingWebhookEvent.findUniqueOrThrow({
+            where: { providerEventId: reusedPaymentEventId },
+          });
+        assert.equal(preservedWebhookEvent.status, "FAILED");
+        assert.equal(
+          preservedWebhookEvent.lastError,
+          rejectedWebhookEvent.lastError,
+        );
         assert.ok(graceUntil);
         assert.ok(cancellationTime > trialStartedAt);
 
