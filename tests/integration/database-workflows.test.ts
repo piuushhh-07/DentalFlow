@@ -3014,15 +3014,15 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
       assert.equal(storedClaim.documents.length, 3);
       assert.ok(storedClaim.activities.length >= 4);
       assert.equal(await getInsuranceClaim(clinicBId, claim.id), null);
-      const clinicADocument = storedClaim.documents[0];
-      assert.ok(clinicADocument);
+      const clinicADocumentForBrowserRead = storedClaim.documents[0];
+      assert.ok(clinicADocumentForBrowserRead);
       const {
         data: crossClinicInsuranceDocumentRead,
         error: crossClinicInsuranceDocumentReadError,
       } = await supabaseB
         .from("insurance_documents")
         .select("id, name, status, storagePath")
-        .eq("id", clinicADocument.id);
+        .eq("id", clinicADocumentForBrowserRead.id);
       assert.equal(
         crossClinicInsuranceDocumentReadError,
         null,
