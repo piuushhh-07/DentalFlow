@@ -3192,13 +3192,36 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         approvedAmount: "5000.00",
         rejectionReason: null,
       });
-      await createInsurancePayment(clinicAId, userAId, claim.id, {
-        kind: "INSURER_PAYMENT",
-        amount: "1000.00",
-        paidAt: new Date("2099-01-10T12:00:00.000Z"),
-        reference: `PAY-${randomUUID()}`,
-        notes: "Synthetic partial insurer payment.",
-      });
+      const insurancePayment = await createInsurancePayment(
+        clinicAId,
+        userAId,
+        claim.id,
+        {
+          kind: "INSURER_PAYMENT",
+          amount: "1000.00",
+          paidAt: new Date("2099-01-10T12:00:00.000Z"),
+          reference: `PAY-${randomUUID()}`,
+          notes: "Synthetic partial insurer payment.",
+        },
+      );
+      const {
+        data: crossClinicInsurancePaymentRead,
+        error: insurancePaymentReadError,
+      } = await supabaseB
+        .from("insurance_payments")
+        .select("id, amount, reference")
+        .eq("id", insurancePayment.id);
+      assert.equal(
+        insurancePaymentReadError,
+        null,
+        "A cross-clinic insurance payment read should be safely filtered by Supabase.",
+      );
+      assert.deepEqual(
+        crossClinicInsurancePaymentRead,
+        [],
+        "Clinic B must not read insurance payment details for Clinic A claims.",
+      );
+
       const finalClaim = await freshReader.insuranceClaim.findUniqueOrThrow({
         where: { id: claim.id },
         include: { payments: true },
