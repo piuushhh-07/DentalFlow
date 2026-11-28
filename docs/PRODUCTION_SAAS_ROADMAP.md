@@ -49,6 +49,12 @@ No static code review, RLS migration, grant assertion, health endpoint, or passi
 
 ## 3. P0 — must close before real-clinic commercial launch
 
+### Production read-only evidence — **P0 BLOCKER IDENTIFIED (2026-11-28)**
+
+The read-only production snapshot is recorded in `docs/PRODUCTION_SECURITY_AUDIT_2026-11-28.md`. Production has 69/69 public tables with RLS enabled, but the three billing tables `billing_plan_versions`, `billing_payments`, and `clinic_subscriptions` still have effective table privileges for `anon`, `authenticated`, and `service_role`. Master migration `20261125203000_revoke_billing_data_api_grants` is not applied in production; the latest applied Prisma migration is `20261121150000_revoke_remaining_clinic_api_grants`.
+
+This is a production configuration gap relative to current master. It is not proof of a successful cross-clinic exploit, because RLS still applies to browser roles and the current billing policies are SELECT-only. However, it means the no-grants exit condition is not met. Do not apply the pending production migration without explicit approval. The Supabase SQL inspection session was `postgres`; the deployed Prisma runtime role remains unverified.
+
 ### P0.1 Tenant isolation proof — **PARTIAL / NOT CLOSED**
 
 Existing evidence includes server-side membership/role guards, clinic-scoped repositories, composite relationships, selected two-clinic integration assertions, raw SQL audit work, insurance Storage checks, and the #213 Data API grant test across 28 tables.
