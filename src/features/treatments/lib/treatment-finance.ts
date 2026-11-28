@@ -204,7 +204,7 @@ export async function updateTreatmentPlanFinance(
               : new Prisma.Decimal(input.finalAmount);
           await measureTransactionQuery(diagnostic, "updateTreatmentPlan", () =>
             transaction.treatmentPlan.update({
-              where: { id: plan.id },
+              where: { id: plan.id, clinicId },
               data: {
                 estimatedAmount,
                 finalAmount,
@@ -499,7 +499,7 @@ async function createTreatmentPlanFinancialEntryInTransaction(
     if (input.entryType === FinancialEntryType.DISCOUNT) {
       await measureTransactionQuery(diagnostic, "updateDiscountTotal", () =>
         transaction.treatmentPlan.update({
-          where: { id: plan.id },
+          where: { id: plan.id, clinicId },
           data: { discountAmount: next.discounts },
         }),
       );
