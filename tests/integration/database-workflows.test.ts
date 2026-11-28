@@ -3204,8 +3204,10 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           notes: "Synthetic partial insurer payment.",
         },
       );
-      const { data: crossClinicInsurancePaymentRead, error: insurancePaymentReadError } =
-        await supabaseB
+      const {
+        data: crossClinicInsurancePaymentRead,
+        error: insurancePaymentReadError,
+      } = await supabaseB
           .from("insurance_payments")
           .select("id, amount, reference")
           .eq("id", insurancePayment.id);
