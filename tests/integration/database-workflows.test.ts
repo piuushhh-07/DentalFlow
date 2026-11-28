@@ -2905,6 +2905,14 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
         notes: "Synthetic integration-test provider.",
       });
       const provider = await createInsuranceProvider(clinicAId, providerData);
+      const crossClinicProviderRead = await supabaseB
+        .from("insurance_providers")
+        .select("id, name, kind")
+        .eq("id", provider.id);
+      assert.ok(
+        crossClinicProviderRead.error || !crossClinicProviderRead.data?.length,
+        "Clinic B must not read Clinic A's insurance provider details.",
+      );
       await assert.rejects(
         createInsuranceProvider(clinicAId, providerData),
         (error: unknown) =>
