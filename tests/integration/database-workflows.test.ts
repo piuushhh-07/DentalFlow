@@ -1440,7 +1440,8 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           })
           .select("id");
         assert.ok(
-          browserSubscriptionInsertError || !browserInsertedSubscription?.length,
+          browserSubscriptionInsertError ||
+            !browserInsertedSubscription?.length,
           "Authenticated clinic owners must not create server-managed subscriptions.",
         );
 
