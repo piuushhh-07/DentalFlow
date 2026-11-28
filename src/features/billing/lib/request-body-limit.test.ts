@@ -22,7 +22,9 @@ test("reads a request body within the configured byte limit", async () => {
   assert.deepEqual(Array.from(body), [1, 2, 3, 4]);
 });
 
-test("accepts a request body exactly at the configured byte limit", async () => {
+test(
+  "accepts a request body exactly at the configured byte limit",
+  async () => {
   const body = await readRequestBodyWithLimit(streamOf([1, 2, 3]), 3);
   assert.deepEqual(Array.from(body), [1, 2, 3]);
 });
@@ -48,10 +50,13 @@ test(
   },
 );
 
-test("treats a missing request body as an empty byte sequence", async () => {
-  const body = await readRequestBodyWithLimit(null, 1);
-  assert.equal(body.byteLength, 0);
-});
+test(
+  "treats a missing request body as an empty byte sequence",
+  async () => {
+    const body = await readRequestBodyWithLimit(null, 1);
+    assert.equal(body.byteLength, 0);
+  },
+);
 
 test("rejects an invalid byte limit", async () => {
   await assert.rejects(readRequestBodyWithLimit(null, -1), RangeError);
