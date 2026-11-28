@@ -3453,6 +3453,39 @@ test("existing clinic workflows persist and enforce tenant boundaries", async (t
           .download(uploadedPath);
       assert.ok(deniedDownloadError || !deniedDownload);
 
+      const crossClinicStorageUpload = await supabaseB.storage
+        .from("dentalflow-insurance-private")
+        .upload(
+          uploadedPath + ".unauthorized",
+          new Blob(["unauthorized clinic B upload"], {
+            type: "application/pdf",
+          }),
+          { contentType: "application/pdf", upsert: false },
+        );
+      assert.ok(
+        crossClinicStorageUpload.error,
+        "Clinic B must not upload objects into Clinic A private storage namespace.",
+      );
+
+      const crossClinicStorageDelete = await supabaseB.storage
+        .from("dentalflow-insurance-private")
+        .remove([uploadedPath]);
+      assert.ok(
+        crossClinicStorageDelete.error ||
+          !crossClinicStorageDelete.data?.length,
+        "Clinic B must not delete Clinic A private insurance objects.",
+      );
+      const { data: preservedClinicAFile, error: preservedClinicAFileError } =
+        await supabaseA.storage
+          .from("dentalflow-insurance-private")
+          .download(uploadedPath);
+      assert.equal(
+        preservedClinicAFileError,
+        null,
+        "A denied cross-clinic delete must leave Clinic A file accessible.",
+      );
+      assert.ok(preservedClinicAFile);
+
       const replaceableDocument = await createInsuranceDocumentRequirement(
         clinicAId,
         userAId,
